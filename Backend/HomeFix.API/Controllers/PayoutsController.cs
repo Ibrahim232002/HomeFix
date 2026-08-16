@@ -13,16 +13,27 @@ namespace HomeFix.API.Controllers;
 public class PayoutsController : ControllerBase
 {
     private readonly IPayoutService _service;
+    private readonly ITechnicianProfileService _technicianProfiles;
 
-    public PayoutsController(IPayoutService service) => _service = service;
+    public PayoutsController(
+        IPayoutService service,
+        ITechnicianProfileService technicianProfiles)
+    {
+        _service = service;
+        _technicianProfiles = technicianProfiles;
+    }
 
     [HttpGet("me")]
     [Authorize(Roles = "Technician")]
     public async Task<ActionResult<List<PayoutDto>>> GetMine()
     {
-        // Payout history is intentionally not exposed until the service supports
-        // a caller-scoped lookup by authenticated technician.
-        return BadRequest(new { message = "Technician payout history is not enabled yet." });
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        var technician = await _technicianProfiles.GetByUserIdAsync(userId);
+        if (technician == null) return NotFound(new { message = "Technician profile not found." });
+
+        var payouts = await _service.GetByTechnicianIdAsync(technician.Id);
+        return Ok(payouts.Select(MapToDto).ToList());
     }
 
     [Authorize(Roles = "Admin")]
@@ -49,8 +60,6 @@ public class PayoutsController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.PaymentMethod)) return BadRequest(new { message = "Payment method is required." });
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
-        // The technician is always derived from the authenticated user inside the BLL;
-        // no technician id is accepted from the client.
         var result = await _service.RequestAsync(userId, request.Amount, request.PaymentMethod);
         if (!result.Success) return BadRequest(new { message = result.Error });
         return CreatedAtAction(nameof(GetById), new { id = result.Payout!.Id }, MapToDto(result.Payout));
