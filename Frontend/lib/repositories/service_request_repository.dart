@@ -1,0 +1,226 @@
+import '../core/constants/api_constants.dart';
+import '../core/network/api_client.dart';
+import '../models/api_dtos.dart';
+import '../models/service_request_model.dart';
+import '../models/address_model.dart';
+
+abstract class IServiceRequestRepository {
+  Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerId);
+  Future<List<ServiceRequestModel>> getAvailableRequestsForTechnicians({String? serviceId, String? governorate});
+  Future<ServiceRequestModel?> getRequestById(String id);
+  Future<ServiceRequestModel> createRequest(ServiceRequestModel request);
+  Future<void> updateStatus(String requestId, ServiceRequestStatus newStatus, {String? notes, String? updatedBy});
+  Future<void> cancelRequest(String requestId, String reason);
+  Future<void> assignTechnician(String requestId, String technicianId, String technicianName);
+
+  // Direct OpenAPI DTO methods
+  Future<ServiceRequestDto> getApiServiceRequestById(int id);
+  Future<List<ServiceRequestDto>> getApiServiceRequestsByCustomer(int customerId);
+  Future<List<ServiceRequestDto>> getApiServiceRequestsByStatus(String status);
+  Future<ServiceRequestDto> createApiServiceRequest(CreateServiceRequestRequest request);
+  Future<void> updateApiServiceRequest(int id, dynamic requestBody);
+
+  Future<List<ServiceRequestFileDto>> getFiles(int serviceRequestId);
+  Future<ServiceRequestFileDto> addFile(CreateServiceRequestFileRequest request);
+  Future<void> deleteFile(int id);
+
+  Future<List<ServiceRequestStatusHistoryDto>> getStatusHistory(int serviceRequestId);
+  Future<ServiceRequestStatusHistoryDto> addStatusHistory(CreateServiceRequestStatusHistoryRequest request);
+}
+
+class ServiceRequestRepository implements IServiceRequestRepository {
+  final ApiClient _client = ApiClient();
+
+  @override
+  Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerId) async {
+    final intId = int.tryParse(customerId);
+    if (intId != null) {
+      try {
+        final dtos = await getApiServiceRequestsByCustomer(intId);
+        return dtos.map((d) => _mapDtoToModel(d)).toList();
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  @override
+  Future<List<ServiceRequestModel>> getAvailableRequestsForTechnicians({String? serviceId, String? governorate}) async {
+    try {
+      final dtos = await getApiServiceRequestsByStatus('Pending');
+      return dtos.map((d) => _mapDtoToModel(d)).toList();
+    } catch (_) {}
+    return [];
+  }
+
+  @override
+  Future<ServiceRequestModel?> getRequestById(String id) async {
+    final intId = int.tryParse(id);
+    if (intId != null) {
+      try {
+        final dto = await getApiServiceRequestById(intId);
+        return _mapDtoToModel(dto);
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  @override
+  Future<ServiceRequestModel> createRequest(ServiceRequestModel request) async {
+    final customerId = int.tryParse(request.customerId) ?? 1;
+    final serviceId = int.tryParse(request.serviceId) ?? 1;
+    final addressId = int.tryParse(request.address.id) ?? 1;
+
+    final dto = await createApiServiceRequest(CreateServiceRequestRequest(
+      customerId: customerId,
+      serviceId: serviceId,
+      addressId: addressId,
+      description: request.problemDescription,
+      preferredDate: request.preferredDate,
+      preferredTime: request.preferredTime,
+      status: 'Pending',
+      visitFee: request.estimatedPriceMin,
+    ));
+    return _mapDtoToModel(dto, fallbackModel: request);
+  }
+
+  @override
+  Future<void> updateStatus(String requestId, ServiceRequestStatus newStatus, {String? notes, String? updatedBy}) async {
+    final intId = int.tryParse(requestId);
+    if (intId != null) {
+      try {
+        await addStatusHistory(CreateServiceRequestStatusHistoryRequest(
+          serviceRequestId: intId,
+          oldStatus: 'Current',
+          newStatus: newStatus.nameStr,
+          changedByUserId: 1,
+        ));
+        await updateApiServiceRequest(intId, {'status': newStatus.nameStr});
+      } catch (_) {}
+    }
+  }
+
+  @override
+  Future<void> cancelRequest(String requestId, String reason) async {
+    await updateStatus(requestId, ServiceRequestStatus.cancelled, notes: reason);
+  }
+
+  @override
+  Future<void> assignTechnician(String requestId, String technicianId, String technicianName) async {
+    final intId = int.tryParse(requestId);
+    if (intId != null) {
+      try {
+        await updateApiServiceRequest(intId, {'status': 'Accepted'});
+      } catch (_) {}
+    }
+  }
+
+  ServiceRequestModel _mapDtoToModel(ServiceRequestDto dto, {ServiceRequestModel? fallbackModel}) {
+    return ServiceRequestModel(
+      id: dto.id.toString(),
+      serviceId: dto.serviceId.toString(),
+      serviceNameAr: fallbackModel?.serviceNameAr ?? 'طلب #${dto.serviceId}',
+      categoryNameAr: fallbackModel?.categoryNameAr ?? '',
+      customerId: dto.customerId.toString(),
+      customerName: fallbackModel?.customerName ?? '',
+      customerPhone: fallbackModel?.customerPhone ?? '',
+      address: fallbackModel?.address ??
+          AddressModel(
+            id: dto.addressId.toString(),
+            userId: dto.customerId.toString(),
+            title: '',
+            governorate: '',
+            city: '',
+            street: '',
+            building: '',
+            floor: '',
+            apartment: '',
+          ),
+      problemDescription: dto.description ?? '',
+      preferredDate: dto.preferredDate ?? '',
+      preferredTime: dto.preferredTime ?? '',
+      files: [],
+      status: ServiceRequestStatus.fromString(dto.status ?? 'Pending'),
+      estimatedPriceMin: dto.visitFee,
+      estimatedPriceMax: dto.visitFee,
+      createdAt: dto.createdAt,
+      statusHistory: [
+        ServiceRequestStatusHistoryModel(
+          status: ServiceRequestStatus.fromString(dto.status ?? 'Pending'),
+          timestamp: dto.createdAt,
+          updatedBy: 'العميل',
+        ),
+      ],
+    );
+  }
+
+  // --- Direct OpenAPI Implementations ---
+  @override
+  Future<ServiceRequestDto> getApiServiceRequestById(int id) async {
+    final response = await _client.get(ApiConstants.serviceRequestById(id));
+    return ServiceRequestDto.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<ServiceRequestDto>> getApiServiceRequestsByCustomer(int customerId) async {
+    final response = await _client.get(ApiConstants.serviceRequestsByCustomer(customerId));
+    if (response is List) {
+      return response.map((item) => ServiceRequestDto.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  @override
+  Future<List<ServiceRequestDto>> getApiServiceRequestsByStatus(String status) async {
+    final response = await _client.get(ApiConstants.serviceRequestsByStatus(status));
+    if (response is List) {
+      return response.map((item) => ServiceRequestDto.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  @override
+  Future<ServiceRequestDto> createApiServiceRequest(CreateServiceRequestRequest request) async {
+    final response = await _client.post(ApiConstants.serviceRequests, body: request.toJson());
+    return ServiceRequestDto.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> updateApiServiceRequest(int id, dynamic requestBody) async {
+    await _client.put(ApiConstants.serviceRequestById(id), body: requestBody);
+  }
+
+  @override
+  Future<List<ServiceRequestFileDto>> getFiles(int serviceRequestId) async {
+    final response = await _client.get(ApiConstants.serviceRequestFilesByRequest(serviceRequestId));
+    if (response is List) {
+      return response.map((item) => ServiceRequestFileDto.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  @override
+  Future<ServiceRequestFileDto> addFile(CreateServiceRequestFileRequest request) async {
+    final response = await _client.post(ApiConstants.serviceRequestFiles, body: request.toJson());
+    return ServiceRequestFileDto.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> deleteFile(int id) async {
+    await _client.delete(ApiConstants.serviceRequestFileById(id));
+  }
+
+  @override
+  Future<List<ServiceRequestStatusHistoryDto>> getStatusHistory(int serviceRequestId) async {
+    final response = await _client.get(ApiConstants.serviceRequestStatusHistoryByRequest(serviceRequestId));
+    if (response is List) {
+      return response.map((item) => ServiceRequestStatusHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  @override
+  Future<ServiceRequestStatusHistoryDto> addStatusHistory(CreateServiceRequestStatusHistoryRequest request) async {
+    final response = await _client.post(ApiConstants.serviceRequestStatusHistory, body: request.toJson());
+    return ServiceRequestStatusHistoryDto.fromJson(response as Map<String, dynamic>);
+  }
+}

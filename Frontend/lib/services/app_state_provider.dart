@@ -1,0 +1,646 @@
+import 'package:flutter/material.dart';
+import '../models/user_model.dart';
+import '../models/category_model.dart';
+import '../models/service_model.dart';
+import '../models/service_request_model.dart';
+import '../models/booking_model.dart';
+import '../models/technician_profile_model.dart';
+import '../models/technician_document_model.dart';
+import '../models/wallet_model.dart';
+import '../models/chat_model.dart';
+import '../models/notification_model.dart';
+import '../models/address_model.dart';
+import '../models/review_model.dart';
+import '../models/promo_code_model.dart';
+import '../models/payment_model.dart';
+
+import '../repositories/service_repository.dart';
+import '../repositories/service_request_repository.dart';
+import '../repositories/booking_repository.dart';
+import '../repositories/chat_repository.dart';
+import '../repositories/technician_repository.dart';
+import '../repositories/wallet_repository.dart';
+import '../repositories/user_repository.dart';
+import '../repositories/promo_code_repository.dart';
+import '../repositories/payment_repository.dart';
+import '../repositories/review_repository.dart';
+import '../models/api_dtos.dart';
+
+class AppStateProvider extends ChangeNotifier {
+  // Repositories
+  final IServiceRepository _serviceRepo = ServiceRepository();
+  final IServiceRequestRepository _requestRepo = ServiceRequestRepository();
+  final IBookingRepository _bookingRepo = BookingRepository();
+  final IChatRepository _chatRepo = ChatRepository();
+  final ITechnicianRepository _techRepo = TechnicianRepository();
+  final IWalletRepository _walletRepo = WalletRepository();
+  final IUserRepository _userRepo = UserRepository();
+  final IPromoCodeRepository _promoRepo = PromoCodeRepository();
+  final IPaymentRepository _paymentRepo = PaymentRepository();
+  final IReviewRepository _reviewRepo = ReviewRepository();
+
+  // Authentication State
+  UserModel? _currentUser;
+  bool _isLoading = false;
+  bool _isLoadingPublic = false;
+  String? _errorMessage;
+  String? _apiError;
+
+  // Navigation State
+  int _customerNavIndex = 0;
+  int _technicianNavIndex = 0;
+
+  // Domain Cached States
+  List<CategoryModel> _categories = [];
+  List<ServiceModel> _services = [];
+  List<ServiceRequestModel> _customerRequests = [];
+  List<ServiceRequestModel> _availableTechRequests = [];
+  List<BookingModel> _bookings = [];
+  List<TechnicianProfileModel> _technicians = [];
+  List<ConversationModel> _conversations = [];
+  List<NotificationModel> _notifications = [];
+  List<AddressModel> _savedAddresses = [];
+  List<TechnicianDocumentModel> _technicianDocuments = [];
+  List<PaymentModel> _payments = [];
+  PaymentModel? _activePayment;
+  WalletModel? _wallet;
+
+  // Active filters & selections
+  String _selectedCategoryId = 'all';
+  String _searchQuery = '';
+  PromoCodeModel? _appliedPromo;
+  TechnicianProfileModel? _currentTechProfile;
+
+  // Getters
+  UserModel? get currentUser => _currentUser;
+  bool get isAuthenticated => _currentUser != null;
+  UserRole get currentRole => _currentUser?.role ?? UserRole.customer;
+  bool get isCustomer => currentRole == UserRole.customer;
+  bool get isTechnician => currentRole == UserRole.technician;
+  bool get isLoading => _isLoading;
+  bool get isLoadingPublic => _isLoadingPublic;
+  String? get errorMessage => _errorMessage;
+  String? get apiError => _apiError;
+
+  int get customerNavIndex => _customerNavIndex;
+  int get technicianNavIndex => _technicianNavIndex;
+
+  List<CategoryModel> get categories => _categories;
+  List<ServiceModel> get services => _services;
+  List<ServiceRequestModel> get customerRequests => _customerRequests;
+  List<ServiceRequestModel> get availableTechRequests => _availableTechRequests;
+  List<BookingModel> get bookings => _bookings;
+  List<TechnicianProfileModel> get technicians => _technicians;
+  List<ConversationModel> get conversations => _conversations;
+  List<NotificationModel> get notifications => _notifications;
+  List<AddressModel> get savedAddresses => _savedAddresses;
+  List<TechnicianDocumentModel> get technicianDocuments => _technicianDocuments;
+  List<PaymentModel> get payments => _payments;
+  PaymentModel? get activePayment => _activePayment;
+  WalletModel? get wallet => _wallet;
+
+  String get selectedCategoryId => _selectedCategoryId;
+  String get searchQuery => _searchQuery;
+  PromoCodeModel? get appliedPromo => _appliedPromo;
+  TechnicianProfileModel? get currentTechProfile => _currentTechProfile;
+
+  int get unreadNotificationsCount =>
+      _notifications.where((n) => !n.isRead).length;
+
+  AppStateProvider() {
+    _loadPublicData();
+  }
+
+  Future<void> _loadPublicData() async {
+    _isLoadingPublic = true;
+    _apiError = null;
+    notifyListeners();
+    try {
+      _services = await _serviceRepo.getServices();
+      _technicians = await _techRepo.getTechnicians();
+      final Map<String, String> catMap = {};
+      for (final s in _services) {
+        if (s.categoryId.isNotEmpty && !catMap.containsKey(s.categoryId)) {
+          catMap[s.categoryId] = s.categoryNameAr;
+        }
+      }
+      _categories = catMap.entries
+          .map((e) => CategoryModel(
+                id: e.key,
+                nameAr: e.value,
+                nameEn: e.value,
+                iconName: 'Wrench',
+                colorHex: '#0284c7',
+                image: '',
+                descriptionAr: e.value,
+              ))
+          .toList();
+    } catch (e) {
+      _apiError = e.toString();
+    } finally {
+      _isLoadingPublic = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshPublicData() async {
+    await _loadPublicData();
+  }
+
+  Future<void> login(String email, String password, UserRole role) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      _currentUser = await _userRepo.login(email, password, role);
+      if (_currentUser?.role == UserRole.technician) {
+        _technicianNavIndex = 0;
+      } else {
+        _customerNavIndex = 0;
+      }
+      await _loadInitialData();
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> register({
+    required String fullName,
+    required String email,
+    required String phoneNumber,
+    required String password,
+    required UserRole role,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final request = RegisterRequest(
+        fullName: fullName,
+        email: email,
+        phoneNumber: phoneNumber,
+        password: password,
+        role: role == UserRole.technician ? 'Technician' : 'Customer',
+      );
+      _currentUser = await _userRepo.register(request);
+      if (_currentUser?.role == UserRole.technician) {
+        _technicianNavIndex = 0;
+      } else {
+        _customerNavIndex = 0;
+      }
+      await _loadInitialData();
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loginWithPhone(String phone, String otp, UserRole role) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      _currentUser = await _userRepo.loginWithPhone(phone, otp, role);
+      if (role == UserRole.technician) {
+        _technicianNavIndex = 0;
+      } else {
+        _customerNavIndex = 0;
+      }
+      await _loadInitialData();
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void logout() {
+    _currentUser = null;
+    _customerNavIndex = 0;
+    _technicianNavIndex = 0;
+    notifyListeners();
+  }
+
+  // Navigation Setters
+  void setCustomerNavIndex(int index) {
+    _customerNavIndex = index;
+    notifyListeners();
+  }
+
+  void setTechnicianNavIndex(int index) {
+    _technicianNavIndex = index;
+    notifyListeners();
+  }
+
+  // Data Loading
+  Future<void> _loadInitialData() async {
+    try {
+      _services = await _serviceRepo.getServices();
+      _technicians = await _techRepo.getTechnicians();
+
+      if (_currentUser != null) {
+        if (isCustomer) {
+          _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
+          _savedAddresses = await _userRepo.getUserAddresses(_currentUser!.id);
+        } else {
+          _availableTechRequests = await _requestRepo.getAvailableRequestsForTechnicians();
+          _currentTechProfile = await _techRepo.getTechnicianById(_currentUser!.id);
+          final techId = _currentTechProfile?.id ?? _currentUser!.id;
+          _bookings = await _bookingRepo.getBookingsByTechnician(techId);
+          _wallet = await _walletRepo.getWalletByTechnician(techId);
+        }
+        _conversations = await _chatRepo.getConversations(_currentUser!.id);
+        _notifications = await _userRepo.getUserNotifications(_currentUser!.id);
+      }
+    } catch (_) {}
+  }
+
+  // Category & Filter selection
+  void selectCategory(String categoryId) async {
+    _selectedCategoryId = categoryId;
+    if (categoryId == 'all') {
+      _services = await _serviceRepo.getServices();
+    } else {
+      _services = await _serviceRepo.getServicesByCategory(categoryId);
+    }
+    notifyListeners();
+  }
+
+  void setSearchQuery(String query) async {
+    _searchQuery = query;
+    _services = await _serviceRepo.searchServices(query);
+    notifyListeners();
+  }
+
+  Future<void> applyPromoCode(String code) async {
+    try {
+      final dto = await _promoRepo.getPromoCodeByCode(code);
+      if (dto != null && dto.isActive) {
+        _appliedPromo = PromoCodeModel(
+          code: dto.code ?? code,
+          title: dto.code ?? 'كود خصم',
+          discount: '${dto.discountValue.toStringAsFixed(0)}%',
+          maxDiscount: 'خصم ${dto.discountValue}',
+          description: 'كود ترويجي',
+          expiry: dto.endDate,
+          discountPercentage: dto.discountValue,
+          maxDiscountAmount: dto.discountValue,
+        );
+      } else {
+        _appliedPromo = null;
+      }
+    } catch (_) {
+      _appliedPromo = null;
+    }
+    notifyListeners();
+  }
+
+  void removePromoCode() {
+    _appliedPromo = null;
+    notifyListeners();
+  }
+
+  // Request Management
+  Future<ServiceRequestModel> createServiceRequest({
+    required ServiceModel service,
+    required AddressModel address,
+    required String problemDescription,
+    required String preferredDate,
+    required String preferredTime,
+    List<ServiceRequestFileModel>? files,
+  }) async {
+    if (_currentUser == null) throw Exception('User not authenticated');
+
+    final requestToCreate = ServiceRequestModel(
+      id: 'req-${DateTime.now().millisecondsSinceEpoch}',
+      serviceId: service.id,
+      serviceNameAr: service.nameAr,
+      categoryNameAr: service.categoryNameAr,
+      customerId: _currentUser!.id,
+      customerName: _currentUser!.fullName,
+      customerPhone: _currentUser!.phoneNumber,
+      address: address,
+      problemDescription: problemDescription,
+      preferredDate: preferredDate,
+      preferredTime: preferredTime,
+      files: files ?? [],
+      status: ServiceRequestStatus.pending,
+      estimatedPriceMin: service.pricing.minPrice,
+      estimatedPriceMax: service.pricing.maxPrice,
+      createdAt: 'الآن',
+      statusHistory: [
+        ServiceRequestStatusHistoryModel(
+          status: ServiceRequestStatus.pending,
+          timestamp: 'الآن',
+          updatedBy: _currentUser!.fullName,
+        ),
+      ],
+    );
+
+    final newReq = await _requestRepo.createRequest(requestToCreate);
+    _customerRequests.insert(0, newReq);
+    _availableTechRequests.insert(0, newReq);
+    notifyListeners();
+    return newReq;
+  }
+
+  Future<void> cancelRequest(String requestId, String reason) async {
+    await _requestRepo.cancelRequest(requestId, reason);
+    if (_currentUser != null) {
+      _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
+    }
+    _availableTechRequests = await _requestRepo.getAvailableRequestsForTechnicians();
+    notifyListeners();
+  }
+
+  // Technician Actions
+  Future<void> acceptRequest(ServiceRequestModel request) async {
+    if (_currentTechProfile == null) return;
+
+    await _requestRepo.assignTechnician(
+      request.id,
+      _currentTechProfile!.id,
+      _currentTechProfile!.fullName,
+    );
+
+    final bookingToCreate = BookingModel(
+      id: 'bk-${DateTime.now().millisecondsSinceEpoch}',
+      requestId: request.id,
+      serviceNameAr: request.serviceNameAr,
+      customerName: request.customerName,
+      customerPhone: request.customerPhone,
+      technicianId: _currentTechProfile!.id,
+      technicianName: _currentTechProfile!.fullName,
+      address: request.address,
+      scheduledDate: request.preferredDate,
+      scheduledTime: request.preferredTime,
+      price: request.estimatedPriceMin,
+      status: BookingStatus.upcoming,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+
+    final newBooking = await _bookingRepo.createBooking(bookingToCreate);
+    _bookings.insert(0, newBooking);
+
+    _availableTechRequests.removeWhere((r) => r.id == request.id);
+    notifyListeners();
+  }
+
+  Future<void> updateBookingStatus(String bookingId, BookingStatus status) async {
+    await _bookingRepo.updateBookingStatus(bookingId, status);
+    if (_currentUser != null) {
+      _bookings = await _bookingRepo.getBookingsByTechnician(_currentUser!.id);
+    }
+    notifyListeners();
+  }
+
+  Future<void> toggleTechnicianAvailability() async {
+    if (_currentUser == null || _currentTechProfile == null) return;
+    final newStatus = !_currentTechProfile!.isAvailable;
+    await _techRepo.updateAvailability(_currentTechProfile!.id, newStatus);
+    _currentTechProfile = _currentTechProfile!.copyWith(isAvailable: newStatus);
+    notifyListeners();
+  }
+
+  // Chat Actions
+  Future<MessageModel> sendMessage(String conversationId, String text, {String? attachmentUrl}) async {
+    if (_currentUser == null) throw Exception('Not logged in');
+    final msg = await _chatRepo.sendMessage(
+      conversationId: conversationId,
+      sender: _currentUser!,
+      text: text,
+      attachmentUrl: attachmentUrl,
+    );
+    _conversations = await _chatRepo.getConversations(_currentUser!.id);
+    notifyListeners();
+    return msg;
+  }
+
+  Future<ConversationModel> startConversationWithTechnician({
+    required TechnicianProfileModel technician,
+    String? serviceNameAr,
+    String? requestId,
+  }) async {
+    if (_currentUser == null) throw Exception('Not logged in');
+    final conv = await _chatRepo.getOrCreateConversation(
+      customerId: _currentUser!.id,
+      customerName: _currentUser!.fullName,
+      customerAvatar: _currentUser!.avatarUrl,
+      technicianId: technician.userId,
+      technicianName: technician.fullName,
+      technicianAvatar: technician.avatarUrl,
+      serviceNameAr: serviceNameAr,
+      requestId: requestId,
+    );
+    _conversations = await _chatRepo.getConversations(_currentUser!.id);
+    notifyListeners();
+    return conv;
+  }
+
+  // Address Actions
+  Future<void> addAddress(AddressModel address) async {
+    final added = await _userRepo.addAddress(address);
+    _savedAddresses.add(added);
+    notifyListeners();
+  }
+
+  // Wallet Actions
+  Future<void> requestWithdrawal(double amount, String iban) async {
+    if (_currentUser == null) return;
+    await _walletRepo.requestWithdrawal(_currentUser!.id, amount, iban);
+    _wallet = await _walletRepo.getWalletByTechnician(_currentUser!.id);
+    notifyListeners();
+  }
+
+  // Notification Actions
+  void markNotificationAsRead(String id) {
+    _userRepo.markNotificationAsRead(id);
+    final index = _notifications.indexWhere((n) => n.id == id);
+    if (index != -1) {
+      _notifications[index] = _notifications[index].copyWith(isRead: true);
+      notifyListeners();
+    }
+  }
+
+  Future<void> markAllNotificationsAsRead() async {
+    for (var i = 0; i < _notifications.length; i++) {
+      if (!_notifications[i].isRead) {
+        _notifications[i] = _notifications[i].copyWith(isRead: true);
+        _userRepo.markNotificationAsRead(_notifications[i].id);
+      }
+    }
+    notifyListeners();
+  }
+
+  // Review Actions
+  Future<void> submitReview({
+    required String requestId,
+    required String technicianId,
+    required double rating,
+    String? comment,
+    String? serviceNameAr,
+  }) async {
+    if (_currentUser == null) return;
+    final reqId = int.tryParse(requestId) ?? 0;
+    final techId = int.tryParse(technicianId) ?? 0;
+    final custId = int.tryParse(_currentUser!.id) ?? 0;
+
+    await _reviewRepo.createReview(CreateReviewRequest(
+      serviceRequestId: reqId,
+      customerId: custId,
+      technicianId: techId,
+      rating: rating.toInt(),
+      comment: comment,
+    ));
+    notifyListeners();
+  }
+
+  // Document Upload Actions
+  Future<void> uploadDocument({
+    required String titleAr,
+    required String titleEn,
+    required String documentType,
+    String? documentNumber,
+    String? fileUrl,
+  }) async {
+    if (_currentUser == null) return;
+    final techId = int.tryParse(_currentTechProfile?.id ?? _currentUser!.id) ?? 0;
+    if (techId == 0) return;
+
+    try {
+      final docDto = await _techRepo.uploadDocument(CreateTechnicianDocumentRequest(
+        technicianId: techId,
+        documentType: documentType,
+        documentUrl: fileUrl ?? 'https://example.com/doc.pdf',
+      ));
+
+      _technicianDocuments.add(TechnicianDocumentModel(
+        id: docDto.id.toString(),
+        technicianId: docDto.technicianId.toString(),
+        titleAr: titleAr,
+        titleEn: titleEn,
+        documentType: docDto.documentType ?? documentType,
+        documentNumber: documentNumber,
+        fileUrl: docDto.documentUrl ?? '',
+        status: DocumentStatus.fromString(docDto.status ?? 'Pending'),
+        submittedAt: docDto.uploadedAt.isNotEmpty ? docDto.uploadedAt : 'الآن',
+      ));
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  // Payment Actions (Egyptian Payment Gateway / Paymob & Cash)
+  Future<List<PaymentModel>> loadPaymentsForRequest(String requestId) async {
+    final reqId = int.tryParse(requestId) ?? 0;
+    if (reqId == 0) return [];
+    try {
+      final dtoList = await _paymentRepo.getPaymentsByRequestId(reqId);
+      final mapped = dtoList.map((d) => PaymentModel.fromDto(d)).toList();
+      _payments = mapped;
+      notifyListeners();
+      return mapped;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<InitiatePaymentResponse> initiatePayment({
+    required String serviceRequestId,
+    required PaymentMethodType method,
+    String? walletPhoneNumber,
+    String paymentType = 'FullService',
+  }) async {
+    final reqId = int.tryParse(serviceRequestId) ?? 0;
+    if (reqId == 0) {
+      throw Exception('معرف طلب الخدمة غير صالح');
+    }
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _paymentRepo.initiatePayment(
+        InitiatePaymentRequest(
+          serviceRequestId: reqId,
+          paymentMethod: method.nameStr,
+          walletPhoneNumber: walletPhoneNumber,
+          paymentType: paymentType,
+        ),
+      );
+
+      _activePayment = PaymentModel.fromInitiateResponse(
+        response,
+        serviceRequestId,
+        response.amount,
+      );
+
+      _isLoading = false;
+      notifyListeners();
+      return response;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<VerifyPaymentResponse> verifyPayment(int paymentId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final verifyResp = await _paymentRepo.verifyPayment(paymentId);
+      if (_activePayment != null && _activePayment!.id == paymentId.toString()) {
+        _activePayment = _activePayment!.copyWith(
+          status: PaymentStatusTypeExtension.fromString(verifyResp.status),
+          transactionReference: verifyResp.transactionReference,
+          paidAt: verifyResp.paidAt,
+        );
+      }
+
+      // Also reload customer requests if payment was successful to reflect updated status
+      if (verifyResp.isSuccess && _currentUser != null) {
+        _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return verifyResp;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<PaymentDto> selectCashOnDelivery(String serviceRequestId) async {
+    final reqId = int.tryParse(serviceRequestId) ?? 0;
+    if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح');
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final dto = await _paymentRepo.setCashPayment(reqId);
+      _activePayment = PaymentModel.fromDto(dto);
+      if (_currentUser != null) {
+        _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
+      }
+      _isLoading = false;
+      notifyListeners();
+      return dto;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+}

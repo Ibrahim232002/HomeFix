@@ -1,0 +1,54 @@
+﻿using HomeFix.DAL.Data;
+using HomeFix.DAL.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace HomeFix.DAL.Repositories;
+
+public class ServiceRequestRepository
+{
+    private readonly HomeFixDbContext _context;
+
+    public ServiceRequestRepository(HomeFixDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<ServiceRequest?> GetByIdAsync(int id)
+    {
+        return await _context.ServiceRequests
+            .Include(r => r.Customer)
+            .Include(r => r.Service)
+            .Include(r => r.Address)
+            .FirstOrDefaultAsync(r => r.Id == id);
+    }
+
+    public async Task<List<ServiceRequest>> GetByCustomerIdAsync(int customerId)
+    {
+        return await _context.ServiceRequests
+            .Include(r => r.Service)
+            .Include(r => r.Address)
+            .Where(r => r.CustomerId == customerId)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<List<ServiceRequest>> GetByStatusAsync(string status)
+    {
+        return await _context.ServiceRequests
+            .Where(r => r.Status == status)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task AddAsync(ServiceRequest request)
+    {
+        await _context.ServiceRequests.AddAsync(request);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task UpdateAsync(ServiceRequest request)
+    {
+        _context.ServiceRequests.Update(request);
+        await _context.SaveChangesAsync();
+    }
+}

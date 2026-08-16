@@ -1,0 +1,71 @@
+# =========================
+# Flutter
+# =========================
+
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+
+# Flutter generated files
+**/android/.gradle/
+**/android/local.properties/
+
+# =========================
+# Android / Gradle
+# =========================
+
+**/.gradle/
+**/captures/
+
+# =========================
+# IDE
+# =========================
+
+**/.idea/
+**/.vscode/
+**/.vs/
+
+# =========================
+# .NET
+# =========================
+
+**/bin/
+**/obj/
+
+# =========================
+# Logs / temporary files
+# =========================
+
+*.log
+*.tmp
+*.temp
+
+# =========================
+# OS files
+# =========================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Environment / secrets
+# =========================
+
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local ASP.NET configuration
+**/appsettings.Local.json
+
+# User-specific Visual Studio files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+# ASP.NET Core local configuration
+Backend/**/appsettings.json
+Backend/**/appsettings.Development.json

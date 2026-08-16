@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="HomeFix.API/HomeFix.API.csproj" />
+  <Project Path="HomeFix.BLL/HomeFix.BLL.csproj" />
+  <Project Path="HomeFix.DAL/HomeFix.DAL.csproj" />
+</Solution>
