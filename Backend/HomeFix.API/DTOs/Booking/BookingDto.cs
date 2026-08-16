@@ -5,6 +5,8 @@ public class BookingDto
     public int Id { get; set; }
     public int ServiceRequestId { get; set; }
     public int TechnicianId { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public decimal? AgreedPrice { get; set; }
 
     public DateTime? AcceptedAt { get; set; }
     public DateTime? ArrivedAt { get; set; }

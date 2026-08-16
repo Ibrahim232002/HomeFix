@@ -21,4 +21,9 @@ public interface IAuthService
         ValidateRefreshTokenAsync(string refreshToken);
 
     Task<bool> RevokeRefreshTokenAsync(string refreshToken);
+
+    Task<(bool Success, string? Error)> VerifyEmailAsync(string email, string code);
+    Task<(bool Success, string? Error)> RequestPasswordResetAsync(string email);
+    Task<(bool Success, string? Error)> ResetPasswordAsync(string email, string code, string newPassword);
+    Task<(bool Success, string? Error, User? User)> GoogleLoginAsync(string idToken);
 }

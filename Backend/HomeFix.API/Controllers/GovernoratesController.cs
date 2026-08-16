@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 ﻿using HomeFix.API.DTOs.Governorate;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
@@ -17,6 +18,7 @@ public class GovernoratesController : ControllerBase
         _governorateService = governorateService;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<List<GovernorateDto>>> GetAll()
     {
@@ -30,6 +32,7 @@ public class GovernoratesController : ControllerBase
         return Ok(result);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<GovernorateDto>> GetById(int id)
     {

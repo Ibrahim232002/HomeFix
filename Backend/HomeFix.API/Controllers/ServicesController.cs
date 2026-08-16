@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 ﻿using HomeFix.API.DTOs.Services;
 using HomeFix.BLL.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,7 @@ public class ServicesController : ControllerBase
         _serviceService = serviceService;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<List<ServiceDto>>> GetAll()
     {
@@ -31,6 +33,7 @@ public class ServicesController : ControllerBase
         return Ok(result);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ServiceDto>> GetById(int id)
     {

@@ -12,4 +12,5 @@ public class NotificationDto
     public DateTime CreatedAt { get; set; }
 
     public string? Type { get; set; }
+    public int? ReferenceId { get; set; }
 }

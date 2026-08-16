@@ -8,6 +8,8 @@ public partial class VerificationCode
 
     public int UserId { get; set; }
 
+    public int? BookingId { get; set; }
+
     public string CodeHash { get; set; } = null!;
 
     public string Purpose { get; set; } = null!;
@@ -23,4 +25,6 @@ public partial class VerificationCode
     public DateTime CreatedAt { get; set; }
 
     public virtual User User { get; set; } = null!;
+
+    public virtual Booking? Booking { get; set; }
 }

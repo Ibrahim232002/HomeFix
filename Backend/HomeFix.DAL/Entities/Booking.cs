@@ -30,4 +30,6 @@ public partial class Booking
     public virtual ServiceRequest ServiceRequest { get; set; } = null!;
 
     public virtual TechnicianProfile Technician { get; set; } = null!;
+
+    public virtual ICollection<VerificationCode> VerificationCodes { get; set; } = new List<VerificationCode>();
 }

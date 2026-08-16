@@ -12,6 +12,8 @@ public class PaymentDto
     public string Status { get; set; } = string.Empty;
 
     public string? TransactionReference { get; set; }
+    public string? Provider { get; set; }
+    public string? ProviderTransactionId { get; set; }
 
     public DateTime? PaidAt { get; set; }
     public DateTime CreatedAt { get; set; }

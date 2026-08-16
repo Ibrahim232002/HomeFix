@@ -1,12 +1,14 @@
-﻿using HomeFix.API.DTOs.PromoCode;
+using HomeFix.API.DTOs.PromoCode;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace HomeFix.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class PromoCodesController : ControllerBase
 {
     private readonly IPromoCodeService _service;
@@ -16,6 +18,7 @@ public class PromoCodesController : ControllerBase
         _service = service;
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<PromoCodeDto>> GetById(int id)
     {
@@ -27,6 +30,7 @@ public class PromoCodesController : ControllerBase
         return Ok(MapToDto(promoCode));
     }
 
+    [AllowAnonymous]
     [HttpGet("code/{code}")]
     public async Task<ActionResult<PromoCodeDto>> GetByCode(
         string code)
@@ -39,6 +43,7 @@ public class PromoCodesController : ControllerBase
         return Ok(MapToDto(promoCode));
     }
 
+    [AllowAnonymous]
     [HttpGet("active")]
     public async Task<ActionResult<List<PromoCodeDto>>> GetActive()
     {
@@ -47,6 +52,7 @@ public class PromoCodesController : ControllerBase
         return Ok(promoCodes.Select(MapToDto).ToList());
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<ActionResult<PromoCodeDto>> Create(
         CreatePromoCodeRequest request)
@@ -71,6 +77,7 @@ public class PromoCodesController : ControllerBase
             MapToDto(promoCode));
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<PromoCodeDto>> Update(
         int id,

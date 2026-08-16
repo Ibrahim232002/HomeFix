@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 ﻿using HomeFix.API.DTOs.City;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
@@ -16,6 +17,7 @@ public class CitiesController : ControllerBase
         _cityService = cityService;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<List<CityDto>>> GetAll()
     {
@@ -29,6 +31,7 @@ public class CitiesController : ControllerBase
         return Ok(result);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<CityDto>> GetById(int id)
     {
@@ -41,6 +44,7 @@ public class CitiesController : ControllerBase
         return Ok(MapToDto(city));
     }
 
+    [AllowAnonymous]
     [HttpGet("governorate/{governorateId:int}")]
     public async Task<ActionResult<List<CityDto>>> GetByGovernorateId(
         int governorateId)

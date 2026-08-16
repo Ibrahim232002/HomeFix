@@ -16,6 +16,7 @@ public class PaymentRepository
     public async Task<Payment?> GetByIdAsync(int id)
     {
         return await _context.Payments
+            .Include(p => p.ServiceRequest)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 

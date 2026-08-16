@@ -1,4 +1,4 @@
-﻿using HomeFix.BLL.Interfaces;
+using HomeFix.BLL.Interfaces;
 using HomeFix.BLL.Models;
 using HomeFix.BLL.Services;
 using HomeFix.DAL;
@@ -18,6 +18,11 @@ public static class DependencyInjection
 
         services.AddScoped<UserRepository>();
         services.AddScoped<RefreshTokenRepository>();
+        services.AddScoped<VerificationCodeRepository>();
+        services.AddScoped<ExternalLoginRepository>();
+        services.AddScoped<UserDeviceRepository>();
+        services.AddScoped<ServiceRequestOfferRepository>();
+        services.AddScoped<PaymentAttemptRepository>();
 
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICustomerProfileService, CustomerProfileService>();
@@ -31,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IServicePricingService, ServicePricingService>();
 
         services.AddScoped<IServiceRequestService, ServiceRequestService>();
+        services.AddScoped<IServiceRequestOfferService, ServiceRequestOfferService>();
         services.AddScoped<IServiceRequestFileService, ServiceRequestFileService>();
         services.AddScoped<IServiceRequestStatusHistoryService, ServiceRequestStatusHistoryService>();
 
@@ -63,9 +69,18 @@ public static class DependencyInjection
         services.AddOptions<JwtSettings>()
             .Bind(configuration.GetSection("Jwt"));
 
+        services.AddOptions<GoogleSettings>()
+            .Bind(configuration.GetSection("Google"));
+
+        services.AddOptions<EmailSettings>()
+            .Bind(configuration.GetSection("Email"));
+
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtService, JwtService>();
+        services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IVerificationCodeService, VerificationCodeService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IUserDeviceService, UserDeviceService>();
 
         return services;
     }

@@ -1,20 +1,26 @@
-﻿using HomeFix.API.DTOs.TechnicianDocument;
+using HomeFix.API.DTOs.TechnicianDocument;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace HomeFix.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class TechnicianDocumentsController : ControllerBase
 {
     private readonly ITechnicianDocumentService _service;
+    private readonly ITechnicianProfileService _technicianProfiles;
 
     public TechnicianDocumentsController(
-        ITechnicianDocumentService service)
+        ITechnicianDocumentService service,
+        ITechnicianProfileService technicianProfiles)
     {
         _service = service;
+        _technicianProfiles = technicianProfiles;
     }
 
     [HttpGet("{id:int}")]
@@ -24,6 +30,7 @@ public class TechnicianDocumentsController : ControllerBase
 
         if (document == null)
             return NotFound();
+        if (!await CanAccessTechnicianAsync(document.TechnicianId)) return Forbid();
 
         return Ok(MapToDto(document));
     }
@@ -32,12 +39,14 @@ public class TechnicianDocumentsController : ControllerBase
     public async Task<ActionResult<List<TechnicianDocumentDto>>>
         GetByTechnicianId(int technicianId)
     {
+        if (!await CanAccessTechnicianAsync(technicianId)) return Forbid();
         var documents =
             await _service.GetByTechnicianIdAsync(technicianId);
 
         return Ok(documents.Select(MapToDto).ToList());
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpGet("pending")]
     public async Task<ActionResult<List<TechnicianDocumentDto>>>
         GetPending()
@@ -47,10 +56,14 @@ public class TechnicianDocumentsController : ControllerBase
         return Ok(documents.Select(MapToDto).ToList());
     }
 
+    [Authorize(Roles = "Technician")]
     [HttpPost]
     public async Task<ActionResult<TechnicianDocumentDto>> Create(
         CreateTechnicianDocumentRequest request)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var technician = await _technicianProfiles.GetByUserIdAsync(userId);
+        if (technician == null || technician.Id != request.TechnicianId) return Forbid();
         var document = new TechnicianDocument
         {
             TechnicianId = request.TechnicianId,
@@ -68,6 +81,7 @@ public class TechnicianDocumentsController : ControllerBase
             MapToDto(document));
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<TechnicianDocumentDto>> Update(
         int id,
@@ -86,6 +100,17 @@ public class TechnicianDocumentsController : ControllerBase
 
         return Ok(MapToDto(document));
     }
+
+    private async Task<bool> CanAccessTechnicianAsync(int technicianId)
+    {
+        if (User.IsInRole("Admin")) return true;
+        if (!TryGetUserId(out var userId)) return false;
+        var technician = await _technicianProfiles.GetByUserIdAsync(userId);
+        return technician != null && technician.Id == technicianId;
+    }
+
+    private bool TryGetUserId(out int userId)
+        => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
     private static TechnicianDocumentDto MapToDto(
         TechnicianDocument document)

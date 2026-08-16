@@ -58,6 +58,12 @@ public static class DependencyInjection
         services.AddScoped<EmailVerificationTokenRepository>();
         services.AddScoped<PasswordResetTokenRepository>();
 
+        services.AddScoped<VerificationCodeRepository>();
+        services.AddScoped<ExternalLoginRepository>();
+        services.AddScoped<UserDeviceRepository>();
+        services.AddScoped<ServiceRequestOfferRepository>();
+        services.AddScoped<PaymentAttemptRepository>();
+
         return services;
     }
 }

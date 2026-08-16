@@ -693,6 +693,7 @@ public partial class HomeFixDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             entity.HasIndex(e => new { e.UserId, e.Purpose, e.Channel, e.CreatedAt });
+            entity.HasIndex(e => new { e.BookingId, e.Purpose, e.UsedAt });
 
             entity.Property(e => e.CodeHash).HasMaxLength(128);
             entity.Property(e => e.Purpose).HasMaxLength(50);
@@ -705,6 +706,12 @@ public partial class HomeFixDbContext : DbContext
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_VerificationCodes_User");
+
+            entity.HasOne(e => e.Booking)
+                .WithMany(b => b.VerificationCodes)
+                .HasForeignKey(e => e.BookingId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_VerificationCodes_Booking");
         });
 
         modelBuilder.Entity<ExternalLogin>(entity =>

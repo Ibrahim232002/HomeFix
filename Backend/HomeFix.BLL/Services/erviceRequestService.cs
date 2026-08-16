@@ -1,4 +1,4 @@
-﻿using HomeFix.DAL;
+using HomeFix.DAL;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
@@ -37,6 +37,9 @@ public class ServiceRequestService : IServiceRequestService
         return await _serviceRequestRepository
             .GetByStatusAsync(status);
     }
+
+    public Task<List<ServiceRequest>> GetPendingForTechnicianAsync(int technicianId)
+        => _serviceRequestRepository.GetPendingForTechnicianAsync(technicianId);
 
     public async Task CreateAsync(ServiceRequest request)
     {

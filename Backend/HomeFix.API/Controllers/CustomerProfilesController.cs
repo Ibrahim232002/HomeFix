@@ -1,12 +1,15 @@
-﻿using HomeFix.API.DTOs.CustomerProfile;
+using HomeFix.API.DTOs.CustomerProfile;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace HomeFix.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class CustomerProfilesController : ControllerBase
 {
     private readonly ICustomerProfileService _customerProfileService;
@@ -24,6 +27,7 @@ public class CustomerProfilesController : ControllerBase
 
         if (profile == null)
             return NotFound();
+        if (!User.IsInRole("Admin") && !IsCurrentUser(profile.UserId)) return Forbid();
 
         return Ok(MapToDto(profile));
     }
@@ -35,11 +39,13 @@ public class CustomerProfilesController : ControllerBase
 
         if (profile == null)
             return NotFound();
+        if (!User.IsInRole("Admin") && !IsCurrentUser(profile.UserId)) return Forbid();
 
         return Ok(MapToDto(profile));
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<CustomerProfileDto>> Create(
         CreateCustomerProfileRequest request)
     {
@@ -68,21 +74,28 @@ public class CustomerProfilesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Customer,Admin")]
     public async Task<ActionResult<CustomerProfileDto>> Update(
         int id,
         UpdateCustomerProfileRequest request)
     {
         var profile = await _customerProfileService.GetByIdAsync(id);
 
-        if (profile == null)
-            return NotFound();
-
+        if (profile == null) return NotFound();
+        if (!User.IsInRole("Admin"))
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || profile.UserId != userId) return Forbid();
+        }
         profile.ProfileImageUrl = request.ProfileImageUrl;
 
         await _customerProfileService.UpdateAsync(profile);
 
         return Ok(MapToDto(profile));
     }
+
+    private bool IsCurrentUser(int userId)
+        => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUserId)
+           && currentUserId == userId;
 
     private static CustomerProfileDto MapToDto(CustomerProfile profile)
     {

@@ -1,12 +1,15 @@
-﻿using HomeFix.API.DTOs.TechnicianProfile;
+using HomeFix.API.DTOs.TechnicianProfile;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace HomeFix.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class TechnicianProfilesController : ControllerBase
 {
     private readonly ITechnicianProfileService _service;
@@ -17,6 +20,7 @@ public class TechnicianProfilesController : ControllerBase
         _service = service;
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TechnicianProfileDto>> GetById(int id)
     {
@@ -28,6 +32,7 @@ public class TechnicianProfilesController : ControllerBase
         return Ok(MapToDto(technician));
     }
 
+    [AllowAnonymous]
     [HttpGet("user/{userId:int}")]
     public async Task<ActionResult<TechnicianProfileDto>>
         GetByUserId(int userId)
@@ -40,6 +45,7 @@ public class TechnicianProfilesController : ControllerBase
         return Ok(MapToDto(technician));
     }
 
+    [AllowAnonymous]
     [HttpGet("active")]
     public async Task<ActionResult<List<TechnicianProfileDto>>>
         GetActiveTechnicians()
@@ -50,6 +56,7 @@ public class TechnicianProfilesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<TechnicianProfileDto>> Create(
         CreateTechnicianProfileRequest request)
     {
@@ -77,6 +84,7 @@ public class TechnicianProfilesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Technician,Admin")]
     public async Task<ActionResult<TechnicianProfileDto>> Update(
         int id,
         UpdateTechnicianProfileRequest request)
@@ -86,13 +94,20 @@ public class TechnicianProfilesController : ControllerBase
         if (technician == null)
             return NotFound();
 
-        technician.Bio = request.Bio;
-        technician.ProfileImageUrl = request.ProfileImageUrl;
-        technician.YearsOfExperience = request.YearsOfExperience;
-        technician.IsVerified = request.IsVerified;
-        technician.IsAvailable = request.IsAvailable;
-        technician.CurrentLatitude = request.CurrentLatitude;
-        technician.CurrentLongitude = request.CurrentLongitude;
+        if (!User.IsInRole("Admin"))
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || technician.UserId != userId) return Forbid();
+            technician.Bio = request.Bio; technician.ProfileImageUrl = request.ProfileImageUrl;
+            technician.YearsOfExperience = request.YearsOfExperience;
+            technician.CurrentLatitude = request.CurrentLatitude; technician.CurrentLongitude = request.CurrentLongitude;
+            technician.IsAvailable = request.IsAvailable;
+        }
+        else
+        {
+            technician.Bio = request.Bio; technician.ProfileImageUrl = request.ProfileImageUrl;
+            technician.YearsOfExperience = request.YearsOfExperience; technician.IsVerified = request.IsVerified;
+            technician.IsAvailable = request.IsAvailable; technician.CurrentLatitude = request.CurrentLatitude; technician.CurrentLongitude = request.CurrentLongitude;
+        }
 
         await _service.UpdateAsync(technician);
 

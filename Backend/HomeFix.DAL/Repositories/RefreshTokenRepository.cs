@@ -15,9 +15,12 @@ public class RefreshTokenRepository
 
     public async Task<RefreshToken?> GetByTokenAsync(string token)
     {
-        return await _context.RefreshTokens
-            .Include(r => r.User)
-            .FirstOrDefaultAsync(r => r.Token == token);
+        return await _context.RefreshTokens.Include(r => r.User).FirstOrDefaultAsync(r => r.Token == token);
+    }
+
+    public async Task<RefreshToken?> GetByHashAsync(string tokenHash)
+    {
+        return await _context.RefreshTokens.Include(r => r.User).FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
     }
 
     public async Task<List<RefreshToken>> GetByUserIdAsync(int userId)

@@ -1,19 +1,29 @@
-﻿using HomeFix.API.DTOs.UserPromoCode;
+using HomeFix.API.DTOs.UserPromoCode;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace HomeFix.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class UserPromoCodesController : ControllerBase
 {
     private readonly IUserPromoCodeService _service;
+    private readonly IServiceRequestService _requests;
+    private readonly ICustomerProfileService _customers;
 
-    public UserPromoCodesController(IUserPromoCodeService service)
+    public UserPromoCodesController(
+        IUserPromoCodeService service,
+        IServiceRequestService requests,
+        ICustomerProfileService customers)
     {
         _service = service;
+        _requests = requests;
+        _customers = customers;
     }
 
     [HttpGet("{id:int}")]
@@ -23,6 +33,7 @@ public class UserPromoCodesController : ControllerBase
 
         if (userPromoCode == null)
             return NotFound();
+        if (!await CanAccessUserAsync(userPromoCode.UserId)) return Forbid();
 
         return Ok(MapToDto(userPromoCode));
     }
@@ -36,6 +47,7 @@ public class UserPromoCodesController : ControllerBase
 
         if (userPromoCode == null)
             return NotFound();
+        if (!await CanAccessUserAsync(userPromoCode.UserId)) return Forbid();
 
         return Ok(MapToDto(userPromoCode));
     }
@@ -44,9 +56,15 @@ public class UserPromoCodesController : ControllerBase
     public async Task<ActionResult<UserPromoCodeDto>> Create(
         CreateUserPromoCodeRequest request)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var customer = await _customers.GetByUserIdAsync(userId);
+        if (customer == null) return NotFound(new { message = "Customer profile not found." });
+        var serviceRequest = await _requests.GetByIdAsync(request.ServiceRequestId);
+        if (serviceRequest == null || serviceRequest.CustomerId != customer.Id) return Forbid();
+
         var userPromoCode = new UserPromoCode
         {
-            UserId = request.UserId,
+            UserId = userId,
             PromoCodeId = request.PromoCodeId,
             ServiceRequestId = request.ServiceRequestId,
             DiscountAmount = request.DiscountAmount,
@@ -60,6 +78,16 @@ public class UserPromoCodesController : ControllerBase
             new { id = userPromoCode.Id },
             MapToDto(userPromoCode));
     }
+
+    private async Task<bool> CanAccessUserAsync(int ownerUserId)
+    {
+        if (User.IsInRole("Admin")) return true;
+        if (!TryGetUserId(out var userId)) return false;
+        return userId == ownerUserId;
+    }
+
+    private bool TryGetUserId(out int userId)
+        => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
     private static UserPromoCodeDto MapToDto(
         UserPromoCode userPromoCode)

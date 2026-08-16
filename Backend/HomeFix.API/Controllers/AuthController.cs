@@ -1,4 +1,4 @@
-﻿using HomeFix.API.DTOs.Auth;
+using HomeFix.API.DTOs.Auth;
 using HomeFix.BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,10 +21,7 @@ public class AuthController : ControllerBase
         _jwtService = jwtService;
     }
 
-    // =========================
-    // REGISTER
-    // =========================
-
+    [AllowAnonymous]
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request)
     {
@@ -36,19 +33,9 @@ public class AuthController : ControllerBase
             request.Role);
 
         if (!result.Success)
-        {
-            return BadRequest(new
-            {
-                message = result.Error
-            });
-        }
+            return BadRequest(new { message = result.Error });
 
         var user = result.User!;
-
-        var accessToken = _jwtService.GenerateAccessToken(user);
-
-        var refreshToken =
-            await _authService.CreateRefreshTokenAsync(user);
 
         return Ok(new AuthResponse
         {
@@ -56,15 +43,28 @@ public class AuthController : ControllerBase
             FullName = user.FullName,
             Email = user.Email,
             Role = user.Role,
-            AccessToken = accessToken,
-            RefreshToken = refreshToken
+            RequiresEmailVerification = true
         });
     }
 
-    // =========================
-    // LOGIN
-    // =========================
+    [AllowAnonymous]
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail(VerifyCodeRequest request)
+    {
+        var result = await _authService.VerifyEmailAsync(
+            request.Email,
+            request.Code);
 
+        if (!result.Success)
+            return BadRequest(new { message = result.Error });
+
+        return Ok(new
+        {
+            message = "Email verified successfully."
+        });
+    }
+
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request)
     {
@@ -76,63 +76,48 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new
             {
-                message = result.Error
+                message = result.Error,
+                requiresEmailVerification =
+                    result.User?.IsEmailVerified == false
             });
         }
 
         var user = result.User!;
 
-        var accessToken = _jwtService.GenerateAccessToken(user);
-
-        var refreshToken =
-            await _authService.CreateRefreshTokenAsync(user);
-
-        return Ok(new AuthResponse
-        {
-            UserId = user.Id,
-            FullName = user.FullName,
-            Email = user.Email,
-            Role = user.Role,
-            AccessToken = accessToken,
-            RefreshToken = refreshToken
-        });
+        return Ok(await BuildAuthResponseAsync(user));
     }
 
-    // =========================
-    // REFRESH TOKEN
-    // =========================
-
+    [AllowAnonymous]
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(
         RefreshTokenRequest request)
     {
-        var result =
-            await _authService.ValidateRefreshTokenAsync(
-                request.RefreshToken);
+        var result = await _authService.ValidateRefreshTokenAsync(
+            request.RefreshToken);
 
         if (!result.Success)
-        {
             return Unauthorized(new
             {
                 message = result.Error
             });
-        }
 
-        var user = result.User!;
+        await _authService.RevokeRefreshTokenAsync(
+            request.RefreshToken);
 
-        var accessToken =
-            _jwtService.GenerateAccessToken(user);
+        var refreshToken =
+            await _authService.CreateRefreshTokenAsync(
+                result.User!);
 
         return Ok(new
         {
-            accessToken
+            accessToken =
+                _jwtService.GenerateAccessToken(result.User!),
+
+            refreshToken
         });
     }
 
-    // =========================
-    // LOGOUT
-    // =========================
-
+    [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(
         RefreshTokenRequest request)
@@ -141,46 +126,123 @@ public class AuthController : ControllerBase
             await _authService.RevokeRefreshTokenAsync(
                 request.RefreshToken);
 
-        if (!success)
-        {
-            return NotFound(new
+        return success
+            ? Ok(new
+            {
+                message = "Logged out successfully."
+            })
+            : NotFound(new
             {
                 message = "Refresh token not found."
             });
-        }
+    }
+
+    [AllowAnonymous]
+    [HttpPost("google")]
+    public async Task<IActionResult> Google(
+        GoogleLoginRequest request)
+    {
+        var result =
+            await _authService.GoogleLoginAsync(
+                request.IdToken);
+
+        if (!result.Success)
+            return Unauthorized(new
+            {
+                message = result.Error
+            });
+
+        return Ok(
+            await BuildAuthResponseAsync(result.User!));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(
+        ForgotPasswordRequest request)
+    {
+        var result =
+            await _authService.RequestPasswordResetAsync(
+                request.Email);
+
+        if (!result.Success)
+            return BadRequest(new
+            {
+                message = result.Error
+            });
 
         return Ok(new
         {
-            message = "Logged out successfully."
+            message =
+                "If the account exists, a password reset code has been issued."
         });
     }
 
-    // =========================
-    // CURRENT USER
-    // =========================
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(
+        ResetPasswordRequest request)
+    {
+        var result =
+            await _authService.ResetPasswordAsync(
+                request.Email,
+                request.Code,
+                request.NewPassword);
+
+        if (!result.Success)
+            return BadRequest(new
+            {
+                message = result.Error
+            });
+
+        return Ok(new
+        {
+            message = "Password reset successfully."
+        });
+    }
 
     [Authorize]
     [HttpGet("me")]
     public IActionResult Me()
     {
-        var userId =
-            User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        var name =
-            User.FindFirstValue(ClaimTypes.Name);
-
-        var email =
-            User.FindFirstValue(ClaimTypes.Email);
-
-        var role =
-            User.FindFirstValue(ClaimTypes.Role);
-
         return Ok(new
         {
-            userId,
-            name,
-            email,
-            role
+            userId =
+                User.FindFirstValue(
+                    ClaimTypes.NameIdentifier),
+
+            name =
+                User.FindFirstValue(
+                    ClaimTypes.Name),
+
+            email =
+                User.FindFirstValue(
+                    ClaimTypes.Email),
+
+            role =
+                User.FindFirstValue(
+                    ClaimTypes.Role)
         });
+    }
+
+    private async Task<AuthResponse> BuildAuthResponseAsync(
+        HomeFix.DAL.Entities.User user)
+    {
+        return new AuthResponse
+        {
+            UserId = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role,
+
+            AccessToken =
+                _jwtService.GenerateAccessToken(user),
+
+            RefreshToken =
+                await _authService.CreateRefreshTokenAsync(user),
+
+            RequiresEmailVerification =
+                !user.IsEmailVerified
+        };
     }
 }

@@ -32,6 +32,12 @@ public class TechnicianProfileRepository
             .ToListAsync();
     }
 
+    public Task<bool> IsEligibleForRequestAsync(int technicianId, int serviceId, int? cityId)
+        => _context.TechnicianProfiles
+            .Where(t => t.Id == technicianId && t.User.IsActive && t.IsVerified && t.IsAvailable)
+            .AnyAsync(t => t.Services.Any(s => s.Id == serviceId) &&
+                           (cityId == null || t.TechnicianServiceAreas.Any(a => a.CityId == cityId)));
+
     public async Task AddAsync(TechnicianProfile technician)
     {
         await _context.TechnicianProfiles.AddAsync(technician);

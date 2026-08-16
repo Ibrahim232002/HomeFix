@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 ﻿using HomeFix.API.DTOs.ServicePricing;
 using HomeFix.BLL.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,7 @@ public class ServicePricingsController : ControllerBase
         _service = service;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<ServicePricingDto>> Get(
         [FromQuery] int serviceId,
@@ -37,6 +39,7 @@ public class ServicePricingsController : ControllerBase
         });
     }
 
+    [AllowAnonymous]
     [HttpGet("service/{serviceId:int}")]
     public async Task<ActionResult<List<ServicePricingDto>>> GetByServiceId(
         int serviceId)

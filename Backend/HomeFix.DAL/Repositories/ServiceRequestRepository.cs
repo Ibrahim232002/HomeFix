@@ -1,4 +1,4 @@
-﻿using HomeFix.DAL.Data;
+using HomeFix.DAL.Data;
 using HomeFix.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +19,7 @@ public class ServiceRequestRepository
             .Include(r => r.Customer)
             .Include(r => r.Service)
             .Include(r => r.Address)
+            .Include(r => r.Booking)
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
@@ -36,6 +37,21 @@ public class ServiceRequestRepository
     {
         return await _context.ServiceRequests
             .Where(r => r.Status == status)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<List<ServiceRequest>> GetPendingForTechnicianAsync(int technicianId)
+    {
+        return await _context.ServiceRequests
+            .Include(r => r.Service)
+            .Include(r => r.Address)
+            .Where(r => r.Status == "Pending" || r.Status == "Open" || r.Status == "OfferPending")
+            .Where(r => r.Address.CityId != null)
+            .Where(r => _context.TechnicianProfiles.Any(t =>
+                t.Id == technicianId && t.User.IsActive && t.IsVerified && t.IsAvailable &&
+                t.Services.Any(s => s.Id == r.ServiceId) &&
+                t.TechnicianServiceAreas.Any(a => a.CityId == r.Address.CityId)))
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
     }

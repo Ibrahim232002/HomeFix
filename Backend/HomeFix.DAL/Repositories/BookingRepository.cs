@@ -25,6 +25,7 @@ public class BookingRepository
     {
         return await _context.Bookings
             .Include(b => b.Technician)
+            .Include(b => b.ServiceRequest)
             .FirstOrDefaultAsync(b => b.ServiceRequestId == serviceRequestId);
     }
 
