@@ -37,12 +37,10 @@ public class CityRepository
     public async Task AddAsync(City city)
     {
         await _context.Cities.AddAsync(city);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(City city)
     {
         _context.Cities.Update(city);
-        await _context.SaveChangesAsync();
     }
 }

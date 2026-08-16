@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class UserService : IUserService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly UserRepository _repository;
 
-    public UserService(UserRepository repository)
+    public UserService(UserRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -28,12 +33,21 @@ public class UserService : IUserService
     public Task<bool> PhoneExistsAsync(string phoneNumber)
         => _repository.PhoneExistsAsync(phoneNumber);
 
-    public Task AddAsync(User user)
-        => _repository.AddAsync(user);
+    public async Task AddAsync(User user)
+        {
+        await _repository.AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(User user)
-        => _repository.UpdateAsync(user);
+    public async Task UpdateAsync(User user)
+        {
+        await _repository.UpdateAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task DeleteAsync(User user)
-        => _repository.DeleteAsync(user);
+    public async Task DeleteAsync(User user)
+        {
+        await _repository.DeleteAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

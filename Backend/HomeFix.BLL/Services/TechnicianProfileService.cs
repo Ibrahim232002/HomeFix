@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class TechnicianProfileService : ITechnicianProfileService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly TechnicianProfileRepository _repository;
 
-    public TechnicianProfileService(TechnicianProfileRepository repository)
+    public TechnicianProfileService(TechnicianProfileRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -22,9 +27,15 @@ public class TechnicianProfileService : ITechnicianProfileService
     public Task<List<TechnicianProfile>> GetActiveTechniciansAsync()
         => _repository.GetActiveTechniciansAsync();
 
-    public Task AddAsync(TechnicianProfile technician)
-        => _repository.AddAsync(technician);
+    public async Task AddAsync(TechnicianProfile technician)
+        {
+        await _repository.AddAsync(technician);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(TechnicianProfile technician)
-        => _repository.UpdateAsync(technician);
+    public async Task UpdateAsync(TechnicianProfile technician)
+        {
+        await _repository.UpdateAsync(technician);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

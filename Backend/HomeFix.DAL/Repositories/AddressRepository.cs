@@ -30,18 +30,15 @@ public class AddressRepository
     public async Task AddAsync(Address address)
     {
         await _context.Addresses.AddAsync(address);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(Address address)
     {
         _context.Addresses.Update(address);
-        await _context.SaveChangesAsync();
     }
 
     public async Task DeleteAsync(Address address)
     {
         _context.Addresses.Remove(address);
-        await _context.SaveChangesAsync();
     }
 }

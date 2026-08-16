@@ -24,6 +24,5 @@ public class SupportMessageRepository
     public async Task AddAsync(SupportMessage message)
     {
         await _context.SupportMessages.AddAsync(message);
-        await _context.SaveChangesAsync();
     }
 }

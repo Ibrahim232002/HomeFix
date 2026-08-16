@@ -26,6 +26,5 @@ public class ServiceRequestStatusHistoryRepository
     public async Task AddAsync(ServiceRequestStatusHistory history)
     {
         await _context.ServiceRequestStatusHistories.AddAsync(history);
-        await _context.SaveChangesAsync();
     }
 }

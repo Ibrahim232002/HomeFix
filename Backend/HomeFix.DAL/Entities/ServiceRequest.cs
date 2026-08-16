@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -40,6 +40,8 @@ public partial class ServiceRequest
     public virtual Review? Review { get; set; }
 
     public virtual Service Service { get; set; } = null!;
+
+    public virtual ICollection<ServiceRequestOffer> ServiceRequestOffers { get; set; } = new List<ServiceRequestOffer>();
 
     public virtual ICollection<ServiceRequestFile> ServiceRequestFiles { get; set; } = new List<ServiceRequestFile>();
 

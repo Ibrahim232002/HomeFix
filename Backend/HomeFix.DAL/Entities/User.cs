@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -21,11 +21,19 @@ public partial class User
 
     public bool IsEmailVerified { get; set; }
 
+    public bool IsPhoneVerified { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public virtual CustomerProfile? CustomerProfile { get; set; }
 
     public virtual ICollection<EmailVerificationToken> EmailVerificationTokens { get; set; } = new List<EmailVerificationToken>();
+
+    public virtual ICollection<ExternalLogin> ExternalLogins { get; set; } = new List<ExternalLogin>();
+
+    public virtual ICollection<VerificationCode> VerificationCodes { get; set; } = new List<VerificationCode>();
+
+    public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
 
     public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
 

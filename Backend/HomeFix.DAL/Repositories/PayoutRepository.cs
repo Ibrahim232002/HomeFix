@@ -30,12 +30,10 @@ public class PayoutRepository
     public async Task AddAsync(Payout payout)
     {
         await _context.Payouts.AddAsync(payout);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(Payout payout)
     {
         _context.Payouts.Update(payout);
-        await _context.SaveChangesAsync();
     }
 }

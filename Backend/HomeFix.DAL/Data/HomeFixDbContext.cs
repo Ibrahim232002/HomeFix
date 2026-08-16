@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using HomeFix.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -76,6 +76,16 @@ public partial class HomeFixDbContext : DbContext
 
     public virtual DbSet<WalletTransaction> WalletTransactions { get; set; }
 
+    public virtual DbSet<VerificationCode> VerificationCodes { get; set; }
+
+    public virtual DbSet<ExternalLogin> ExternalLogins { get; set; }
+
+    public virtual DbSet<UserDevice> UserDevices { get; set; }
+
+    public virtual DbSet<ServiceRequestOffer> ServiceRequestOffers { get; set; }
+
+    public virtual DbSet<PaymentAttempt> PaymentAttempts { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Address>(entity =>
@@ -113,7 +123,11 @@ public partial class HomeFixDbContext : DbContext
 
             entity.HasIndex(e => e.ServiceRequestId, "UQ__Bookings__790F6C8A34F866A4").IsUnique();
 
+            entity.Property(e => e.AgreedPrice).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.FinalPrice).HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.Status)
+                .HasMaxLength(30)
+                .HasDefaultValue("Confirmed");
             entity.Property(e => e.TechnicianNotes).HasMaxLength(2000);
 
             entity.HasOne(d => d.ServiceRequest).WithOne(p => p.Booking)
@@ -236,6 +250,7 @@ public partial class HomeFixDbContext : DbContext
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.Message).HasMaxLength(1000);
+            entity.Property(e => e.ReferenceId);
             entity.Property(e => e.Title).HasMaxLength(200);
             entity.Property(e => e.Type).HasMaxLength(50);
 
@@ -268,6 +283,8 @@ public partial class HomeFixDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.PaymentMethod).HasMaxLength(30);
             entity.Property(e => e.PaymentType).HasMaxLength(30);
+            entity.Property(e => e.Provider).HasMaxLength(50);
+            entity.Property(e => e.ProviderTransactionId).HasMaxLength(200);
             entity.Property(e => e.Status)
                 .HasMaxLength(30)
                 .HasDefaultValue("Pending");
@@ -318,6 +335,11 @@ public partial class HomeFixDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.IsRevoked).HasComputedColumnSql("(CONVERT([bit],case when [RevokedAt] IS NULL then (0) else (1) end))", true);
             entity.Property(e => e.Token).HasMaxLength(500);
+            entity.Property(e => e.TokenHash).HasMaxLength(128);
+            entity.HasIndex(e => e.TokenHash)
+                .HasDatabaseName("UX_RefreshTokens_TokenHash")
+                .IsUnique()
+                .HasFilter("[TokenHash] IS NOT NULL");
 
             entity.HasOne(d => d.User).WithMany(p => p.RefreshTokens)
                 .HasForeignKey(d => d.UserId)
@@ -356,6 +378,8 @@ public partial class HomeFixDbContext : DbContext
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.EstimatedDurationMinutes);
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.Name).HasMaxLength(100);
         });
@@ -368,8 +392,19 @@ public partial class HomeFixDbContext : DbContext
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.MaximumPrice).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.MinimumPrice).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.VisitFee).HasColumnType("decimal(10, 2)");
+
+            entity.HasIndex(e => new { e.ServiceId, e.CityId })
+                .HasDatabaseName("UX_ServicePricing_Active_Service_City")
+                .IsUnique()
+                .HasFilter("[IsActive] = 1 AND [CityId] IS NOT NULL");
+
+            entity.HasIndex(e => e.ServiceId)
+                .HasDatabaseName("UX_ServicePricing_Active_Service_Global")
+                .IsUnique()
+                .HasFilter("[IsActive] = 1 AND [CityId] IS NULL");
 
             entity.HasOne(d => d.City).WithMany(p => p.ServicePricings)
                 .HasForeignKey(d => d.CityId)
@@ -600,6 +635,7 @@ public partial class HomeFixDbContext : DbContext
             entity.Property(e => e.Email).HasMaxLength(255);
             entity.Property(e => e.FullName).HasMaxLength(150);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.IsPhoneVerified).HasDefaultValue(false);
             entity.Property(e => e.PasswordHash).HasMaxLength(500);
             entity.Property(e => e.PhoneNumber).HasMaxLength(20);
             entity.Property(e => e.Role).HasMaxLength(20);
@@ -635,6 +671,8 @@ public partial class HomeFixDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__WalletTr__3214EC078EB50875");
 
             entity.Property(e => e.Amount).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.BalanceAfter).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.BalanceBefore).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.TransactionType).HasMaxLength(30);
@@ -647,6 +685,125 @@ public partial class HomeFixDbContext : DbContext
                 .HasForeignKey(d => d.WalletId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_WalletTransactions_Wallet");
+        });
+
+
+        modelBuilder.Entity<VerificationCode>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasIndex(e => new { e.UserId, e.Purpose, e.Channel, e.CreatedAt });
+
+            entity.Property(e => e.CodeHash).HasMaxLength(128);
+            entity.Property(e => e.Purpose).HasMaxLength(50);
+            entity.Property(e => e.Channel).HasMaxLength(20);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.Attempts).HasDefaultValue(0);
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.VerificationCodes)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_VerificationCodes_User");
+        });
+
+        modelBuilder.Entity<ExternalLogin>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasIndex(e => new { e.Provider, e.ProviderSubjectId })
+                .IsUnique()
+                .HasDatabaseName("UX_ExternalLogins_Provider_Subject");
+
+            entity.Property(e => e.Provider).HasMaxLength(30);
+            entity.Property(e => e.ProviderSubjectId).HasMaxLength(200);
+            entity.Property(e => e.Email).HasMaxLength(255);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.ExternalLogins)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ExternalLogins_User");
+        });
+
+        modelBuilder.Entity<UserDevice>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasIndex(e => e.DeviceToken)
+                .IsUnique()
+                .HasDatabaseName("UX_UserDevices_DeviceToken");
+
+            entity.HasIndex(e => new { e.UserId, e.IsActive });
+
+            entity.Property(e => e.DeviceToken).HasMaxLength(500);
+            entity.Property(e => e.Platform).HasMaxLength(20);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.UserDevices)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_UserDevices_User");
+        });
+
+        modelBuilder.Entity<ServiceRequestOffer>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasIndex(e => new { e.ServiceRequestId, e.Status });
+            entity.HasIndex(e => new { e.TechnicianId, e.Status });
+            entity.HasIndex(e => e.ServiceRequestId)
+                .HasDatabaseName("UX_ServiceRequestOffers_OneAccepted")
+                .IsUnique()
+                .HasFilter("[Status] = 'Accepted'");
+
+            entity.Property(e => e.ProposedPrice).HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.Status)
+                .HasMaxLength(30)
+                .HasDefaultValue("Pending");
+            entity.Property(e => e.TechnicianNote).HasMaxLength(2000);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(e => e.ServiceRequest)
+                .WithMany(r => r.ServiceRequestOffers)
+                .HasForeignKey(e => e.ServiceRequestId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ServiceRequestOffers_ServiceRequest");
+
+            entity.HasOne(e => e.Technician)
+                .WithMany(t => t.ServiceRequestOffers)
+                .HasForeignKey(e => e.TechnicianId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ServiceRequestOffers_Technician");
+        });
+
+        modelBuilder.Entity<PaymentAttempt>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasIndex(e => e.PaymentId);
+            entity.HasIndex(e => e.ProviderTransactionId)
+                .IsUnique()
+                .HasDatabaseName("UX_PaymentAttempts_ProviderTransactionId")
+                .HasFilter("[ProviderTransactionId] IS NOT NULL");
+
+            entity.Property(e => e.Amount).HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.Provider).HasMaxLength(50);
+            entity.Property(e => e.ProviderTransactionId).HasMaxLength(200);
+            entity.Property(e => e.Status)
+                .HasMaxLength(30)
+                .HasDefaultValue("Pending");
+            entity.Property(e => e.FailureReason).HasMaxLength(1000);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(e => e.Payment)
+                .WithMany(p => p.PaymentAttempts)
+                .HasForeignKey(e => e.PaymentId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PaymentAttempts_Payment");
         });
 
         OnModelCreatingPartial(modelBuilder);

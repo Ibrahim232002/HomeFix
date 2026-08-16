@@ -31,12 +31,10 @@ public class TechnicianServiceAreaRepository
     public async Task AddAsync(TechnicianServiceArea area)
     {
         await _context.TechnicianServiceAreas.AddAsync(area);
-        await _context.SaveChangesAsync();
     }
 
     public async Task DeleteAsync(TechnicianServiceArea area)
     {
         _context.TechnicianServiceAreas.Remove(area);
-        await _context.SaveChangesAsync();
     }
 }

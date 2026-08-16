@@ -35,12 +35,10 @@ public class TechnicianProfileRepository
     public async Task AddAsync(TechnicianProfile technician)
     {
         await _context.TechnicianProfiles.AddAsync(technician);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(TechnicianProfile technician)
     {
         _context.TechnicianProfiles.Update(technician);
-        await _context.SaveChangesAsync();
     }
 }

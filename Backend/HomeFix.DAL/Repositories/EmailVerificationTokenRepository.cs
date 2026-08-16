@@ -31,6 +31,5 @@ public class EmailVerificationTokenRepository
     public async Task AddAsync(EmailVerificationToken token)
     {
         await _context.EmailVerificationTokens.AddAsync(token);
-        await _context.SaveChangesAsync();
     }
 }

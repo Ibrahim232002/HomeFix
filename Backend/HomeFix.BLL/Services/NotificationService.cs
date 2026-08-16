@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class NotificationService : INotificationService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly NotificationRepository _repository;
 
-    public NotificationService(NotificationRepository repository)
+    public NotificationService(NotificationRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -19,9 +24,15 @@ public class NotificationService : INotificationService
     public Task<Notification?> GetByIdAsync(int id)
         => _repository.GetByIdAsync(id);
 
-    public Task AddAsync(Notification notification)
-        => _repository.AddAsync(notification);
+    public async Task AddAsync(Notification notification)
+        {
+        await _repository.AddAsync(notification);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(Notification notification)
-        => _repository.UpdateAsync(notification);
+    public async Task UpdateAsync(Notification notification)
+        {
+        await _repository.UpdateAsync(notification);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

@@ -30,6 +30,5 @@ public class WalletTransactionRepository
     public async Task AddAsync(WalletTransaction transaction)
     {
         await _context.WalletTransactions.AddAsync(transaction);
-        await _context.SaveChangesAsync();
     }
 }

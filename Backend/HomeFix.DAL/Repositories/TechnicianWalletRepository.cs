@@ -28,12 +28,10 @@ public class TechnicianWalletRepository
     public async Task AddAsync(TechnicianWallet wallet)
     {
         await _context.TechnicianWallets.AddAsync(wallet);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(TechnicianWallet wallet)
     {
         _context.TechnicianWallets.Update(wallet);
-        await _context.SaveChangesAsync();
     }
 }

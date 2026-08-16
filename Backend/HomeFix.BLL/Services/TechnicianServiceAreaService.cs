@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,11 +7,15 @@ namespace HomeFix.BLL.Services;
 
 public class TechnicianServiceAreaService : ITechnicianServiceAreaService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly TechnicianServiceAreaRepository _repository;
 
     public TechnicianServiceAreaService(
-        TechnicianServiceAreaRepository repository)
+        TechnicianServiceAreaRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -21,9 +26,15 @@ public class TechnicianServiceAreaService : ITechnicianServiceAreaService
     public Task<List<TechnicianServiceArea>> GetByCityIdAsync(int cityId)
         => _repository.GetByCityIdAsync(cityId);
 
-    public Task AddAsync(TechnicianServiceArea area)
-        => _repository.AddAsync(area);
+    public async Task AddAsync(TechnicianServiceArea area)
+        {
+        await _repository.AddAsync(area);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task DeleteAsync(TechnicianServiceArea area)
-        => _repository.DeleteAsync(area);
+    public async Task DeleteAsync(TechnicianServiceArea area)
+        {
+        await _repository.DeleteAsync(area);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

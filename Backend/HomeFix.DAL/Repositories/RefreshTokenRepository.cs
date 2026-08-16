@@ -31,12 +31,10 @@ public class RefreshTokenRepository
     public async Task AddAsync(RefreshToken refreshToken)
     {
         await _context.RefreshTokens.AddAsync(refreshToken);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(RefreshToken refreshToken)
     {
         _context.RefreshTokens.Update(refreshToken);
-        await _context.SaveChangesAsync();
     }
 }

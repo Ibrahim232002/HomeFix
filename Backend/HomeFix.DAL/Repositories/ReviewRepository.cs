@@ -38,6 +38,5 @@ public class ReviewRepository
     public async Task AddAsync(Review review)
     {
         await _context.Reviews.AddAsync(review);
-        await _context.SaveChangesAsync();
     }
 }
