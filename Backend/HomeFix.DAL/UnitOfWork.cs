@@ -1,5 +1,7 @@
 using HomeFix.DAL.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using System.Data;
 
 namespace HomeFix.DAL;
 
@@ -21,4 +23,9 @@ public sealed class UnitOfWork
 
     public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
         => _context.Database.BeginTransactionAsync(cancellationToken);
+
+    public Task<IDbContextTransaction> BeginTransactionAsync(
+        IsolationLevel isolationLevel,
+        CancellationToken cancellationToken = default)
+        => _context.Database.BeginTransactionAsync(isolationLevel, cancellationToken);
 }
