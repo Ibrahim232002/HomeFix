@@ -17,12 +17,12 @@ public class PayoutsController : ControllerBase
     public PayoutsController(IPayoutService service) => _service = service;
 
     [HttpGet("me")]
+    [Authorize(Roles = "Technician")]
     public async Task<ActionResult<List<PayoutDto>>> GetMine()
     {
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-        // The BLL currently exposes payout lookup by technician id; caller-specific mapping
-        // stays in the service layer in the next hardening pass.
-        return BadRequest(new { message = "Use the technician payout history endpoint after technician profile mapping is enabled." });
+        // Payout history is intentionally not exposed until the service supports
+        // a caller-scoped lookup by authenticated technician.
+        return BadRequest(new { message = "Technician payout history is not enabled yet." });
     }
 
     [Authorize(Roles = "Admin")]
@@ -42,9 +42,15 @@ public class PayoutsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Technician")]
     public async Task<ActionResult<PayoutDto>> Create(CreatePayoutRequest request)
     {
+        if (request.Amount <= 0) return BadRequest(new { message = "Payout amount must be greater than zero." });
+        if (string.IsNullOrWhiteSpace(request.PaymentMethod)) return BadRequest(new { message = "Payment method is required." });
         if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        // The technician is always derived from the authenticated user inside the BLL;
+        // no technician id is accepted from the client.
         var result = await _service.RequestAsync(userId, request.Amount, request.PaymentMethod);
         if (!result.Success) return BadRequest(new { message = result.Error });
         return CreatedAtAction(nameof(GetById), new { id = result.Payout!.Id }, MapToDto(result.Payout));
