@@ -15,10 +15,18 @@ public class ServiceRequestsController : ControllerBase
     private readonly IServiceRequestService _service;
     private readonly ICustomerProfileService _customerProfiles;
     private readonly ITechnicianProfileService _technicianProfiles;
+    private readonly IAddressService _addresses;
 
-    public ServiceRequestsController(IServiceRequestService service, ICustomerProfileService customerProfiles, ITechnicianProfileService technicianProfiles)
+    public ServiceRequestsController(
+        IServiceRequestService service,
+        ICustomerProfileService customerProfiles,
+        ITechnicianProfileService technicianProfiles,
+        IAddressService addresses)
     {
-        _service = service; _customerProfiles = customerProfiles; _technicianProfiles = technicianProfiles;
+        _service = service;
+        _customerProfiles = customerProfiles;
+        _technicianProfiles = technicianProfiles;
+        _addresses = addresses;
     }
 
     [HttpGet("{id:int}")]
@@ -77,6 +85,10 @@ public class ServiceRequestsController : ControllerBase
         var profile = await _customerProfiles.GetByUserIdAsync(userId);
         if (profile == null) return NotFound(new { message = "Customer profile not found." });
         if (string.IsNullOrWhiteSpace(request.Description)) return BadRequest(new { message = "Description is required." });
+
+        var address = await _addresses.GetByIdAsync(request.AddressId);
+        if (address == null) return BadRequest(new { message = "Address not found." });
+        if (address.CustomerId != profile.Id) return Forbid();
 
         var serviceRequest = new ServiceRequest
         {
