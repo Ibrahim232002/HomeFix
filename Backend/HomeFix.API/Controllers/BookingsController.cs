@@ -80,6 +80,10 @@ public class BookingsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(request.Status)) return BadRequest(new { message = "Status is required." });
         if (!User.IsInRole("Admin") && !await TechnicianOwnsBookingAsync(id)) return Forbid();
+
+        if (request.FinalPrice.HasValue && request.FinalPrice.Value <= 0)
+            return BadRequest(new { message = "Final price must be greater than zero." });
+
         var result = await _service.TransitionStatusAsync(id, request.Status, request.FinalPrice, request.TechnicianNotes);
         if (!result.Success) return BadRequest(new { message = result.Error });
         return Ok(MapToDto((await _service.GetByIdAsync(id))!));
@@ -89,27 +93,30 @@ public class BookingsController : ControllerBase
     [Authorize(Roles = "Customer,Technician")]
     public async Task<IActionResult> IssueVerificationCode(int id, [FromQuery] string purpose)
     {
+        if (purpose is not ("JobStart" or "JobCompletion"))
+            return BadRequest(new { message = "Invalid verification purpose." });
+
         if (!TryGetUserId(out var userId)) return Unauthorized();
         var booking = await _service.GetByIdAsync(id);
         if (booking == null) return NotFound();
         if (!await IsParticipantAsync(booking)) return Forbid();
-        var effectiveRecipient = purpose == "JobCompletion" ? booking.ServiceRequest.CustomerId : booking.TechnicianId;
+
         if (purpose == "JobCompletion")
         {
+            if (!User.IsInRole("Customer")) return Forbid();
             var customer = await _customerProfiles.GetByUserIdAsync(userId);
-            if (customer == null || customer.Id != effectiveRecipient) return Forbid();
-            var result = await _verificationCodes.IssueForBookingAsync(userId, id, purpose, "Email");
-            if (!result.Success) return BadRequest(new { message = result.Error });
-            return Ok(new { message = "Verification code issued.", developmentCode = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment() ? result.DevelopmentCode : null });
+            if (customer == null || booking.ServiceRequest?.CustomerId != customer.Id) return Forbid();
         }
         else
         {
+            if (!User.IsInRole("Technician")) return Forbid();
             var technician = await _technicianProfiles.GetByUserIdAsync(userId);
-            if (technician == null || technician.Id != effectiveRecipient) return Forbid();
-            var result = await _verificationCodes.IssueForBookingAsync(userId, id, purpose, "Email");
-            if (!result.Success) return BadRequest(new { message = result.Error });
-            return Ok(new { message = "Verification code issued.", developmentCode = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment() ? result.DevelopmentCode : null });
+            if (technician == null || booking.TechnicianId != technician.Id) return Forbid();
         }
+
+        var result = await _verificationCodes.IssueForBookingAsync(userId, id, purpose, "Email");
+        if (!result.Success) return BadRequest(new { message = result.Error });
+        return Ok(new { message = "Verification code issued.", developmentCode = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment() ? result.DevelopmentCode : null });
     }
 
     [HttpPost("{id:int}/verify-code")]
