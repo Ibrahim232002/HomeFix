@@ -46,11 +46,41 @@ public class PaymentService : IPaymentService
         if (!amount.HasValue || amount.Value <= 0)
             return (false, "The booking does not have a valid agreed price.", null);
 
-        var existing = (await _repository.GetByRequestIdAsync(serviceRequestId))
-            .FirstOrDefault(p => p.PaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase)
-                              && p.Status is "Pending" or "Paid");
-        if (existing is not null)
-            return (true, null, existing);
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+
+        var existingPayments = await _repository.GetByRequestIdAsync(serviceRequestId);
+
+        // A successful payment means the service request is already paid.
+        // Never create a second payment, even if the existing payment used a different method.
+        var paid = existingPayments.FirstOrDefault(p =>
+            p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase));
+
+        if (paid is not null)
+        {
+            await transaction.CommitAsync();
+            return (true, null, paid);
+        }
+
+        // Reuse an existing pending cash payment rather than creating another one.
+        var pendingCash = existingPayments.FirstOrDefault(p =>
+            p.PaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase) &&
+            p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
+
+        if (pendingCash is not null)
+        {
+            await transaction.CommitAsync();
+            return (true, null, pendingCash);
+        }
+
+        // Do not allow two payment flows to remain open for the same request.
+        var pendingPayment = existingPayments.FirstOrDefault(p =>
+            p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
+
+        if (pendingPayment is not null)
+        {
+            await transaction.CommitAsync();
+            return (false, "A payment is already pending for this service request.", null);
+        }
 
         var payment = new Payment
         {
@@ -64,6 +94,8 @@ public class PaymentService : IPaymentService
 
         await _repository.AddAsync(payment);
         await _unitOfWork.SaveChangesAsync();
+        await transaction.CommitAsync();
+
         return (true, null, payment);
     }
 
