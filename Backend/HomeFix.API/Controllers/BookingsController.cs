@@ -79,6 +79,8 @@ public class BookingsController : ControllerBase
     public async Task<IActionResult> Transition(int id, UpdateBookingRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Status)) return BadRequest(new { message = "Status is required." });
+        if (request.FinalPrice.HasValue && !string.Equals(request.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Final price can only be set when completing the booking." });
         if (!User.IsInRole("Admin") && !await TechnicianOwnsBookingAsync(id)) return Forbid();
 
         if (request.FinalPrice.HasValue && request.FinalPrice.Value <= 0)
