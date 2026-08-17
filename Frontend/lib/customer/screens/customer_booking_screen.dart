@@ -8,7 +8,6 @@ import '../../services/app_state_provider.dart';
 
 class CustomerBookingScreen extends StatefulWidget {
   final String requestId;
-
   const CustomerBookingScreen({super.key, required this.requestId});
 
   @override
@@ -29,16 +28,13 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
     try {
-      final booking = await _repository.getBookingByRequest(int.parse(widget.requestId));
+      final booking = await _repository.getBookingByRequest(widget.requestId);
       if (!mounted) return;
       setState(() => _booking = booking);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -47,7 +43,6 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
   Future<void> _verifyCompletion() async {
     final booking = _booking;
     if (booking == null || _busy) return;
-
     final codeController = TextEditingController();
     var codeIssued = false;
     var dialogBusy = false;
@@ -60,58 +55,39 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(codeIssued
-                  ? 'أدخل رمز التحقق الذي وصلك على بريدك الإلكتروني.'
-                  : 'اضغط إرسال الرمز للحصول على رمز تأكيد إتمام الخدمة.'),
+              Text(codeIssued ? 'أدخل رمز التحقق الذي وصلك على بريدك الإلكتروني.' : 'اضغط إرسال الرمز للحصول على رمز تأكيد إتمام الخدمة.'),
               if (codeIssued) ...[
                 const SizedBox(height: 12),
-                TextField(
-                  controller: codeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'رمز التحقق'),
-                ),
+                TextField(controller: codeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'رمز التحقق')),
               ],
             ],
           ),
           actions: [
             TextButton(onPressed: dialogBusy ? null : () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
             TextButton(
-              onPressed: dialogBusy
-                  ? null
-                  : () async {
-                      setDialogState(() => dialogBusy = true);
-                      try {
-                        await context.read<AppStateProvider>().requestVerificationCode(booking.id, 'JobCompletion');
-                        if (dialogContext.mounted) {
-                          setDialogState(() => codeIssued = true);
-                          ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('تم إرسال الرمز.')));
-                        }
-                      } catch (e) {
-                        if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(e.toString())));
-                      } finally {
-                        if (dialogContext.mounted) setDialogState(() => dialogBusy = false);
-                      }
-                    },
-              child: const Text('إرسال الرمز'),
+              onPressed: dialogBusy ? null : () async {
+                setDialogState(() => dialogBusy = true);
+                try {
+                  if (!codeIssued) {
+                    await context.read<AppStateProvider>().requestVerificationCode(booking.id, 'JobCompletion');
+                    if (dialogContext.mounted) setDialogState(() => codeIssued = true);
+                  } else {
+                    setState(() => _busy = true);
+                    await context.read<AppStateProvider>().verifyBookingCode(booking.id, 'JobCompletion', codeController.text.trim());
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    await _load();
+                  }
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+                  }
+                } finally {
+                  setDialogState(() => dialogBusy = false);
+                  if (mounted) setState(() => _busy = false);
+                }
+              },
+              child: Text(codeIssued ? 'تأكيد الإتمام' : 'إرسال الرمز'),
             ),
-            if (codeIssued)
-              ElevatedButton(
-                onPressed: dialogBusy || codeController.text.trim().isEmpty
-                    ? null
-                    : () async {
-                        setDialogState(() => dialogBusy = true);
-                        try {
-                          await context.read<AppStateProvider>().verifyBookingCode(booking.id, 'JobCompletion', codeController.text.trim());
-                          if (dialogContext.mounted) Navigator.pop(dialogContext);
-                          if (mounted) await _load();
-                        } catch (e) {
-                          if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(e.toString())));
-                        } finally {
-                          if (dialogContext.mounted) setDialogState(() => dialogBusy = false);
-                        }
-                      },
-                child: const Text('تأكيد الإتمام'),
-              ),
           ],
         ),
       ),
@@ -121,59 +97,47 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('الحجز')),
-        body: Center(child: Text(_error!)),
-      );
-    }
     final booking = _booking;
-    if (booking == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('الحجز')),
-        body: const Center(child: Text('لا يوجد حجز مرتبط بهذا الطلب بعد.')),
-      );
-    }
-
-    final canConfirm = booking.status == BookingStatus.awaitingCompletion;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('الحجز #${booking.id}')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(booking.serviceNameAr, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 8),
-                  Text('الحالة: ${booking.status.displayNameAr}'),
-                  const SizedBox(height: 8),
-                  Text('السعر: ${booking.price.toStringAsFixed(2)} ج.م'),
-                  const SizedBox(height: 8),
-                  Text('الفني: ${booking.technicianName}'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (canConfirm)
-            ElevatedButton(
-              onPressed: _busy ? null : _verifyCompletion,
-              child: const Text('تأكيد إتمام الخدمة'),
-            )
-          else
-            const Text(
-              'يمكن تأكيد الإتمام بعد أن ينهي الفني العمل ويصبح الحجز في حالة انتظار تأكيد العميل.',
-              textAlign: TextAlign.center,
-            ),
-        ],
+      appBar: AppBar(title: const Text('تفاصيل الحجز')),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: _loading
+            ? const ListView(children: [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))])
+            : _error != null
+                ? ListView(children: [Padding(padding: const EdgeInsets.all(24), child: Card(child: ListTile(title: Text(_error!), trailing: TextButton(onPressed: _load, child: const Text('إعادة المحاولة')))))])
+                : booking == null
+                    ? const ListView(children: [SizedBox(height: 180), Center(child: Text('لا يوجد حجز مرتبط بهذا الطلب حتى الآن.'))])
+                    : ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          Card(child: ListTile(title: Text('حجز #${booking.id}'), subtitle: Text(booking.status.displayNameAr))),
+                          const SizedBox(height: 12),
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(booking.serviceNameAr, style: const TextStyle(fontWeight: FontWeight.w800)),
+                                  const SizedBox(height: 8),
+                                  Text('العميل: ${booking.customerName}'),
+                                  Text('السعر: ${booking.price.toStringAsFixed(2)} ج.م'),
+                                  if (booking.notes?.isNotEmpty == true) Text(booking.notes!),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          if (booking.status == BookingStatus.awaitingCompletion)
+                            ElevatedButton.icon(
+                              onPressed: _busy ? null : _verifyCompletion,
+                              icon: const Icon(Icons.verified_outlined),
+                              label: const Text('تأكيد إتمام الخدمة'),
+                            ),
+                        ],
+                      ),
       ),
     );
   }
