@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_design_tokens.dart';
 import '../../core/theme/app_responsive.dart';
@@ -72,7 +71,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => CustomerRequestDetailScreen(requestId: request.id)));
     } catch (error) {
       if (!mounted) return;
-      _showError(error is UnsupportedError ? error.message : 'تعذر إرسال الطلب. حاول مرة أخرى.');
+      _showError(error is UnsupportedError ? (error.message ?? 'تعذر إرسال الطلب. حاول مرة أخرى.') : 'تعذر إرسال الطلب. حاول مرة أخرى.');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -179,7 +178,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                 const SizedBox(height: AppDesignTokens.space3),
                 Text('التوقيت', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: AppDesignTokens.space2),
-                Wrap(spacing: AppDesignTokens.space2, runSpacing: AppDesignTokens.space2, children: _times.map((time) => ChoiceChip(label: Text(time), selected: _time == time, onSelected: (_) => setState(() => _time = time)).toList()),
+                Wrap(spacing: AppDesignTokens.space2, runSpacing: AppDesignTokens.space2, children: _times.map((time) => ChoiceChip(label: Text(time), selected: _time == time, onSelected: (_) => setState(() => _time = time))).toList()),
                 const SizedBox(height: AppDesignTokens.space5),
                 HomeFixCard(
                   child: Row(
