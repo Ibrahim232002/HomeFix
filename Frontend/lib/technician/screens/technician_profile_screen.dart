@@ -5,6 +5,7 @@ import '../../auth/auth_session_provider.dart';
 import '../../common/screens/notifications_screen.dart';
 import '../../common/screens/support_center_screen.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../models/api_dtos.dart';
 import '../../repositories/technician_repository.dart';
@@ -33,6 +34,8 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
     _load();
   }
 
+  String _safeError(Object error) => error is ApiException ? error.message : 'تعذر تحميل أو تحديث الملف المهني. يرجى المحاولة مرة أخرى.';
+
   Future<void> _load() async {
     final userId = _userId;
     if (userId == null) return;
@@ -55,7 +58,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = _safeError(e);
       });
     }
   }
@@ -112,7 +115,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = _safeError(e);
       });
     }
   }
@@ -134,7 +137,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = _safeError(e);
       });
     }
   }
@@ -159,7 +162,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
       await _repository.addServiceArea(CreateTechnicianServiceAreaRequest(technicianId: _profile!.id, cityId: cityId));
       await _load();
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = _safeError(e));
     }
   }
 
@@ -168,7 +171,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
       await _repository.deleteServiceArea(area.technicianId, area.cityId);
       await _load();
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = _safeError(e));
     }
   }
 
@@ -262,20 +265,19 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
               ),
               const SizedBox(height: 16),
               Card(
-                child: Column(
-                  children: [
-                    ListTile(leading: const Icon(Icons.notifications_outlined), title: const Text('الإشعارات'), trailing: const Icon(Icons.chevron_left), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
-                    const Divider(height: 1),
-                    ListTile(leading: const Icon(Icons.support_agent), title: const Text('الدعم الفني'), trailing: const Icon(Icons.chevron_left), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportCenterScreen()))),
-                  ],
+                child: ListTile(
+                  leading: const Icon(Icons.support_agent),
+                  title: const Text('الدعم'),
+                  subtitle: const Text('فتح مركز الدعم الفني'),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportCenterScreen())),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.logout, color: AppColors.error),
-                  title: const Text('تسجيل الخروج', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
-                  onTap: () => session.logout(),
+                  leading: const Icon(Icons.notifications_outlined),
+                  title: const Text('الإشعارات'),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
                 ),
               ),
             ],
