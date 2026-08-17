@@ -200,7 +200,7 @@ class AppStateProvider extends ChangeNotifier {
     try {
       _services = await _serviceRepo.getServices();
       _technicians = await _techRepo.getTechnicians();
-      _conversations = await _chatRepo.getConversations(user.id);
+      _conversations = await _chatRepo.getConversations(user.id, user.role);
       _notifications = await _userRepo.getUserNotifications(user.id);
 
       if (isCustomer) {
@@ -248,26 +248,8 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   Future<void> applyPromoCode(String code) async {
-    try {
-      final dto = await _promoRepo.getPromoCodeByCode(code);
-      if (dto != null && dto.isActive) {
-        _appliedPromo = PromoCodeModel(
-          code: dto.code ?? code,
-          title: dto.code ?? 'كود خصم',
-          discount: '${dto.discountValue.toStringAsFixed(0)}%',
-          maxDiscount: 'خصم ${dto.discountValue}',
-          description: 'كود ترويجي',
-          expiry: dto.endDate,
-          discountPercentage: dto.discountValue,
-          maxDiscountAmount: dto.discountValue,
-        );
-      } else {
-        _appliedPromo = null;
-      }
-    } catch (e) {
-      _errorMessage = e.toString();
-      _appliedPromo = null;
-    }
+    _errorMessage = 'كوبونات الخصم غير متاحة لتطبيقها على طلب الخدمة في عقد الـAPI الحالي.';
+    _appliedPromo = null;
     _notify();
   }
 
@@ -313,7 +295,7 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   Future<void> cancelRequest(String requestId, String reason) async {
-    await _requestRepo.cancelRequest(requestId, reason);
+    throw UnsupportedError('Request cancellation is not exposed by the current backend contract.');
   }
 
   Future<ServiceRequestOfferModel> createOffer(
@@ -403,7 +385,7 @@ class AppStateProvider extends ChangeNotifier {
       text: text.trim(),
       attachmentUrl: attachmentUrl,
     );
-    _conversations = await _chatRepo.getConversations(user.id);
+    _conversations = await _chatRepo.getConversations(user.id, user.role);
     _notify();
     return msg;
   }
@@ -425,7 +407,7 @@ class AppStateProvider extends ChangeNotifier {
       serviceNameAr: serviceNameAr,
       requestId: requestId,
     );
-    _conversations = await _chatRepo.getConversations(user.id);
+    _conversations = await _chatRepo.getConversations(user.id, user.role);
     _notify();
     return conv;
   }
