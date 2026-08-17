@@ -1,206 +1,229 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../auth/auth_session_provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../models/address_model.dart';
-import '../../services/app_state_provider.dart';
+import '../../core/network/api_exception.dart';
+import '../../core/theme/app_responsive.dart';
+import '../../core/widgets/homefix_button.dart';
+import '../../core/widgets/homefix_card.dart';
+import '../../core/widgets/homefix_field.dart';
+import '../../core/widgets/homefix_states.dart';
+import '../../models/api_dtos.dart';
+import '../../repositories/address_repository.dart';
 
-class CustomerAddressesScreen extends StatelessWidget {
-  const CustomerAddressesScreen({Key? key}) : super(key: key);
+class CustomerAddressesScreen extends StatefulWidget {
+  const CustomerAddressesScreen({super.key});
 
-  void _showAddAddressDialog(BuildContext context) {
-    final titleController = TextEditingController();
-    final cityController = TextEditingController();
-    final streetController = TextEditingController();
-    final buildingController = TextEditingController();
+  @override
+  State<CustomerAddressesScreen> createState() => _CustomerAddressesScreenState();
+}
 
-    showDialog(
+class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
+  final IAddressRepository _repository = AddressRepository();
+  List<AddressDto> _addresses = const [];
+  bool _loading = true;
+  String? _error;
+
+  int? get _customerId => int.tryParse(context.read<AuthSessionProvider>().user?.id ?? '');
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final customerId = _customerId;
+    if (customerId == null) {
+      if (mounted) setState(() { _loading = false; _error = 'انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.'; });
+      return;
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final addresses = await _repository.getAddressesByCustomerId(customerId);
+      if (!mounted) return;
+      setState(() { _addresses = addresses; _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loading = false; _error = _message(e); });
+    }
+  }
+
+  String _message(Object error) => error is ApiException ? error.message : 'تعذر تحميل العناوين. يرجى المحاولة مرة أخرى.';
+
+  Future<void> _openEditor({AddressDto? address}) async {
+    final customerId = _customerId;
+    if (customerId == null) return;
+
+    final label = TextEditingController(text: address?.label ?? '');
+    final fullAddress = TextEditingController(text: address?.fullAddress ?? '');
+    final building = TextEditingController(text: address?.buildingNumber ?? '');
+    final floor = TextEditingController(text: address?.floorNumber ?? '');
+    final apartment = TextEditingController(text: address?.apartmentNumber ?? '');
+    final instructions = TextEditingController(text: address?.additionalInstructions ?? '');
+    var isDefault = address?.isDefault ?? _addresses.isEmpty;
+    var saving = false;
+
+    await showDialog<void>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('إضافة عنوان جديد', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(address == null ? 'إضافة عنوان' : 'تعديل العنوان'),
           content: SingleChildScrollView(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'اسم العنوان (مثل: المنزل، العمل)'),
-                ),
+                HomeFixField(controller: label, label: 'اسم العنوان', hintText: 'المنزل، العمل...'),
+                const SizedBox(height: 10),
+                HomeFixField(controller: fullAddress, label: 'العنوان الكامل', maxLines: 2),
+                const SizedBox(height: 10),
+                HomeFixField(controller: building, label: 'رقم المبنى'),
+                const SizedBox(height: 10),
+                Row(children: [Expanded(child: HomeFixField(controller: floor, label: 'الدور')), const SizedBox(width: 10), Expanded(child: HomeFixField(controller: apartment, label: 'الشقة'))]),
+                const SizedBox(height: 10),
+                HomeFixField(controller: instructions, label: 'تعليمات إضافية', maxLines: 2),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: cityController,
-                  decoration: const InputDecoration(labelText: 'المدينة / المنطقة'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: streetController,
-                  decoration: const InputDecoration(labelText: 'اسم الشارع'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: buildingController,
-                  decoration: const InputDecoration(labelText: 'تفاصيل المبنى والشقة'),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: isDefault,
+                  onChanged: saving ? null : (value) => setDialogState(() => isDefault = value),
+                  title: const Text('جعله العنوان الافتراضي'),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              onPressed: () {
-                final appState = Provider.of<AppStateProvider>(context, listen: false);
-                final newAddr = AddressModel(
-                  id: 'addr-${DateTime.now().millisecondsSinceEpoch}',
-                  userId: appState.currentUser?.id ?? '',
-                  title: titleController.text.trim().isEmpty ? 'عنوان جديد' : titleController.text.trim(),
-                  governorate: '',
-                  city: cityController.text.trim(),
-                  street: streetController.text.trim(),
-                  building: buildingController.text.trim(),
-                  floor: '',
-                  apartment: '',
-                  isDefault: appState.savedAddresses.isEmpty,
-                );
-                appState.addAddress(newAddr);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تمت إضافة العنوان بنجاح')),
-                );
+            TextButton(onPressed: saving ? null : () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+            HomeFixButton(
+              expanded: false,
+              loading: saving,
+              label: address == null ? 'إضافة' : 'حفظ التعديل',
+              icon: Icons.check_rounded,
+              onPressed: saving ? null : () async {
+                if (fullAddress.text.trim().isEmpty) return;
+                setDialogState(() => saving = true);
+                try {
+                  if (address == null) {
+                    final created = await _repository.createAddress(CreateAddressRequest(
+                      customerId: customerId,
+                      label: label.text.trim().isEmpty ? 'عنوان محفوظ' : label.text.trim(),
+                      fullAddress: fullAddress.text.trim(),
+                      buildingNumber: building.text.trim(),
+                      floorNumber: floor.text.trim(),
+                      apartmentNumber: apartment.text.trim(),
+                      additionalInstructions: instructions.text.trim(),
+                      isDefault: isDefault,
+                    ));
+                    if (mounted) setState(() => _addresses = [created, ..._addresses]);
+                  } else {
+                    final updated = await _repository.updateAddress(address.id, UpdateAddressRequest(
+                      label: label.text.trim().isEmpty ? 'عنوان محفوظ' : label.text.trim(),
+                      fullAddress: fullAddress.text.trim(),
+                      buildingNumber: building.text.trim(),
+                      floorNumber: floor.text.trim(),
+                      apartmentNumber: apartment.text.trim(),
+                      additionalInstructions: instructions.text.trim(),
+                      isDefault: isDefault,
+                    ));
+                    if (mounted) setState(() => _addresses = _addresses.map((item) => item.id == updated.id ? updated : item).toList());
+                  }
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ العنوان.')));
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    setDialogState(() => saving = false);
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_message(e))));
+                  }
+                }
               },
-              child: const Text('حفظ العنوان', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
             ),
           ],
         ),
       ),
     );
+    label.dispose(); fullAddress.dispose(); building.dispose(); floor.dispose(); apartment.dispose(); instructions.dispose();
+  }
+
+  Future<void> _delete(AddressDto address) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف العنوان؟'),
+        content: Text('سيتم حذف «${address.label ?? 'العنوان'}» من حسابك.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+          FilledButton.tonal(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('حذف')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _repository.deleteAddress(address.id);
+      if (!mounted) return;
+      setState(() => _addresses = _addresses.where((item) => item.id != address.id).toList());
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف العنوان.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_message(e))));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
-
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('عناويني المسجلة'),
-      ),
-      body: appState.savedAddresses.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
+      appBar: AppBar(title: const Text('عناويني')),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: AppResponsive.pagePadding(context),
+            children: [
+              AppResponsive.content(
+                context,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.location_off_outlined,
-                      size: 64,
-                      color: AppColors.textMuted.withOpacity(0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'لا توجد عناوين مسجلة',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Cairo',
-                        color: AppColors.textPrimary,
+                    if (_loading)
+                      const HomeFixLoadingList(itemCount: 4)
+                    else if (_error != null)
+                      HomeFixErrorState(title: 'تعذر تحميل العناوين', message: _error, onRetry: _load)
+                    else if (_addresses.isEmpty)
+                      const SizedBox(height: 360, child: HomeFixEmptyState(icon: Icons.location_off_outlined, title: 'لا توجد عناوين محفوظة', message: 'أضف عنواناً واضحاً لتسهيل وصول الفني إلى مكان الخدمة.'))
+                    else ..._addresses.map((address) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: HomeFixCard(
+                        borderColor: address.isDefault ? AppColors.primary : AppColors.border,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                const DecoratedBox(decoration: BoxDecoration(color: AppColors.primarySurface, shape: BoxShape.circle), child: Padding(padding: EdgeInsets.all(10), child: Icon(Icons.location_on_rounded, color: AppColors.primary))),
+                                const SizedBox(width: 12),
+                                Expanded(child: Text(address.label?.isNotEmpty == true ? address.label! : 'عنوان محفوظ', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+                                if (address.isDefault) const Chip(avatar: Icon(Icons.check_rounded, size: 16), label: Text('افتراضي')),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(address.fullAddress?.isNotEmpty == true ? address.fullAddress! : 'لا توجد تفاصيل للعنوان.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+                            if ([address.buildingNumber, address.floorNumber, address.apartmentNumber].any((value) => value?.isNotEmpty == true)) ...[
+                              const SizedBox(height: 8),
+                              Text('مبنى ${address.buildingNumber ?? '-'} • دور ${address.floorNumber ?? '-'} • شقة ${address.apartmentNumber ?? '-'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+                            ],
+                            const SizedBox(height: 12),
+                            Row(children: [Expanded(child: HomeFixButton(expanded: true, variant: HomeFixButtonVariant.outline, icon: Icons.edit_outlined, label: 'تعديل', onPressed: () => _openEditor(address: address))), const SizedBox(width: 8), IconButton(tooltip: 'حذف', onPressed: () => _delete(address), icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error))]),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'أضف عنوانك لتسهيل وصول الفني إليك بدقة',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                        fontFamily: 'Cairo',
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                    )),
                   ],
                 ),
               ),
-            )
-          : ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: appState.savedAddresses.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final addr = appState.savedAddresses[index];
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: addr.isDefault ? AppColors.primary : AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: addr.isDefault ? AppColors.primarySurface : AppColors.scaffoldBackground,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.location_on_rounded,
-                    color: addr.isDefault ? AppColors.primary : AppColors.textMuted,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            addr.title,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              fontFamily: 'Cairo',
-                            ),
-                          ),
-                          if (addr.isDefault) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.primarySurface,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'الرئيسي',
-                                style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        addr.fullAddressDescription,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        onPressed: () => _showAddAddressDialog(context),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('إضافة عنوان جديد', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: Colors.white)),
-      ),
+      floatingActionButton: HomeFixButton(expanded: false, icon: Icons.add_location_alt_outlined, label: 'إضافة عنوان', onPressed: () => _openEditor()),
     );
   }
 }
