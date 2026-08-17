@@ -104,11 +104,11 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading
-            ? const ListView(children: [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))])
+            ? ListView(children: const [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))])
             : _error != null
                 ? ListView(children: [Padding(padding: const EdgeInsets.all(24), child: Card(child: ListTile(title: Text(_error!), trailing: TextButton(onPressed: _load, child: const Text('إعادة المحاولة')))))])
                 : booking == null
-                    ? const ListView(children: [SizedBox(height: 180), Center(child: Text('لا يوجد حجز مرتبط بهذا الطلب حتى الآن.'))])
+                    ? ListView(children: const [SizedBox(height: 180), Center(child: Text('لا يوجد حجز مرتبط بهذا الطلب حتى الآن.'))])
                     : ListView(
                         padding: const EdgeInsets.all(16),
                         children: [
