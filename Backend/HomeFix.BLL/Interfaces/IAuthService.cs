@@ -1,4 +1,4 @@
-﻿using HomeFix.DAL.Entities;
+using HomeFix.DAL.Entities;
 
 namespace HomeFix.BLL.Interfaces;
 
@@ -19,6 +19,9 @@ public interface IAuthService
 
     Task<(bool Success, string? Error, User? User)>
         ValidateRefreshTokenAsync(string refreshToken);
+
+    Task<(bool Success, string? Error, User? User, string? RefreshToken)>
+        RotateRefreshTokenAsync(string refreshToken);
 
     Task<bool> RevokeRefreshTokenAsync(string refreshToken);
 
