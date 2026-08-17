@@ -7,6 +7,7 @@ import '../../core/network/api_exception.dart';
 import '../../models/api_dtos.dart';
 import '../../models/payment_model.dart';
 import '../../models/service_request_model.dart';
+import '../../repositories/payment_repository.dart';
 import '../../repositories/promo_code_repository.dart';
 import '../../services/app_state_provider.dart';
 
@@ -28,26 +29,24 @@ class CustomerPaymentScreen extends StatefulWidget {
 
 class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
   final PromoCodeRepository _promoRepository = PromoCodeRepository();
+  final PaymentRepository _paymentRepository = PaymentRepository();
   final TextEditingController _promoController = TextEditingController();
 
   bool _submitting = false;
   bool _promoSubmitting = false;
+  bool _loadingAmount = true;
   String? _errorMessage;
   String? _promoErrorMessage;
   List<PaymentModel> _payments = const [];
   UserPromoCodeDto? _appliedPromo;
-
-  double get _amount => widget.amountToPay != null && widget.amountToPay! > 0
-      ? widget.amountToPay!
-      : widget.request.finalPrice != null && widget.request.finalPrice! > 0
-          ? widget.request.finalPrice!
-          : widget.request.estimatedPriceMin;
+  double? _serverPayableAmount;
 
   @override
   void initState() {
     super.initState();
     _loadPayments();
     _loadAppliedPromo();
+    _loadPayableAmount();
   }
 
   @override
@@ -77,6 +76,37 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
     }
   }
 
+  Future<void> _loadPayableAmount() async {
+    final requestId = int.tryParse(widget.request.id);
+    if (requestId == null) return;
+
+    if (mounted) {
+      setState(() {
+        _loadingAmount = true;
+        _errorMessage = null;
+      });
+    }
+
+    try {
+      final amount = await _paymentRepository.getPayableAmountByRequest(requestId);
+      if (!mounted) return;
+      setState(() {
+        _serverPayableAmount = amount;
+        _loadingAmount = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.message
+          : 'تعذر تحميل المبلغ المستحق من الخادم. يرجى المحاولة مرة أخرى.';
+      setState(() {
+        _loadingAmount = false;
+        _errorMessage = message;
+        _serverPayableAmount = null;
+      });
+    }
+  }
+
   Future<void> _applyPromo() async {
     if (_promoSubmitting || _appliedPromo != null) return;
     final code = _promoController.text.trim();
@@ -98,9 +128,8 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
         throw const FormatException('كود الخصم غير صالح أو غير موجود.');
       }
 
-      // DiscountAmount is intentionally sent as zero. The backend's
-      // UserPromoCodeService calculates and stores the authoritative discount;
-      // the client never calculates the discount itself.
+      // discountAmount is deliberately ignored by the backend; the authoritative
+      // UserPromoCodeService calculates and stores the real discount server-side.
       final applied = await _promoRepository.createUserPromoCode(
         CreateUserPromoCodeRequest(
           userId: userId,
@@ -115,6 +144,7 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
         _appliedPromo = applied;
         _promoController.clear();
       });
+      await _loadPayableAmount();
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'تعذر تطبيق كود الخصم. يرجى المحاولة مرة أخرى.';
@@ -125,7 +155,7 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
   }
 
   Future<void> _chooseCash() async {
-    if (_submitting) return;
+    if (_submitting || _loadingAmount || _serverPayableAmount == null) return;
     setState(() {
       _submitting = true;
       _errorMessage = null;
@@ -135,6 +165,8 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
       await context.read<AppStateProvider>().selectCashOnDelivery(widget.request.id);
       if (!mounted) return;
       await _loadPayments();
+      await _loadPayableAmount();
+      if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
@@ -181,10 +213,19 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
                 children: [
                   const Text('المبلغ المستحق', style: TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
-                  Text(
-                    '${_amount.toStringAsFixed(2)} ج.م',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-                  ),
+                  if (_loadingAmount)
+                    const SizedBox(
+                      height: 32,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                      ),
+                    )
+                  else
+                    Text(
+                      '${(_serverPayableAmount ?? 0).toStringAsFixed(2)} ج.م',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                    ),
                   if (_appliedPromo != null) ...[
                     const SizedBox(height: 10),
                     Container(
@@ -205,11 +246,6 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'المبلغ النهائي للدفع يظل معتمداً على سعر الحجز الذي يؤكده الخادم. لا يتم خصم القيمة محلياً.',
-                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                     ),
                   ],
                 ],
@@ -272,12 +308,8 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
             Card(
               child: ListTile(
                 leading: Icon(
-                  activePayment.status == PaymentStatusType.paid
-                      ? Icons.check_circle
-                      : Icons.schedule,
-                  color: activePayment.status == PaymentStatusType.paid
-                      ? AppColors.successDark
-                      : AppColors.warningDark,
+                  activePayment.status == PaymentStatusType.paid ? Icons.check_circle : Icons.schedule,
+                  color: activePayment.status == PaymentStatusType.paid ? AppColors.successDark : AppColors.warningDark,
                 ),
                 title: Text(activePayment.method.displayNameAr),
                 subtitle: Text(activePayment.status.displayNameAr),
@@ -308,9 +340,11 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: _submitting || activePayment?.status == PaymentStatusType.paid ? null : _chooseCash,
+                    onPressed: _submitting || _loadingAmount || _serverPayableAmount == null || activePayment?.status == PaymentStatusType.paid
+                        ? null
+                        : _chooseCash,
                     icon: _submitting
-                        ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.payments_rounded),
                     label: const Text('اختيار الدفع نقداً'),
                   ),
