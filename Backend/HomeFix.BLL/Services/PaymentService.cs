@@ -2,6 +2,7 @@ using HomeFix.BLL.Interfaces;
 using HomeFix.DAL;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
+using Microsoft.EntityFrameworkCore;
 using System.Data;
 
 namespace HomeFix.BLL.Services;
@@ -55,7 +56,6 @@ public class PaymentService : IPaymentService
         var promo = request.UserPromoCode;
         if (promo is not null)
         {
-            // The stored UserPromoCode is authoritative. Never accept discount values from Flutter.
             var expectedCustomerUserId = request.Customer?.UserId;
             if (expectedCustomerUserId.HasValue && promo.UserId != expectedCustomerUserId.Value)
                 return (false, "The promo application does not belong to this service request customer.", null);
@@ -65,9 +65,6 @@ public class PaymentService : IPaymentService
         }
 
         var amount = PaymentAmountCalculator.Calculate(baseAmount.Value, promo?.DiscountAmount);
-        if (amount <= 0)
-            return (false, "The payable amount must be greater than zero after applying the promo discount.", null);
-
         return (true, null, amount);
     }
 
@@ -76,6 +73,8 @@ public class PaymentService : IPaymentService
         var payable = await GetPayableAmountAsync(serviceRequestId, userId);
         if (!payable.Success || !payable.Amount.HasValue)
             return (false, payable.Error, null);
+        if (payable.Amount.Value == 0)
+            return (false, "No payment is required after applying the promo discount.", null);
 
         await using var transaction = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
         var existingPayments = await _repository.GetByRequestIdAsync(serviceRequestId);
