@@ -130,21 +130,40 @@ public class BookingsController : ControllerBase
         if (booking == null) return NotFound();
         if (!await IsParticipantAsync(booking)) return Forbid();
         if (purpose is not ("JobStart" or "JobCompletion")) return BadRequest(new { message = "Invalid verification purpose." });
+
+        if (purpose == "JobStart")
+        {
+            if (!User.IsInRole("Technician")) return Forbid();
+            var technician = await _technicianProfiles.GetByUserIdAsync(userId);
+            if (technician == null || booking.TechnicianId != technician.Id) return Forbid();
+            if (booking.Status != "Arrived")
+                return BadRequest(new { message = "Technician must verify after arrival." });
+        }
+        else
+        {
+            if (!User.IsInRole("Customer")) return Forbid();
+            var customer = await _customerProfiles.GetByUserIdAsync(userId);
+            if (customer == null || booking.ServiceRequest?.CustomerId != customer.Id) return Forbid();
+            if (booking.Status != "AwaitingCompletion")
+                return BadRequest(new { message = "Customer completion confirmation is required." });
+        }
+
+        // Validate role and state before consuming the code. Otherwise an authorized
+        // participant could waste a valid code with the wrong operation/state.
         var result = await _verificationCodes.VerifyBookingAsync(userId, id, purpose, "Email", code);
         if (!result.Success) return BadRequest(new { message = result.Error });
 
         if (purpose == "JobStart")
         {
-            if (!User.IsInRole("Technician") || booking.Status != "Arrived") return BadRequest(new { message = "Technician must verify after arrival." });
             var transition = await _service.TransitionStatusAsync(id, "InProgress", null, null);
             if (!transition.Success) return BadRequest(new { message = transition.Error });
         }
         else
         {
-            if (!User.IsInRole("Customer") || booking.Status != "AwaitingCompletion") return BadRequest(new { message = "Customer completion confirmation is required." });
             var transition = await _service.TransitionStatusAsync(id, "Completed", null, null);
             if (!transition.Success) return BadRequest(new { message = transition.Error });
         }
+
         return Ok(MapToDto((await _service.GetByIdAsync(id))!));
     }
 
