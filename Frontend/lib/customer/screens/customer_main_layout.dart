@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/app_state_provider.dart';
 import '../widgets/customer_bottom_nav.dart';
-import 'customer_home_screen.dart';
+import 'customer_home_redesign.dart';
 import 'customer_requests_screen.dart';
 import '../../common/screens/chat_list_screen.dart';
 import 'customer_profile_screen.dart';
 
 class CustomerMainLayout extends StatelessWidget {
-  const CustomerMainLayout({Key? key}) : super(key: key);
+  const CustomerMainLayout({super.key});
 
   static final List<Widget> _screens = [
-    const CustomerHomeScreen(),
+    const CustomerHomeRedesign(),
     const CustomerRequestsScreen(),
     const ChatListScreen(),
     const CustomerProfileScreen(),
@@ -19,19 +19,16 @@ class CustomerMainLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
+    final appState = context.watch<AppStateProvider>();
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        body: IndexedStack(
-          index: appState.customerNavIndex,
-          children: _screens,
-        ),
-        bottomNavigationBar: CustomerBottomNav(
-          currentIndex: appState.customerNavIndex,
-          onTap: (index) => appState.setCustomerNavIndex(index),
-        ),
+    return Scaffold(
+      body: IndexedStack(
+        index: appState.customerNavIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: CustomerBottomNav(
+        currentIndex: appState.customerNavIndex,
+        onTap: appState.setCustomerNavIndex,
       ),
     );
   }
