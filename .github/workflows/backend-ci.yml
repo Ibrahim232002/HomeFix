@@ -2,11 +2,13 @@ name: Backend CI
 
 on:
   push:
-    branches:
-      - phase-1.5-security-audit
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/backend-ci.yml'
   pull_request:
-    branches:
-      - phase-1.5-security-audit
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/backend-ci.yml'
 
 env:
   DOTNET_VERSION: 8.0.x
@@ -24,17 +26,11 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore API
-        run: dotnet restore Backend/HomeFix.API/HomeFix.API.csproj
+      - name: Restore
+        run: dotnet restore Backend/HomeFix.slnx
 
-      - name: Restore tests
-        run: dotnet restore Backend/HomeFix.Tests/HomeFix.Tests.csproj
+      - name: Build
+        run: dotnet build Backend/HomeFix.slnx --configuration Release --no-restore
 
-      - name: Build API
-        run: dotnet build Backend/HomeFix.API/HomeFix.API.csproj --configuration Release --no-restore
-
-      - name: Build tests
-        run: dotnet build Backend/HomeFix.Tests/HomeFix.Tests.csproj --configuration Release --no-restore
-
-      - name: Run tests
-        run: dotnet test Backend/HomeFix.Tests/HomeFix.Tests.csproj --configuration Release --no-build --verbosity normal
+      - name: Test
+        run: dotnet test Backend/HomeFix.slnx --configuration Release --no-build --verbosity normal
