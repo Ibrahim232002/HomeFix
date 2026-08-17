@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - frontend-ui-redesign
+      - production-release
   pull_request:
     paths:
       - 'Frontend/**'
