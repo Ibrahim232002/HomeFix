@@ -37,7 +37,7 @@ jobs:
             -keystore "$GITHUB_WORKSPACE/Frontend/.ci/homefix-ci-release.jks" \
             -storepass ci-store-password \
             -alias homefix-ci \
-            -keypass ci-key-password \
+            -keypass ci-store-password \
             -keyalg RSA \
             -keysize 2048 \
             -validity 3650 \
@@ -45,7 +45,7 @@ jobs:
           echo "HOMEFIX_KEYSTORE_PATH=$GITHUB_WORKSPACE/Frontend/.ci/homefix-ci-release.jks" >> "$GITHUB_ENV"
           echo "HOMEFIX_KEYSTORE_PASSWORD=ci-store-password" >> "$GITHUB_ENV"
           echo "HOMEFIX_KEY_ALIAS=homefix-ci" >> "$GITHUB_ENV"
-          echo "HOMEFIX_KEY_PASSWORD=ci-key-password" >> "$GITHUB_ENV"
+          echo "HOMEFIX_KEY_PASSWORD=ci-store-password" >> "$GITHUB_ENV"
 
       - name: Dependencies
         run: flutter pub get
