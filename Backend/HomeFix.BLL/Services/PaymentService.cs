@@ -70,13 +70,20 @@ public class PaymentService : IPaymentService
 
     public async Task<(bool Success, string? Error, Payment? Payment)> CreateCashForCustomerAsync(int serviceRequestId, int userId)
     {
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+
         var payable = await GetPayableAmountAsync(serviceRequestId, userId);
         if (!payable.Success || !payable.Amount.HasValue)
+        {
+            await transaction.RollbackAsync();
             return (false, payable.Error, null);
+        }
         if (payable.Amount.Value == 0)
+        {
+            await transaction.RollbackAsync();
             return (false, "No payment is required after applying the promo discount.", null);
+        }
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
         var existingPayments = await _repository.GetByRequestIdAsync(serviceRequestId);
 
         var paid = PaymentRules.FindPaid(existingPayments);
