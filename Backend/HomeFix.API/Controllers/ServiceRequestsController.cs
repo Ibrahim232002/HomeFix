@@ -16,17 +16,20 @@ public class ServiceRequestsController : ControllerBase
     private readonly ICustomerProfileService _customerProfiles;
     private readonly ITechnicianProfileService _technicianProfiles;
     private readonly IAddressService _addresses;
+    private readonly IServicePricingService _servicePricing;
 
     public ServiceRequestsController(
         IServiceRequestService service,
         ICustomerProfileService customerProfiles,
         ITechnicianProfileService technicianProfiles,
-        IAddressService addresses)
+        IAddressService addresses,
+        IServicePricingService servicePricing)
     {
         _service = service;
         _customerProfiles = customerProfiles;
         _technicianProfiles = technicianProfiles;
         _addresses = addresses;
+        _servicePricing = servicePricing;
     }
 
     [HttpGet("{id:int}")]
@@ -85,10 +88,16 @@ public class ServiceRequestsController : ControllerBase
         var profile = await _customerProfiles.GetByUserIdAsync(userId);
         if (profile == null) return NotFound(new { message = "Customer profile not found." });
         if (string.IsNullOrWhiteSpace(request.Description)) return BadRequest(new { message = "Description is required." });
+        if (request.ServiceId <= 0) return BadRequest(new { message = "A valid service is required." });
 
         var address = await _addresses.GetByIdAsync(request.AddressId);
         if (address == null) return BadRequest(new { message = "Address not found." });
         if (address.CustomerId != profile.Id) return Forbid();
+
+        // Pricing is authoritative server-side. Never trust VisitFee or CustomerId/Status from the client.
+        var pricing = await _servicePricing.GetForServiceAsync(request.ServiceId, address.CityId);
+        if (pricing == null)
+            return BadRequest(new { message = "No active pricing is configured for this service and location." });
 
         var serviceRequest = new ServiceRequest
         {
@@ -99,7 +108,7 @@ public class ServiceRequestsController : ControllerBase
             PreferredDate = request.PreferredDate,
             PreferredTime = request.PreferredTime,
             Status = "Open",
-            VisitFee = request.VisitFee,
+            VisitFee = pricing.VisitFee,
             CreatedAt = DateTime.UtcNow
         };
         await _service.CreateAsync(serviceRequest);
