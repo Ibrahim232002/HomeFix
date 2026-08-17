@@ -54,9 +54,7 @@ class _CustomerServicesScreenState extends State<CustomerServicesScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('الخدمات'),
-      ),
+      appBar: AppBar(title: const Text('الخدمات')),
       body: RefreshIndicator(
         onRefresh: state.refreshPublicData,
         child: CustomScrollView(
@@ -73,7 +71,7 @@ class _CustomerServicesScreenState extends State<CustomerServicesScreen> {
                       Text('اختار الخدمة المناسبة', style: Theme.of(context).textTheme.headlineSmall),
                       const SizedBox(height: AppDesignTokens.space1),
                       Text(
-                        'خدمات منزلية موثوقة، واضحة، ومصممة لتوصلّك للطلب المناسب بأقل خطوات.',
+                        'خدمات منزلية موثوقة، واضحة، ومصممة لتوصلك للطلب المناسب بأقل خطوات.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: AppDesignTokens.space4),
@@ -81,10 +79,15 @@ class _CustomerServicesScreenState extends State<CustomerServicesScreen> {
                         controller: _searchController,
                         label: 'ابحث عن خدمة',
                         hintText: 'مثال: تكييف، سباكة، كهرباء',
-                        prefixIcon: Icons.search_rounded,
+                        prefixIcon: const Icon(Icons.search_rounded),
                         textInputAction: TextInputAction.search,
-                        onSubmitted: (value) => _search(state, value),
-                        suffixIcon: _searching ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+                        suffixIcon: _searching
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : IconButton(
+                                tooltip: 'بحث',
+                                onPressed: () => _search(state, _searchController.text),
+                                icon: const Icon(Icons.arrow_forward_rounded),
+                              ),
                       ),
                       const SizedBox(height: AppDesignTokens.space4),
                     ],
@@ -114,7 +117,7 @@ class _CustomerServicesScreenState extends State<CustomerServicesScreen> {
                   ),
                 ),
               ),
-            SliverToBoxAdapter(child: const SizedBox(height: AppDesignTokens.space4)),
+            const SliverToBoxAdapter(child: SizedBox(height: AppDesignTokens.space4)),
             if (state.isLoadingPublic && services.isEmpty)
               SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: padding),
@@ -181,7 +184,7 @@ class _ServiceCard extends StatelessWidget {
                     right: AppDesignTokens.space2,
                     child: HomeFixStatusChip(
                       label: service.isPopular ? 'الأكثر طلباً' : service.categoryNameAr,
-                      color: service.isPopular ? AppColors.technicianPrimary : AppColors.primary,
+                      tone: service.isPopular ? HomeFixStatusTone.technician : HomeFixStatusTone.info,
                     ),
                   ),
                 ],
