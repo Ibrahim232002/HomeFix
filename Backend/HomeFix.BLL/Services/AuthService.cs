@@ -6,6 +6,7 @@ using HomeFix.DAL;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 using Microsoft.Extensions.Options;
+using System.Data;
 
 namespace HomeFix.BLL.Services;
 
@@ -105,7 +106,7 @@ public class AuthService : IAuthService
 
     public async Task<string> CreateRefreshTokenAsync(User user)
     {
-        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        var token = GenerateRefreshToken();
         var refreshToken = new RefreshToken
         {
             UserId = user.Id,
@@ -124,6 +125,43 @@ public class AuthService : IAuthService
         var token = await _refreshTokenRepository.GetByHashAsync(HashRefreshToken(refreshToken));
         if (token == null || token.RevokedAt != null || token.ExpiresAt <= DateTime.UtcNow || !token.User.IsActive) return (false, "Invalid or expired refresh token.", null);
         return (true, null, token.User);
+    }
+
+    public async Task<(bool Success, string? Error, User? User, string? RefreshToken)> RotateRefreshTokenAsync(string refreshToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return (false, "Invalid or expired refresh token.", null, null);
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            var current = await _refreshTokenRepository.GetByHashAsync(HashRefreshToken(refreshToken));
+            if (current == null || current.RevokedAt != null || current.ExpiresAt <= DateTime.UtcNow || !current.User.IsActive)
+            {
+                await tx.RollbackAsync();
+                return (false, "Invalid or expired refresh token.", null, null);
+            }
+
+            current.RevokedAt = DateTime.UtcNow;
+            var newToken = GenerateRefreshToken();
+            await _refreshTokenRepository.AddAsync(new RefreshToken
+            {
+                UserId = current.UserId,
+                TokenHash = HashRefreshToken(newToken),
+                ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays),
+                CreatedAt = DateTime.UtcNow,
+                RevokedAt = null
+            });
+
+            await _unitOfWork.SaveChangesAsync();
+            await tx.CommitAsync();
+            return (true, null, current.User, newToken);
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<bool> RevokeRefreshTokenAsync(string refreshToken)
@@ -233,6 +271,9 @@ public class AuthService : IAuthService
         }
         return (true, null, user);
     }
+
+    private static string GenerateRefreshToken()
+        => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 
     private static string HashRefreshToken(string token)
         => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
