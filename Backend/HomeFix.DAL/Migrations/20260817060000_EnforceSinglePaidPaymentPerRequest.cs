@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using HomeFix.DAL.Data;
 
 #nullable disable
 
 namespace HomeFix.DAL.Migrations;
 
+[DbContext(typeof(HomeFixDbContext))]
 [Migration("20260817060000_EnforceSinglePaidPaymentPerRequest")]
 public partial class EnforceSinglePaidPaymentPerRequest : Migration
 {
