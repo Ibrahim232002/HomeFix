@@ -142,7 +142,7 @@ class CustomerHomeRedesign extends StatelessWidget {
                           subtitle: Text('${upcoming.first.scheduledDate} • ${upcoming.first.scheduledTime}'),
                           trailing: IconButton(
                             tooltip: 'تفاصيل الحجز',
-                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerBookingScreen(requestId: upcoming.first.serviceRequestId))),
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerBookingScreen(requestId: upcoming.first.requestId))),
                             icon: const Icon(Icons.chevron_left_rounded),
                           ),
                         ),
