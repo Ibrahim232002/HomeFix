@@ -15,4 +15,19 @@ public class BookingDto
 
     public decimal? FinalPrice { get; set; }
     public string? TechnicianNotes { get; set; }
+
+    // Presentation-only fields populated from the related authorized booking graph.
+    public string? ServiceName { get; set; }
+    public string? CustomerName { get; set; }
+    public string? CustomerPhone { get; set; }
+    public string? AddressLabel { get; set; }
+    public string? FullAddress { get; set; }
+    public string? BuildingNumber { get; set; }
+    public string? FloorNumber { get; set; }
+    public string? ApartmentNumber { get; set; }
+    public string? AdditionalInstructions { get; set; }
+    public int? GovernorateId { get; set; }
+    public int? CityId { get; set; }
+    public string? GovernorateName { get; set; }
+    public string? CityName { get; set; }
 }
