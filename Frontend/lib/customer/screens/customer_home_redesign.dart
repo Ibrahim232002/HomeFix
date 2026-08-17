@@ -7,6 +7,8 @@ import '../../core/theme/app_design_tokens.dart';
 import '../../core/widgets/homefix_card.dart';
 import '../../core/widgets/homefix_states.dart';
 import '../../services/app_state_provider.dart';
+import '../../models/service_request_model.dart';
+import '../../models/booking_model.dart';
 import 'create_request_screen.dart';
 import 'service_detail_screen.dart';
 import 'customer_request_detail_screen.dart';
@@ -90,77 +92,33 @@ class CustomerHomeRedesign extends StatelessWidget {
                   ),
                 ),
                 if (active.isNotEmpty)
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 20, AppDesignTokens.pagePadding, 4),
-                    sliver: SliverToBoxAdapter(child: Text('طلبك الحالي', style: Theme.of(context).textTheme.titleLarge)),
-                  ),
+                  SliverPadding(padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 20, AppDesignTokens.pagePadding, 4), sliver: SliverToBoxAdapter(child: Text('طلبك الحالي', style: Theme.of(context).textTheme.titleLarge))),
                 if (active.isNotEmpty)
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding, vertical: 8),
-                    sliver: SliverToBoxAdapter(
-                      child: HomeFixCard(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(backgroundColor: AppColors.primaryLight, child: const Icon(Icons.home_repair_service_rounded, color: AppColors.primaryDark)),
-                          title: Text(active.first.serviceNameAr, style: Theme.of(context).textTheme.titleMedium),
-                          subtitle: Text(active.first.problemDescription, maxLines: 2, overflow: TextOverflow.ellipsis),
-                          trailing: const Icon(Icons.chevron_left_rounded),
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerRequestDetailScreen(request: active.first))),
-                        ),
-                      ),
-                    ),
+                    sliver: SliverToBoxAdapter(child: HomeFixCard(child: ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(backgroundColor: AppColors.primaryLight, child: const Icon(Icons.home_repair_service_rounded, color: AppColors.primaryDark)), title: Text(active.first.serviceNameAr, style: Theme.of(context).textTheme.titleMedium), subtitle: Text(active.first.problemDescription, maxLines: 2, overflow: TextOverflow.ellipsis), trailing: const Icon(Icons.chevron_left_rounded), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerRequestDetailScreen(request: active.first)))))),
                   )
                 else if (upcoming.isEmpty)
-                  const SliverPadding(
-                    padding: EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding, vertical: 12),
-                    sliver: SliverToBoxAdapter(child: HomeFixEmptyState(icon: Icons.home_work_outlined, title: 'لا توجد أعمال جارية', message: 'ابدأ بطلب خدمة وسنساعدك في كل خطوة.')),
-                  ),
+                  const SliverPadding(padding: EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding, vertical: 12), sliver: SliverToBoxAdapter(child: HomeFixEmptyState(icon: Icons.home_work_outlined, title: 'لا توجد أعمال جارية', message: 'ابدأ بطلب خدمة وسنساعدك في كل خطوة.'))),
                 if (upcoming.isNotEmpty)
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 18, AppDesignTokens.pagePadding, 4),
-                    sliver: SliverToBoxAdapter(child: Text('الحجز القادم', style: Theme.of(context).textTheme.titleLarge)),
-                  ),
+                  SliverPadding(padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 18, AppDesignTokens.pagePadding, 4), sliver: SliverToBoxAdapter(child: Text('الحجز القادم', style: Theme.of(context).textTheme.titleLarge))),
                 if (upcoming.isNotEmpty)
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding, vertical: 8),
-                    sliver: SliverToBoxAdapter(
-                      child: HomeFixCard(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(backgroundColor: AppColors.technicianLight, child: const Icon(Icons.calendar_today_rounded, color: AppColors.technicianDark)),
-                          title: Text(upcoming.first.serviceName, style: Theme.of(context).textTheme.titleMedium),
-                          subtitle: Text('${upcoming.first.scheduledDate} • ${upcoming.first.scheduledTime ?? 'موعد قريب'}'),
-                        ),
-                      ),
-                    ),
+                    sliver: SliverToBoxAdapter(child: HomeFixCard(child: ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(backgroundColor: AppColors.technicianLight, child: const Icon(Icons.calendar_today_rounded, color: AppColors.technicianDark)), title: Text(upcoming.first.serviceNameAr, style: Theme.of(context).textTheme.titleMedium), subtitle: Text('${upcoming.first.scheduledDate} • ${upcoming.first.scheduledTime}')))),
                   ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 20, AppDesignTokens.pagePadding, 8),
-                  sliver: SliverToBoxAdapter(child: Text('الخدمات', style: Theme.of(context).textTheme.titleLarge)),
-                ),
+                SliverPadding(padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 20, AppDesignTokens.pagePadding, 8), sliver: SliverToBoxAdapter(child: Text('الخدمات', style: Theme.of(context).textTheme.titleLarge))),
                 if (state.isLoadingPublic && state.services.isEmpty)
                   const SliverPadding(padding: EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding), sliver: SliverToBoxAdapter(child: HomeFixSkeletonList(itemCount: 3)))
                 else if (!state.isLoadingPublic && state.services.isEmpty)
-                  const SliverPadding(padding: EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding), sliver: SliverToBoxAdapter(child: HomeFixEmptyState(icon: Icons.home_repair_service_outlined, title: 'الخدمات غير متاحة الآن', message: 'حاول مرة أخرى خلال قليل.', showRetry: false)))
+                  const SliverPadding(padding: EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding), sliver: SliverToBoxAdapter(child: HomeFixEmptyState(icon: Icons.home_repair_service_outlined, title: 'الخدمات غير متاحة الآن', message: 'حاول مرة أخرى خلال قليل.')))
                 else
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 0, AppDesignTokens.pagePadding, 24),
                     sliver: SliverGrid(
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final service = state.services[index];
-                        return HomeFixCard(
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServiceDetailScreen(service: service))),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(height: 88, decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd)), child: const Center(child: Icon(Icons.home_repair_service_rounded, size: 36, color: AppColors.primary))),
-                              const SizedBox(height: 12),
-                              Text(service.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
-                              const SizedBox(height: 4),
-                              Text(service.categoryNameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
-                            ],
-                          ),
-                        );
+                        return HomeFixCard(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServiceDetailScreen(service: service))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(height: 88, decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd)), child: const Center(child: Icon(Icons.home_repair_service_rounded, size: 36, color: AppColors.primary))), const SizedBox(height: 12), Text(service.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 4), Text(service.categoryNameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted))]));
                       }, childCount: state.services.length.clamp(0, 6)),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: AppResponsive.columns(context), crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.95),
                     ),
