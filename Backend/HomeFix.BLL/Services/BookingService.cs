@@ -2,6 +2,7 @@ using HomeFix.DAL;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
+using System.Data;
 
 namespace HomeFix.BLL.Services;
 
@@ -59,47 +60,73 @@ public class BookingService : IBookingService
         decimal? finalPrice,
         string? technicianNotes)
     {
-        var booking = await _bookingRepository.GetByIdAsync(bookingId);
-        if (booking == null) return (false, "Booking not found.");
-
-        var allowed = booking.Status switch
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
         {
-            "Confirmed" => newStatus is "TechnicianOnTheWay" or "Cancelled",
-            "TechnicianOnTheWay" => newStatus is "Arrived" or "Cancelled",
-            "Arrived" => newStatus == "InProgress",
-            "InProgress" => newStatus is "AwaitingCompletion" or "Cancelled",
-            "AwaitingCompletion" => newStatus == "Completed",
-            _ => false
-        };
+            var booking = await _bookingRepository.GetByIdAsync(bookingId);
+            if (booking == null)
+            {
+                await transaction.RollbackAsync();
+                return (false, "Booking not found.");
+            }
 
-        if (!allowed)
-            return (false, $"Invalid booking status transition from {booking.Status} to {newStatus}.");
+            var allowed = booking.Status switch
+            {
+                "Confirmed" => newStatus is "TechnicianOnTheWay" or "Cancelled",
+                "TechnicianOnTheWay" => newStatus is "Arrived" or "Cancelled",
+                "Arrived" => newStatus == "InProgress",
+                "InProgress" => newStatus is "AwaitingCompletion" or "Cancelled",
+                "AwaitingCompletion" => newStatus == "Completed",
+                _ => false
+            };
 
-        if (finalPrice.HasValue && !string.Equals(newStatus, "Completed", StringComparison.OrdinalIgnoreCase))
-            return (false, "Final price can only be set when completing the booking.");
+            if (!allowed)
+            {
+                await transaction.RollbackAsync();
+                return (false, $"Invalid booking status transition from {booking.Status} to {newStatus}.");
+            }
 
-        if (finalPrice.HasValue && finalPrice.Value <= 0)
-            return (false, "Final price must be greater than zero.");
+            if (finalPrice.HasValue && !string.Equals(newStatus, "Completed", StringComparison.OrdinalIgnoreCase))
+            {
+                await transaction.RollbackAsync();
+                return (false, "Final price can only be set when completing the booking.");
+            }
 
-        var now = DateTime.UtcNow;
-        booking.Status = newStatus;
+            if (finalPrice.HasValue && finalPrice.Value <= 0)
+            {
+                await transaction.RollbackAsync();
+                return (false, "Final price must be greater than zero.");
+            }
 
-        if (newStatus == "TechnicianOnTheWay") booking.AcceptedAt ??= now;
-        if (newStatus == "Arrived") booking.ArrivedAt = now;
-        if (newStatus == "InProgress") booking.StartedAt = now;
+            var now = DateTime.UtcNow;
+            booking.Status = newStatus;
 
-        if (newStatus == "Completed")
-        {
-            booking.CompletedAt = now;
-            booking.FinalPrice = finalPrice ?? booking.FinalPrice ?? booking.AgreedPrice;
-            if (!booking.FinalPrice.HasValue || booking.FinalPrice.Value <= 0)
-                return (false, "A valid final or agreed price is required to complete the booking.");
+            if (newStatus == "TechnicianOnTheWay") booking.AcceptedAt ??= now;
+            if (newStatus == "Arrived") booking.ArrivedAt = now;
+            if (newStatus == "InProgress") booking.StartedAt = now;
+
+            if (newStatus == "Completed")
+            {
+                booking.CompletedAt = now;
+                booking.FinalPrice = finalPrice ?? booking.FinalPrice ?? booking.AgreedPrice;
+                if (!booking.FinalPrice.HasValue || booking.FinalPrice.Value <= 0)
+                {
+                    await transaction.RollbackAsync();
+                    return (false, "A valid final or agreed price is required to complete the booking.");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(technicianNotes))
+                booking.TechnicianNotes = technicianNotes;
+
+            await _unitOfWork.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return (true, null);
         }
-
-        if (!string.IsNullOrWhiteSpace(technicianNotes))
-            booking.TechnicianNotes = technicianNotes;
-
-        await _unitOfWork.SaveChangesAsync();
-        return (true, null);
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
