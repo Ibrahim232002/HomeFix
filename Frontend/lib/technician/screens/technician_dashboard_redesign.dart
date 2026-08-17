@@ -7,6 +7,7 @@ import '../../core/theme/app_responsive.dart';
 import '../../core/widgets/homefix_card.dart';
 import '../../core/widgets/homefix_states.dart';
 import '../../core/widgets/homefix_status_chip.dart';
+import '../../models/booking_model.dart';
 import '../../services/app_state_provider.dart';
 import '../../common/screens/notifications_screen.dart';
 
@@ -74,22 +75,14 @@ class TechnicianDashboardRedesign extends StatelessWidget {
                         children: [
                           Icon((tech?.isAvailable ?? false) ? Icons.radio_button_checked_rounded : Icons.pause_circle_outline_rounded, color: (tech?.isAvailable ?? false) ? AppColors.successDark : AppColors.textMuted),
                           const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text((tech?.isAvailable ?? false) ? 'متاح لاستقبال الطلبات' : 'غير متاح حالياً', style: Theme.of(context).textTheme.titleMedium),
-                              Text((tech?.isAvailable ?? false) ? 'يمكن للعملاء إرسال طلبات جديدة لك.' : 'فعّل التوفر عندما تكون جاهزاً للعمل.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
-                            ]),
-                          ),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text((tech?.isAvailable ?? false) ? 'متاح لاستقبال الطلبات' : 'غير متاح حالياً', style: Theme.of(context).textTheme.titleMedium), Text((tech?.isAvailable ?? false) ? 'يمكن للعملاء إرسال طلبات جديدة لك.' : 'فعّل التوفر عندما تكون جاهزاً للعمل.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted))])),
                           Switch(value: tech?.isAvailable ?? false, onChanged: (_) => state.toggleTechnicianAvailability()),
                         ],
                       ),
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 18, AppDesignTokens.pagePadding, 8),
-                  sliver: SliverToBoxAdapter(child: Text('اليوم', style: Theme.of(context).textTheme.titleLarge)),
-                ),
+                SliverPadding(padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 18, AppDesignTokens.pagePadding, 8), sliver: SliverToBoxAdapter(child: Text('اليوم', style: Theme.of(context).textTheme.titleLarge))),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding),
                   sliver: SliverGrid(
@@ -102,10 +95,7 @@ class TechnicianDashboardRedesign extends StatelessWidget {
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: AppResponsive.columns(context), crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.6),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 20, AppDesignTokens.pagePadding, 8),
-                  sliver: SliverToBoxAdapter(child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('طلبـات جديدة', style: Theme.of(context).textTheme.titleLarge), TextButton(onPressed: () => state.setTechnicianNavIndex(1), child: const Text('عرض الكل'))])),
-                ),
+                SliverPadding(padding: const EdgeInsets.fromLTRB(AppDesignTokens.pagePadding, 20, AppDesignTokens.pagePadding, 8), sliver: SliverToBoxAdapter(child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('طلبات جديدة', style: Theme.of(context).textTheme.titleLarge), TextButton(onPressed: () => state.setTechnicianNavIndex(1), child: const Text('عرض الكل'))]))),
                 if (state.isLoading)
                   const SliverPadding(padding: EdgeInsets.symmetric(horizontal: AppDesignTokens.pagePadding), sliver: SliverToBoxAdapter(child: HomeFixSkeletonList(itemCount: 3)))
                 else if (state.availableTechRequests.isEmpty)
@@ -117,15 +107,7 @@ class TechnicianDashboardRedesign extends StatelessWidget {
                       final request = state.availableTechRequests[index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: HomeFixCard(
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: CircleAvatar(backgroundColor: AppColors.technicianLight, child: const Icon(Icons.home_repair_service_rounded, color: AppColors.technicianDark)),
-                            title: Text(request.serviceNameAr, style: Theme.of(context).textTheme.titleMedium),
-                            subtitle: Text(request.problemDescription, maxLines: 2, overflow: TextOverflow.ellipsis),
-                            trailing: HomeFixStatusChip(label: request.status.nameAr),
-                          ),
-                        ),
+                        child: HomeFixCard(child: ListTile(contentPadding: EdgeInsets.zero, leading: CircleAvatar(backgroundColor: AppColors.technicianLight, child: const Icon(Icons.home_repair_service_rounded, color: AppColors.technicianDark)), title: Text(request.serviceNameAr, style: Theme.of(context).textTheme.titleMedium), subtitle: Text(request.problemDescription, maxLines: 2, overflow: TextOverflow.ellipsis), trailing: HomeFixStatusChip(label: request.status.displayNameAr))),
                       );
                     }, childCount: state.availableTechRequests.length.clamp(0, 5))),
                   ),
