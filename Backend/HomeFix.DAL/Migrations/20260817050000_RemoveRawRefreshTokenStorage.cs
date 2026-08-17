@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace HomeFix.DAL.Migrations;
 
+[Migration("20260817050000_RemoveRawRefreshTokenStorage")]
 public partial class RemoveRawRefreshTokenStorage : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
