@@ -32,12 +32,15 @@ class TechnicianRepository implements ITechnicianRepository {
   TechnicianProfileModel _mapProfile(TechnicianProfileDto dto) => TechnicianProfileModel(
         id: dto.id.toString(),
         userId: dto.userId.toString(),
-        fullName: 'فني #${dto.id}',
+        // The current TechnicianProfiles DTO does not expose the technician's
+        // display name or phone number. Never fabricate an identity from the id.
+        fullName: 'فني معتمد',
         phoneNumber: '',
         bio: dto.bio ?? '',
         avatarUrl: dto.profileImageUrl ?? '',
         rating: dto.averageRating,
-        reviewCount: dto.totalJobs,
+        // totalJobs is not a review count.
+        reviewCount: 0,
         completedJobsCount: dto.totalJobs,
         experienceYears: dto.yearsOfExperience ?? 0,
         verified: dto.isVerified,
@@ -47,7 +50,9 @@ class TechnicianRepository implements ITechnicianRepository {
         governorates: const [],
         cities: const [],
         workingDays: const [],
-        workingHours: WorkingHoursModel(start: '08:00', end: '20:00'),
+        // The profile endpoint does not expose working hours. Keep them empty
+        // instead of presenting an invented schedule.
+        workingHours: WorkingHoursModel(start: '', end: ''),
       );
 
   @override
