@@ -163,8 +163,30 @@ public class ServiceRequestsController : ControllerBase
 
     private static ServiceRequestDto MapToDto(ServiceRequest request) => new()
     {
-        Id = request.Id, CustomerId = request.CustomerId, ServiceId = request.ServiceId, AddressId = request.AddressId,
-        Description = request.Description, PreferredDate = request.PreferredDate, PreferredTime = request.PreferredTime,
-        Status = request.Status, VisitFee = request.VisitFee, CreatedAt = request.CreatedAt, UpdatedAt = request.UpdatedAt
+        Id = request.Id,
+        CustomerId = request.CustomerId,
+        ServiceId = request.ServiceId,
+        AddressId = request.AddressId,
+        Description = request.Description,
+        PreferredDate = request.PreferredDate,
+        PreferredTime = request.PreferredTime,
+        Status = request.Status,
+        VisitFee = request.VisitFee,
+        CreatedAt = request.CreatedAt,
+        UpdatedAt = request.UpdatedAt,
+        ServiceName = request.Service?.Name,
+        ServiceDescription = request.Service?.Description,
+        ServiceImageUrl = request.Service?.ImageUrl,
+        EstimatedDurationMinutes = request.Service?.EstimatedDurationMinutes,
+        AddressLabel = request.Address?.Label,
+        FullAddress = request.Address?.FullAddress,
+        BuildingNumber = request.Address?.BuildingNumber,
+        FloorNumber = request.Address?.FloorNumber,
+        ApartmentNumber = request.Address?.ApartmentNumber,
+        AdditionalInstructions = request.Address?.AdditionalInstructions,
+        GovernorateId = request.Address?.GovernorateId,
+        CityId = request.Address?.CityId,
+        GovernorateName = request.Address?.Governorate?.Name,
+        CityName = request.Address?.City?.Name,
     };
 }
