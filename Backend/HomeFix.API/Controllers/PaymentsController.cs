@@ -4,6 +4,7 @@ using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace HomeFix.API.Controllers;
 
@@ -57,25 +58,48 @@ public class PaymentsController : ControllerBase
         return Ok(MapToDto(result.Payment!));
     }
 
-    // Administrative reconciliation endpoint. Customers/technicians must not
-    // be able to set payment status, amount, or provider references directly.
     [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<ActionResult<PaymentDto>> Create(CreatePaymentRequest request)
     {
-        if (request.Amount <= 0) return BadRequest(new { message = "Amount must be greater than zero." });
+        if (request.Amount <= 0)
+            return BadRequest(new { message = "Amount must be greater than zero." });
+
+        if (string.IsNullOrWhiteSpace(request.PaymentMethod) || string.IsNullOrWhiteSpace(request.PaymentType))
+            return BadRequest(new { message = "Payment type and payment method are required." });
+
+        var serviceRequest = await _requests.GetByIdAsync(request.ServiceRequestId);
+        if (serviceRequest?.Booking is null)
+            return BadRequest(new { message = "A confirmed booking is required before payment." });
+
+        var expectedAmount = serviceRequest.Booking.FinalPrice ?? serviceRequest.Booking.AgreedPrice;
+        if (!expectedAmount.HasValue || expectedAmount.Value <= 0 || expectedAmount.Value != request.Amount)
+            return BadRequest(new { message = "Payment amount must match the booking amount." });
+
+        var existingPayments = await _service.GetByRequestIdAsync(request.ServiceRequestId);
+        if (existingPayments.Any(p => p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
+                                      p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)))
+            return Conflict(new { message = "An active payment already exists for this service request." });
 
         var payment = new Payment
         {
             ServiceRequestId = request.ServiceRequestId,
             Amount = request.Amount,
-            PaymentType = request.PaymentType,
-            PaymentMethod = request.PaymentMethod,
+            PaymentType = request.PaymentType.Trim(),
+            PaymentMethod = request.PaymentMethod.Trim(),
             Status = "Pending",
             CreatedAt = DateTime.UtcNow
         };
 
-        await _service.AddAsync(payment);
+        try
+        {
+            await _service.AddAsync(payment);
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { message = "An active payment already exists for this service request." });
+        }
+
         return CreatedAtAction(nameof(GetById), new { id = payment.Id }, MapToDto(payment));
     }
 
@@ -86,10 +110,55 @@ public class PaymentsController : ControllerBase
         var payment = await _service.GetByIdAsync(id);
         if (payment == null) return NotFound();
 
-        payment.Status = request.Status;
-        payment.TransactionReference = request.TransactionReference;
-        payment.PaidAt = request.PaidAt;
-        await _service.UpdateAsync(payment);
+        var nextStatus = request.Status?.Trim();
+        if (string.IsNullOrWhiteSpace(nextStatus))
+            return BadRequest(new { message = "Payment status is required." });
+
+        var normalizedNext = nextStatus.ToLowerInvariant();
+        var normalizedCurrent = payment.Status.ToLowerInvariant();
+        var allowed = normalizedCurrent switch
+        {
+            "pending" => normalizedNext is "pending" or "paid" or "failed" or "cancelled",
+            "paid" => normalizedNext == "paid",
+            "failed" => normalizedNext == "failed",
+            "cancelled" => normalizedNext == "cancelled",
+            _ => false
+        };
+        if (!allowed)
+            return Conflict(new { message = "Invalid payment status transition." });
+
+        if (normalizedNext is "pending" or "paid")
+        {
+            var conflicting = (await _service.GetByRequestIdAsync(payment.ServiceRequestId))
+                .Any(p => p.Id != payment.Id &&
+                          (p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
+                           p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)));
+            if (conflicting)
+                return Conflict(new { message = "Another active payment already exists for this service request." });
+        }
+
+        payment.Status = normalizedNext switch
+        {
+            "pending" => "Pending",
+            "paid" => "Paid",
+            "failed" => "Failed",
+            "cancelled" => "Cancelled",
+            _ => payment.Status
+        };
+        payment.TransactionReference = request.TransactionReference?.Trim();
+        payment.PaidAt = payment.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)
+            ? request.PaidAt ?? DateTime.UtcNow
+            : null;
+
+        try
+        {
+            await _service.UpdateAsync(payment);
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { message = "Another active payment already exists for this service request." });
+        }
+
         return Ok(MapToDto(payment));
     }
 
