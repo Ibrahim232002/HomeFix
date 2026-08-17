@@ -102,7 +102,6 @@ public class AuthService : IAuthService
         var refreshToken = new RefreshToken
         {
             UserId = user.Id,
-            Token = token,
             TokenHash = HashRefreshToken(token),
             ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays),
             CreatedAt = DateTime.UtcNow,
@@ -211,7 +210,6 @@ public class AuthService : IAuthService
                 IsPhoneVerified = false,
                 CreatedAt = DateTime.UtcNow
             };
-            // Google-created accounts have no usable phone until the user adds one. The current DB requires a value, so the placeholder is unique and must be replaced in profile completion.
             while (await _userRepository.PhoneExistsAsync(user.PhoneNumber)) user.PhoneNumber = "GOOGLE_" + Convert.ToHexString(RandomNumberGenerator.GetBytes(8));
             await _userRepository.AddAsync(user);
             await _unitOfWork.SaveChangesAsync();
@@ -230,7 +228,5 @@ public class AuthService : IAuthService
     }
 
     private static string HashRefreshToken(string token)
-    {
-        return Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
-    }
+        => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
 }
