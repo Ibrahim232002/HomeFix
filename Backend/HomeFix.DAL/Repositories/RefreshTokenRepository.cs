@@ -1,6 +1,8 @@
 ﻿using HomeFix.DAL.Data;
 using HomeFix.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace HomeFix.DAL.Repositories;
 
@@ -13,14 +15,17 @@ public class RefreshTokenRepository
         _context = context;
     }
 
-    public async Task<RefreshToken?> GetByTokenAsync(string token)
+    public Task<RefreshToken?> GetByTokenAsync(string token)
     {
-        return await _context.RefreshTokens.Include(r => r.User).FirstOrDefaultAsync(r => r.Token == token);
+        var tokenHash = HashToken(token);
+        return GetByHashAsync(tokenHash);
     }
 
     public async Task<RefreshToken?> GetByHashAsync(string tokenHash)
     {
-        return await _context.RefreshTokens.Include(r => r.User).FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
+        return await _context.RefreshTokens
+            .Include(r => r.User)
+            .FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
     }
 
     public async Task<List<RefreshToken>> GetByUserIdAsync(int userId)
@@ -40,4 +45,7 @@ public class RefreshTokenRepository
     {
         _context.RefreshTokens.Update(refreshToken);
     }
+
+    private static string HashToken(string token)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }
