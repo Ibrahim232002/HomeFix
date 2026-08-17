@@ -25,272 +25,338 @@ class CustomerRequestDetailScreen extends StatefulWidget {
 }
 
 class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScreen> {
+  ServiceRequestModel? _request;
+  bool _loading = true;
+  String? _error;
   bool _refreshing = false;
 
-  ServiceRequestModel? _findRequest(AppStateProvider state) {
-    for (final request in state.customerRequests) {
-      if (request.id == widget.requestId) return request;
-    }
-    return null;
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
 
-  Future<void> _retry() async {
+  Future<void> _load() async {
     if (_refreshing) return;
-    setState(() => _refreshing = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      await context.read<AppStateProvider>().refreshAuthenticatedData();
-    } finally {
-      if (mounted) setState(() => _refreshing = false);
+      final state = context.read<AppStateProvider>();
+      await state.refreshAuthenticatedData();
+      final request = state.customerRequests.cast<ServiceRequestModel?>().firstWhere(
+            (item) => item?.id == widget.requestId,
+            orElse: () => null,
+          );
+      if (!mounted) return;
+      setState(() {
+        _request = request;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = stateMessage(e);
+      });
     }
   }
 
-  HomeFixStatusTone _tone(ServiceRequestStatus status) => switch (status) {
-        ServiceRequestStatus.pending => HomeFixStatusTone.warning,
-        ServiceRequestStatus.accepted || ServiceRequestStatus.scheduled => HomeFixStatusTone.info,
-        ServiceRequestStatus.inProgress => HomeFixStatusTone.technician,
-        ServiceRequestStatus.completed => HomeFixStatusTone.success,
-        ServiceRequestStatus.cancelled => HomeFixStatusTone.error,
-      };
-
-  IconData _statusIcon(ServiceRequestStatus status) => switch (status) {
-        ServiceRequestStatus.pending => Icons.hourglass_top_rounded,
-        ServiceRequestStatus.accepted => Icons.check_circle_outline_rounded,
-        ServiceRequestStatus.scheduled => Icons.event_available_rounded,
-        ServiceRequestStatus.inProgress => Icons.handyman_rounded,
-        ServiceRequestStatus.completed => Icons.verified_rounded,
-        ServiceRequestStatus.cancelled => Icons.cancel_outlined,
-      };
+  String stateMessage(Object error) => 'تعذر تحميل تفاصيل الطلب. يرجى المحاولة مرة أخرى.';
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppStateProvider>();
-    final request = _findRequest(state);
-
-    if (request == null && state.isLoading) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(title: Text('طلب #${widget.requestId}')),
-        body: ListView(
-          padding: AppResponsive.pagePadding(context),
-          children: const [
-            HomeFixSkeleton(height: 140),
-            SizedBox(height: AppDesignTokens.space4),
-            HomeFixSkeleton(height: 180),
-            SizedBox(height: AppDesignTokens.space4),
-            HomeFixSkeleton(height: 150),
-          ],
-        ),
-      );
-    }
-
-    if (request == null) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(title: Text('طلب #${widget.requestId}')),
-        body: HomeFixErrorState(
-          title: 'تعذر تحميل الطلب',
-          message: state.errorMessage ?? 'لم يتم العثور على بيانات الطلب حالياً.',
-          onRetry: _retry,
-        ),
-      );
-    }
+    final request = _request;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('تفاصيل الطلب #${request.id}'),
-        actions: [
-          IconButton(
-            tooltip: 'تحديث',
-            onPressed: _refreshing ? null : _retry,
-            icon: _refreshing
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text('طلب #${widget.requestId}')),
       body: RefreshIndicator(
-        onRefresh: _retry,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: AppResponsive.pagePadding(context).add(const EdgeInsets.only(bottom: AppDesignTokens.space8)),
-          children: [
-            _HeaderCard(request: request, tone: _tone(request.status), statusIcon: _statusIcon(request.status)),
-            const SizedBox(height: AppDesignTokens.space4),
-            _StatusTimeline(request: request),
-            const SizedBox(height: AppDesignTokens.space4),
-            _SectionCard(
-              title: 'تفاصيل الخدمة',
-              icon: Icons.home_repair_service_rounded,
-              children: [
-                _InfoRow(label: 'الخدمة', value: request.serviceNameAr),
-                _InfoRow(label: 'الوصف', value: request.problemDescription),
-                _InfoRow(label: 'الموعد المطلوب', value: '${request.preferredDate} · ${request.preferredTime}'),
-              ],
-            ),
-            const SizedBox(height: AppDesignTokens.space4),
-            _SectionCard(
-              title: 'العنوان',
-              icon: Icons.location_on_outlined,
-              children: [_InfoRow(label: 'العنوان', value: request.address.fullAddressDescription)],
-            ),
-            const SizedBox(height: AppDesignTokens.space4),
-            _SectionCard(
-              title: 'السعر',
-              icon: Icons.payments_outlined,
-              children: [
-                if (request.finalPrice != null)
-                  Text(
-                    '${request.finalPrice!.toStringAsFixed(2)} ج.م',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppColors.primaryDark),
+        onRefresh: () async {
+          if (_refreshing) return;
+          _refreshing = true;
+          try {
+            await _load();
+          } finally {
+            _refreshing = false;
+          }
+        },
+        child: _loading
+            ? const ListView(padding: EdgeInsets.all(AppDesignTokens.space4), children: [HomeFixSkeletonList(itemCount: 5)])
+            : _error != null
+                ? ListView(
+                    padding: const EdgeInsets.all(AppDesignTokens.space4),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.65,
+                        child: HomeFixErrorState(
+                          title: 'تعذر تحميل الطلب',
+                          message: _error!,
+                          onRetry: _load,
+                        ),
+                      ),
+                    ],
                   )
-                else if (request.estimatedPriceMax > 0)
-                  Text(
-                    '${request.estimatedPriceMin.toStringAsFixed(0)} – ${request.estimatedPriceMax.toStringAsFixed(0)} ج.م',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.primaryDark),
-                  )
-                else
-                  Text('السعر النهائي يحدده عرض الفني.', style: Theme.of(context).textTheme.bodyLarge),
-                if (request.finalPrice == null) ...[
-                  const SizedBox(height: AppDesignTokens.space2),
-                  Text(
-                    'القيمة المعروضة هنا من بيانات الخادم وليست حساباً محلياً نهائياً.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
-                  ),
-                ],
-              ],
-            ),
-            if (request.files.isNotEmpty) ...[
-              const SizedBox(height: AppDesignTokens.space4),
-              _AttachmentsCard(files: request.files),
-            ],
-            if (_showActions(request.status)) ...[
-              const SizedBox(height: AppDesignTokens.space5),
-              _Actions(request: request),
-            ],
-          ],
-        ),
+                : request == null
+                    ? ListView(
+                        padding: const EdgeInsets.all(AppDesignTokens.space4),
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.sizeOf(context).height * 0.65,
+                            child: const HomeFixEmptyState(
+                              icon: Icons.receipt_long_outlined,
+                              title: 'الطلب غير موجود',
+                              message: 'قد يكون الطلب غير متاح أو تم تحديث البيانات. حاول مرة أخرى.',
+                            ),
+                          ),
+                        ],
+                      )
+                    : _buildContent(context, request),
       ),
     );
   }
 
-  bool _showActions(ServiceRequestStatus status) => status != ServiceRequestStatus.cancelled;
-}
-
-class _HeaderCard extends StatelessWidget {
-  const _HeaderCard({required this.request, required this.tone, required this.statusIcon});
-
-  final ServiceRequestModel request;
-  final HomeFixStatusTone tone;
-  final IconData statusIcon;
-
-  @override
-  Widget build(BuildContext context) {
-    return HomeFixCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(request.serviceNameAr, style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: AppDesignTokens.space1),
-                    Text('تم إنشاء الطلب ${request.createdAt}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
-                  ],
-                ),
-              ),
-              HomeFixStatusChip(label: request.status.displayNameAr, tone: tone, icon: statusIcon),
-            ],
-          ),
-          if (request.technicianName != null && request.technicianName!.trim().isNotEmpty) ...[
-            const SizedBox(height: AppDesignTokens.space4),
-            Container(
-              padding: const EdgeInsets.all(AppDesignTokens.space3),
-              decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd)),
-              child: Row(
-                children: [
-                  const CircleAvatar(radius: 22, child: Icon(Icons.person_outline_rounded)),
-                  const SizedBox(width: AppDesignTokens.space3),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('الفني', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
-                        const SizedBox(height: 2),
-                        Text(request.technicianName!, style: Theme.of(context).textTheme.titleMedium),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusTimeline extends StatelessWidget {
-  const _StatusTimeline({required this.request});
-
-  final ServiceRequestModel request;
-
-  @override
-  Widget build(BuildContext context) {
-    final statuses = <ServiceRequestStatus>[
-      ServiceRequestStatus.pending,
+  Widget _buildContent(BuildContext context, ServiceRequestModel request) {
+    final padding = AppResponsive.pagePadding(context);
+    final statusTone = _toneFor(request.status);
+    final hasBooking = {
       ServiceRequestStatus.accepted,
       ServiceRequestStatus.scheduled,
       ServiceRequestStatus.inProgress,
       ServiceRequestStatus.completed,
-    ];
-    final currentIndex = request.status == ServiceRequestStatus.cancelled ? -1 : statuses.indexOf(request.status);
+    }.contains(request.status);
 
-    return HomeFixCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('حالة الطلب', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppDesignTokens.space4),
-          if (request.status == ServiceRequestStatus.cancelled)
-            const _TimelineRow(label: 'تم إلغاء الطلب', icon: Icons.cancel_outlined, tone: HomeFixStatusTone.error, active: true)
-          else
-            for (var index = 0; index < statuses.length; index++)
-              _TimelineRow(
-                label: statuses[index].displayNameAr,
-                icon: Icons.circle,
-                tone: index <= currentIndex ? HomeFixStatusTone.info : HomeFixStatusTone.neutral,
-                active: index == currentIndex,
-                showConnector: index != statuses.length - 1,
+    return ListView(
+      padding: padding.copyWith(bottom: AppDesignTokens.space8),
+      children: [
+        HomeFixCard(
+          gradient: AppColors.primaryGradient,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('طلب الخدمة', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Colors.white70)),
+                        const SizedBox(height: AppDesignTokens.space1),
+                        Text(request.serviceNameAr, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  ),
+                  HomeFixStatusChip(label: request.status.displayNameAr, tone: statusTone, icon: Icons.circle),
+                ],
               ),
+              const SizedBox(height: AppDesignTokens.space4),
+              Text('رقم الطلب: #${request.id}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppDesignTokens.space4),
+        HomeFixCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const HomeFixSectionHeader(title: 'حالة الطلب', subtitle: 'آخر حالة مؤكدة من الخادم'),
+              const SizedBox(height: AppDesignTokens.space4),
+              for (var i = 0; i < _timeline.length; i++)
+                _TimelineItem(
+                  label: _timeline[i].$1,
+                  tone: _timeline[i].$2,
+                  active: _statusStep(request.status) >= i,
+                  showConnector: i < _timeline.length - 1,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppDesignTokens.space4),
+        HomeFixCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const HomeFixSectionHeader(title: 'تفاصيل الخدمة'),
+              const SizedBox(height: AppDesignTokens.space3),
+              _DetailRow(icon: Icons.home_repair_service_outlined, label: 'الخدمة', value: request.serviceNameAr),
+              const SizedBox(height: AppDesignTokens.space2),
+              _DetailRow(icon: Icons.location_on_outlined, label: 'العنوان', value: request.address.fullAddressDescription),
+              const SizedBox(height: AppDesignTokens.space2),
+              _DetailRow(icon: Icons.calendar_today_outlined, label: 'الموعد المفضل', value: '${request.preferredDate} · ${request.preferredTime}'),
+              const SizedBox(height: AppDesignTokens.space2),
+              _DetailRow(icon: Icons.notes_outlined, label: 'وصف المشكلة', value: request.problemDescription),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppDesignTokens.space4),
+        HomeFixCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const HomeFixSectionHeader(title: 'التسعير'),
+              const SizedBox(height: AppDesignTokens.space3),
+              Text(
+                request.finalPrice != null
+                    ? '${request.finalPrice!.toStringAsFixed(2)} ج.م'
+                    : request.estimatedPriceMin > 0
+                        ? '${request.estimatedPriceMin.toStringAsFixed(2)} ج.م – ${request.estimatedPriceMax.toStringAsFixed(2)} ج.م'
+                        : 'سيظهر السعر النهائي بعد اعتماد عرض الفني.',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.primaryDark),
+              ),
+            ],
+          ),
+        ),
+        if (request.files.isNotEmpty) ...[
+          const SizedBox(height: AppDesignTokens.space4),
+          HomeFixCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const HomeFixSectionHeader(title: 'المرفقات'),
+                const SizedBox(height: AppDesignTokens.space3),
+                SizedBox(
+                  height: 90,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: request.files.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: AppDesignTokens.space2),
+                    itemBuilder: (_, index) => ClipRRect(
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd),
+                      child: Image.network(
+                        request.files[index].url,
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 90,
+                          height: 90,
+                          color: AppColors.borderLight,
+                          child: const Icon(Icons.insert_drive_file_outlined),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
+        const SizedBox(height: AppDesignTokens.space5),
+        if (request.status == ServiceRequestStatus.pending)
+          HomeFixButton(
+            label: 'مشاهدة عروض الفنيين',
+            icon: Icons.local_offer_outlined,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerOffersScreen(requestId: request.id))),
+          ),
+        if (hasBooking) ...[
+          if (request.status == ServiceRequestStatus.pending) const SizedBox(height: AppDesignTokens.space2),
+          HomeFixButton(
+            label: 'تفاصيل الحجز والتحقق',
+            icon: Icons.event_available_outlined,
+            variant: HomeFixButtonVariant.secondary,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerBookingScreen(requestId: request.id))),
+          ),
+        ],
+        if (request.status != ServiceRequestStatus.cancelled && request.finalPrice != null) ...[
+          const SizedBox(height: AppDesignTokens.space2),
+          HomeFixButton(
+            label: 'الدفع',
+            icon: Icons.payments_outlined,
+            variant: HomeFixButtonVariant.outline,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerPaymentScreen(request: request))),
+          ),
+        ],
+        if (request.status == ServiceRequestStatus.completed && request.technicianId != null) ...[
+          const SizedBox(height: AppDesignTokens.space2),
+          HomeFixButton(
+            label: 'تقييم الخدمة',
+            icon: Icons.star_rounded,
+            variant: HomeFixButtonVariant.outline,
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => ReviewDialog(
+                requestId: request.id,
+                technicianId: request.technicianId!,
+                technicianName: request.technicianName ?? 'الفني',
+                serviceNameAr: request.serviceNameAr,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
+
+  HomeFixStatusTone _toneFor(ServiceRequestStatus status) {
+    switch (status) {
+      case ServiceRequestStatus.pending:
+        return HomeFixStatusTone.warning;
+      case ServiceRequestStatus.accepted:
+      case ServiceRequestStatus.scheduled:
+        return HomeFixStatusTone.info;
+      case ServiceRequestStatus.inProgress:
+        return HomeFixStatusTone.technician;
+      case ServiceRequestStatus.completed:
+        return HomeFixStatusTone.success;
+      case ServiceRequestStatus.cancelled:
+        return HomeFixStatusTone.error;
+    }
+  }
+
+  int _statusStep(ServiceRequestStatus status) {
+    switch (status) {
+      case ServiceRequestStatus.pending:
+        return 0;
+      case ServiceRequestStatus.accepted:
+      case ServiceRequestStatus.scheduled:
+        return 1;
+      case ServiceRequestStatus.inProgress:
+        return 2;
+      case ServiceRequestStatus.completed:
+        return 3;
+      case ServiceRequestStatus.cancelled:
+        return 0;
+    }
+  }
+
+  List<(String, HomeFixStatusTone)> get _timeline => const [
+        ('قيد المراجعة', HomeFixStatusTone.warning),
+        ('تم قبول الطلب', HomeFixStatusTone.info),
+        ('جاري تنفيذ الخدمة', HomeFixStatusTone.technician),
+        ('اكتملت الخدمة', HomeFixStatusTone.success),
+      ];
 }
 
-class _TimelineRow extends StatelessWidget {
-  const _TimelineRow({required this.label, required this.icon, required this.tone, required this.active, this.showConnector = false});
+class _TimelineItem extends StatelessWidget {
+  const _TimelineItem({required this.label, required this.tone, required this.active, required this.showConnector});
 
   final String label;
-  final IconData icon;
   final HomeFixStatusTone tone;
   final bool active;
   final bool showConnector;
 
+  Color _color() {
+    switch (tone) {
+      case HomeFixStatusTone.success:
+        return AppColors.success;
+      case HomeFixStatusTone.warning:
+        return AppColors.warning;
+      case HomeFixStatusTone.error:
+        return AppColors.error;
+      case HomeFixStatusTone.technician:
+        return AppColors.technicianPrimary;
+      case HomeFixStatusTone.info:
+        return AppColors.primary;
+      case HomeFixStatusTone.neutral:
+        return AppColors.border;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final color = switch (tone) {
-      HomeFixStatusTone.info => AppColors.primary,
-      HomeFixStatusTone.error => AppColors.error,
-      _ => AppColors.border,
-    };
-
+    final color = _color();
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -299,8 +365,12 @@ class _TimelineRow extends StatelessWidget {
           child: Column(
             children: [
               DecoratedBox(
-                decoration: BoxDecoration(color: active ? color : AppColors.surface, shape: BoxShape.circle, border: Border.all(color: color, width: 2)),
-                child: SizedBox(width: 16, height: 16, child: active ? Icon(Icons.check_rounded, size: 11, color: color) : null),
+                decoration: BoxDecoration(
+                  color: active ? color : AppColors.cardBackground,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 2),
+                ),
+                child: SizedBox(width: 16, height: 16, child: active ? Icon(Icons.check_rounded, size: 11, color: Colors.white) : null),
               ),
               if (showConnector) Container(width: 2, height: 28, color: color.withValues(alpha: 0.35)),
             ],
@@ -309,8 +379,14 @@ class _TimelineRow extends StatelessWidget {
         const SizedBox(width: AppDesignTokens.space3),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(top: 0, bottom: AppDesignTokens.space3),
-            child: Text(label, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? AppColors.textPrimary : AppColors.textSecondary)),
+            padding: const EdgeInsets.only(bottom: AppDesignTokens.space3),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    color: active ? AppColors.textPrimary : AppColors.textSecondary,
+                  ),
+            ),
           ),
         ),
       ],
@@ -318,162 +394,31 @@ class _TimelineRow extends StatelessWidget {
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.icon, required this.children});
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.icon, required this.label, required this.value});
 
-  final String title;
   final IconData icon;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return HomeFixCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              DecoratedBox(
-                decoration: const BoxDecoration(color: AppColors.primarySurface, shape: BoxShape.circle),
-                child: Padding(padding: const EdgeInsets.all(AppDesignTokens.space2), child: Icon(icon, size: 19, color: AppColors.primaryDark)),
-              ),
-              const SizedBox(width: AppDesignTokens.space2),
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-            ],
-          ),
-          const SizedBox(height: AppDesignTokens.space4),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDesignTokens.space3),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: AppColors.textMuted)),
-          const SizedBox(height: AppDesignTokens.space1),
-          Text(value, style: Theme.of(context).textTheme.bodyLarge),
-        ],
-      ),
-    );
-  }
-}
-
-class _AttachmentsCard extends StatelessWidget {
-  const _AttachmentsCard({required this.files});
-
-  final List<ServiceRequestFileModel> files;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'المرفقات',
-      icon: Icons.attach_file_rounded,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 94,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: files.length,
-            separatorBuilder: (_, __) => const SizedBox(width: AppDesignTokens.space2),
-            itemBuilder: (_, index) {
-              final file = files[index];
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd),
-                child: Image.network(
-                  file.url,
-                  width: 94,
-                  height: 94,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(width: 94, height: 94, color: AppColors.borderLight, child: const Icon(Icons.insert_drive_file_outlined)),
-                ),
-              );
-            },
+        Icon(icon, size: 20, color: AppColors.primary),
+        const SizedBox(width: AppDesignTokens.space3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: AppColors.textMuted)),
+              const SizedBox(height: AppDesignTokens.space1),
+              Text(value, style: Theme.of(context).textTheme.bodyLarge),
+            ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _Actions extends StatelessWidget {
-  const _Actions({required this.request});
-
-  final ServiceRequestModel request;
-
-  @override
-  Widget build(BuildContext context) {
-    final actions = <Widget>[];
-    if (request.status == ServiceRequestStatus.pending) {
-      actions.add(
-        HomeFixButton(
-          label: 'عرض عروض الفنيين',
-          icon: Icons.local_offer_outlined,
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerOffersScreen(requestId: request.id))),
-        ),
-      );
-    }
-    if (request.status == ServiceRequestStatus.accepted || request.status == ServiceRequestStatus.scheduled || request.status == ServiceRequestStatus.inProgress) {
-      actions.add(
-        HomeFixButton(
-          label: 'تفاصيل الحجز والتحقق',
-          icon: Icons.event_available_outlined,
-          variant: HomeFixButtonVariant.secondary,
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerBookingScreen(requestId: request.id))),
-        ),
-      );
-    }
-    if (request.status == ServiceRequestStatus.completed || request.status == ServiceRequestStatus.scheduled) {
-      actions.add(
-        HomeFixButton(
-          label: 'فتح الدفع',
-          icon: Icons.payments_outlined,
-          variant: HomeFixButtonVariant.outline,
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerPaymentScreen(request: request))),
-        ),
-      );
-    }
-    if (request.status == ServiceRequestStatus.completed && request.technicianId != null && request.technicianId!.isNotEmpty) {
-      actions.add(
-        HomeFixButton(
-          label: 'تقييم الخدمة',
-          icon: Icons.star_outline_rounded,
-          variant: HomeFixButtonVariant.secondary,
-          onPressed: () => showDialog(
-            context: context,
-            builder: (_) => ReviewDialog(
-              requestId: request.id,
-              technicianId: request.technicianId!,
-              technicianName: request.technicianName ?? 'الفني',
-              serviceNameAr: request.serviceNameAr,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (actions.isEmpty) return const SizedBox.shrink();
-    return HomeFixCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('الخطوة التالية', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppDesignTokens.space3),
-          ...actions.map((action) => Padding(padding: const EdgeInsets.only(bottom: AppDesignTokens.space2), child: action)),
-        ],
-      ),
     );
   }
 }
