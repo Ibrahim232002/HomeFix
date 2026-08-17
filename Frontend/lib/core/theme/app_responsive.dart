@@ -29,11 +29,11 @@ class AppResponsive {
     return 2;
   }
 
-  static Widget content(BuildContext context, {required Widget child, bool wide = false}) => HomeFixContent(child: child, wide: wide);
+  static Widget content(BuildContext context, {required Widget child, bool wide = false}) => HomeFixContent(wide: wide, child: child);
 }
 
 class HomeFixContent extends StatelessWidget {
-  const HomeFixContent({super.key, required this.child, this.wide = false, this.padding});
+  const HomeFixContent({super.key, this.wide = false, this.padding, required this.child});
   final Widget child;
   final bool wide;
   final EdgeInsetsGeometry? padding;
