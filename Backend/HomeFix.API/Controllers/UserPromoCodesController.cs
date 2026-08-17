@@ -15,18 +15,15 @@ public class UserPromoCodesController : ControllerBase
     private readonly IUserPromoCodeService _service;
     private readonly IServiceRequestService _requests;
     private readonly ICustomerProfileService _customers;
-    private readonly IPromoCodeService _promoCodes;
 
     public UserPromoCodesController(
         IUserPromoCodeService service,
         IServiceRequestService requests,
-        ICustomerProfileService customers,
-        IPromoCodeService promoCodes)
+        ICustomerProfileService customers)
     {
         _service = service;
         _requests = requests;
         _customers = customers;
-        _promoCodes = promoCodes;
     }
 
     [HttpGet("{id:int}")]
@@ -60,41 +57,15 @@ public class UserPromoCodesController : ControllerBase
         if (serviceRequest == null) return NotFound(new { message = "Service request not found." });
         if (serviceRequest.CustomerId != customer.Id) return Forbid();
 
-        var existing = await _service.GetByRequestIdAsync(request.ServiceRequestId);
-        if (existing != null) return Conflict(new { message = "A promo code has already been applied to this service request." });
-
-        var promo = await _promoCodes.GetByIdAsync(request.PromoCodeId);
-        if (promo == null || !promo.IsActive) return BadRequest(new { message = "Invalid or inactive promo code." });
-        var now = DateTime.UtcNow;
-        if (now < promo.StartDate || now > promo.EndDate) return BadRequest(new { message = "Promo code is outside its validity period." });
-        if (promo.MaxUses.HasValue && promo.UsedCount >= promo.MaxUses.Value) return BadRequest(new { message = "Promo code usage limit has been reached." });
-
-        // Never trust UserId or DiscountAmount sent by the client.
-        var baseAmount = serviceRequest.VisitFee;
-        decimal discountAmount;
-        if (promo.DiscountType.Equals("Percentage", StringComparison.OrdinalIgnoreCase))
-            discountAmount = baseAmount * (promo.DiscountValue / 100m);
-        else if (promo.DiscountType.Equals("Fixed", StringComparison.OrdinalIgnoreCase))
-            discountAmount = promo.DiscountValue;
-        else
-            return BadRequest(new { message = "Unsupported promo code discount type." });
-
-        discountAmount = Math.Max(0m, Math.Min(discountAmount, baseAmount));
-
-        var userPromoCode = new UserPromoCode
+        var result = await _service.ApplyAsync(userId, request.ServiceRequestId, request.PromoCodeId);
+        if (!result.Success)
         {
-            UserId = userId,
-            PromoCodeId = promo.Id,
-            ServiceRequestId = serviceRequest.Id,
-            DiscountAmount = discountAmount,
-            UsedAt = now
-        };
+            if (result.Error?.Contains("already been applied", StringComparison.OrdinalIgnoreCase) == true)
+                return Conflict(new { message = result.Error });
+            return BadRequest(new { message = result.Error });
+        }
 
-        promo.UsedCount++;
-        await _service.AddAsync(userPromoCode);
-        await _promoCodes.UpdateAsync(promo);
-
-        return CreatedAtAction(nameof(GetById), new { id = userPromoCode.Id }, MapToDto(userPromoCode));
+        return CreatedAtAction(nameof(GetById), new { id = result.UserPromoCode!.Id }, MapToDto(result.UserPromoCode));
     }
 
     private async Task<bool> CanAccessUserAsync(int ownerUserId)
