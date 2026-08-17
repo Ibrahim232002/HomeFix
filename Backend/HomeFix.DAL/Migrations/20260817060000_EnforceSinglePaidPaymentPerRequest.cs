@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace HomeFix.DAL.Migrations;
 
+[Migration("20260817060000_EnforceSinglePaidPaymentPerRequest")]
 public partial class EnforceSinglePaidPaymentPerRequest : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
