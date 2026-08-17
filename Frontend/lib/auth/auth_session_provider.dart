@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../core/storage/token_storage.dart';
 import '../models/api_dtos.dart';
@@ -44,8 +45,8 @@ class AuthSessionProvider extends ChangeNotifier {
 
     try {
       await _tokenStorage.initialize();
-      if (!_tokenStorage.hasToken &&
-          (_tokenStorage.refreshToken == null || _tokenStorage.refreshToken!.isEmpty)) {
+      final hasRefresh = _tokenStorage.refreshToken?.isNotEmpty == true;
+      if (!_tokenStorage.hasToken && !hasRefresh) {
         _setUnauthenticated();
         return;
       }
@@ -68,8 +69,6 @@ class AuthSessionProvider extends ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     _clearMessages();
-    _setStatus(AuthSessionStatus.unauthenticated);
-
     try {
       final response = await _authRepository.login(
         LoginRequest(email: email.trim(), password: password),
@@ -92,7 +91,6 @@ class AuthSessionProvider extends ChangeNotifier {
     required UserRole role,
   }) async {
     _clearMessages();
-
     try {
       final response = await _authRepository.register(
         RegisterRequest(
@@ -107,7 +105,6 @@ class AuthSessionProvider extends ChangeNotifier {
       final requiresVerification = response is Map<String, dynamic>
           ? response['requiresEmailVerification'] == true
           : false;
-
       _infoMessage = requiresVerification
           ? 'تم إنشاء الحساب. يرجى تأكيد البريد الإلكتروني ثم تسجيل الدخول.'
           : 'تم إنشاء الحساب. يمكنك تسجيل الدخول الآن.';
@@ -125,8 +122,9 @@ class AuthSessionProvider extends ChangeNotifier {
     try {
       await _apiClient.post(
         ApiConstants.verifyEmail,
-        body: VerifyCodeRequest(email: email.trim(), code: code.trim()).toJson(),
+        body: {'email': email.trim(), 'code': code.trim()},
         includeAuth: false,
+        allowAutoRefresh: false,
       );
       _infoMessage = 'تم تأكيد البريد الإلكتروني. يمكنك تسجيل الدخول الآن.';
       _notify();
@@ -155,6 +153,7 @@ class AuthSessionProvider extends ChangeNotifier {
     final refreshToken = _tokenStorage.refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) {
       await _tokenStorage.clear();
+      _user = null;
       _setUnauthenticated();
       return false;
     }
@@ -189,18 +188,21 @@ class AuthSessionProvider extends ChangeNotifier {
     if (id == null || id.isEmpty) return null;
 
     final role = UserRole.fromString(response['role']?.toString() ?? 'Customer');
+    final name = response['name']?.toString() ?? _tokenStorage.userFullName ?? '';
+    final email = response['email']?.toString() ?? _tokenStorage.userEmail ?? '';
+
     await _tokenStorage.saveTokens(
       accessToken: _tokenStorage.accessToken ?? '',
       userId: int.tryParse(id),
       userRole: role.nameStr,
-      userEmail: response['email']?.toString(),
-      userFullName: response['name']?.toString(),
+      userEmail: email,
+      userFullName: name,
     );
 
     return UserModel(
       id: id,
-      fullName: response['name']?.toString() ?? _tokenStorage.userFullName ?? '',
-      email: response['email']?.toString() ?? _tokenStorage.userEmail ?? '',
+      fullName: name,
+      email: email,
       phoneNumber: '',
       role: role,
       createdAt: '',
@@ -223,10 +225,7 @@ class AuthSessionProvider extends ChangeNotifier {
       if (_status == AuthSessionStatus.authenticated) {
         _setStatus(AuthSessionStatus.refreshing);
       }
-      return;
-    }
-
-    if (_status == AuthSessionStatus.refreshing && _tokenStorage.hasToken) {
+    } else if (_status == AuthSessionStatus.refreshing && _tokenStorage.hasToken) {
       _setStatus(AuthSessionStatus.authenticated);
     }
   }
@@ -264,9 +263,7 @@ class AuthSessionProvider extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _apiClient.refreshInProgress.removeListener(_handleRefreshStateChanged);
-    if (identical(_apiClient.onSessionExpired, _handleSessionExpired)) {
-      _apiClient.onSessionExpired = null;
-    }
+    _apiClient.onSessionExpired = null;
     super.dispose();
   }
 }
