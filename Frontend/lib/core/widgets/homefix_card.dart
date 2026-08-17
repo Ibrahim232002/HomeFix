@@ -10,6 +10,7 @@ class HomeFixCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(AppDesignTokens.space4),
     this.margin = EdgeInsets.zero,
     this.backgroundColor = AppColors.cardBackground,
+    this.gradient,
     this.borderColor = AppColors.border,
     this.radius = AppDesignTokens.radiusLg,
     this.onTap,
@@ -19,6 +20,7 @@ class HomeFixCard extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
   final Color backgroundColor;
+  final Gradient? gradient;
   final Color borderColor;
   final double radius;
   final VoidCallback? onTap;
@@ -26,13 +28,19 @@ class HomeFixCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = Material(
-      color: backgroundColor,
+      color: gradient == null ? backgroundColor : Colors.transparent,
       elevation: 0,
       borderRadius: BorderRadius.circular(radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Padding(padding: padding, child: child),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: gradient == null ? backgroundColor : null,
+            gradient: gradient,
+          ),
+          child: Padding(padding: padding, child: child),
+        ),
       ),
     );
 
@@ -41,7 +49,6 @@ class HomeFixCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: borderColor),
-        boxShadow: const [],
       ),
       child: card,
     );
