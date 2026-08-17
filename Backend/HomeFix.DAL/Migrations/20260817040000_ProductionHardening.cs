@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using HomeFix.DAL.Data;
 
@@ -12,7 +13,6 @@ public partial class ProductionHardening : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        // Clean up legacy conflicts created before payment idempotency hardening.
         migrationBuilder.Sql("""
             UPDATE pendingPayment
             SET Status = 'Cancelled'
@@ -27,7 +27,6 @@ public partial class ProductionHardening : Migration
               );
             """);
 
-        // Keep the oldest remaining pending payment for each request; cancel stale duplicates.
         migrationBuilder.Sql("""
             WITH PendingPayments AS
             (
