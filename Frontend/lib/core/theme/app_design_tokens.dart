@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// HomeFix visual language in one place.
-///
-/// Keep business logic out of this layer. Screen-level styling should consume
-/// these tokens instead of introducing one-off values.
 class AppDesignTokens {
   AppDesignTokens._();
 
-  // Spacing scale — 4pt base.
   static const double space1 = 4;
   static const double space2 = 8;
   static const double space3 = 12;
@@ -20,7 +16,6 @@ class AppDesignTokens {
   static const double space12 = 48;
   static const double space16 = 64;
 
-  // Radius scale.
   static const double radiusXs = 8;
   static const double radiusSm = 10;
   static const double radiusMd = 12;
@@ -28,19 +23,16 @@ class AppDesignTokens {
   static const double radiusXl = 20;
   static const double radiusPill = 999;
 
-  // Component heights / touch targets.
   static const double buttonHeight = 50;
   static const double buttonHeightCompact = 44;
   static const double fieldHeight = 52;
   static const double navHeight = 72;
   static const double minTouchTarget = 48;
 
-  // Elevation values stay intentionally restrained for a modern marketplace UI.
   static const double elevationCard = 0;
   static const double elevationSheet = 8;
   static const double elevationDialog = 16;
 
-  // Responsive content widths.
   static const double contentMaxWidth = 720;
   static const double wideContentMaxWidth = 1120;
 
