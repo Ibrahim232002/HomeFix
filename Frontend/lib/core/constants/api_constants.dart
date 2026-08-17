@@ -73,6 +73,7 @@ class ApiConstants {
   static const String payments = '/api/Payments';
   static String paymentById(int id) => '/api/Payments/$id';
   static String paymentsByRequest(int serviceRequestId) => '/api/Payments/request/$serviceRequestId';
+  static String payableAmountByRequest(int serviceRequestId) => '/api/Payments/request/$serviceRequestId/payable';
   static String setCashPayment(int serviceRequestId) => '/api/Payments/cash/$serviceRequestId';
 
   static const String reviews = '/api/Reviews';
