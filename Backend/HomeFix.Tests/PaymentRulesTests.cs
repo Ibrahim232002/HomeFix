@@ -34,6 +34,15 @@ public class PaymentRulesTests
         Assert.False(PaymentRules.HasActiveConflict(new[] { payment }, excludedPaymentId: 7));
     }
 
+    [Fact]
+    public void SecondPaymentAttempt_IsBlockedWhenFirstAttemptIsActive()
+    {
+        var firstAttempt = new Payment { Id = 20, Status = "Pending", PaymentMethod = "Cash" };
+
+        // The payment service executes this invariant inside a Serializable transaction.
+        Assert.True(PaymentRules.HasActiveConflict(new[] { firstAttempt }));
+    }
+
     [Theory]
     [InlineData("Pending", "Paid", true)]
     [InlineData("Pending", "Cancelled", true)]
