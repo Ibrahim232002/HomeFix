@@ -13,77 +13,65 @@ class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
 
-  ApiClient._internal({http.Client? httpClient, IAuthSessionStorage? tokenStorage})
+  ApiClient._internal({http.Client? httpClient, IAuthSessionStorage? tokenStorage, String? baseUrl})
       : _httpClient = httpClient ?? http.Client(),
-        _tokenStorage = tokenStorage ?? TokenStorage();
+        _tokenStorage = tokenStorage ?? TokenStorage(),
+        _baseUrl = baseUrl;
 
   @visibleForTesting
-  ApiClient.testing({required http.Client httpClient, required IAuthSessionStorage tokenStorage})
+  ApiClient.testing({required http.Client httpClient, required IAuthSessionStorage tokenStorage, String baseUrl = 'https://test.invalid'})
       : _httpClient = httpClient,
-        _tokenStorage = tokenStorage;
+        _tokenStorage = tokenStorage,
+        _baseUrl = baseUrl;
 
   final http.Client _httpClient;
   final IAuthSessionStorage _tokenStorage;
+  final String? _baseUrl;
   final ValueNotifier<bool> refreshInProgress = ValueNotifier<bool>(false);
 
   Future<bool>? _refreshOperation;
   VoidCallback? onSessionExpired;
 
+  String get _configuredBaseUrl => _baseUrl ?? ApiConstants.baseUrl;
+
   Uri _buildUri(String endpoint, [Map<String, dynamic>? queryParameters]) {
     final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
-    final uri = Uri.parse('${ApiConstants.baseUrl}$cleanEndpoint');
+    final uri = Uri.parse('$_configuredBaseUrl$cleanEndpoint');
     if (queryParameters == null || queryParameters.isEmpty) return uri;
     final stringParams = queryParameters.map((key, value) => MapEntry(key, value?.toString() ?? ''));
     return uri.replace(queryParameters: stringParams);
   }
 
   Map<String, String> _buildHeaders({bool includeAuth = true, Map<String, String>? customHeaders}) {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-    if (includeAuth && _tokenStorage.hasToken) {
-      headers['Authorization'] = 'Bearer ${_tokenStorage.accessToken}';
-    }
+    final headers = <String, String>{'Content-Type': 'application/json', 'Accept': 'application/json'};
+    if (includeAuth && _tokenStorage.hasToken) headers['Authorization'] = 'Bearer ${_tokenStorage.accessToken}';
     if (customHeaders != null) headers.addAll(customHeaders);
     return headers;
   }
 
-  Future<dynamic> get(String endpoint, {Map<String, dynamic>? queryParameters, bool includeAuth = true, bool allowAutoRefresh = true}) {
-    return _sendRequest(() async {
-      final response = await _httpClient
-          .get(_buildUri(endpoint, queryParameters), headers: _buildHeaders(includeAuth: includeAuth))
-          .timeout(ApiConstants.timeoutDuration);
-      return _handleResponse(response);
-    }, endpoint: endpoint, allowAutoRefresh: allowAutoRefresh);
-  }
+  Future<dynamic> get(String endpoint, {Map<String, dynamic>? queryParameters, bool includeAuth = true, bool allowAutoRefresh = true}) =>
+      _sendRequest(() async {
+        final response = await _httpClient.get(_buildUri(endpoint, queryParameters), headers: _buildHeaders(includeAuth: includeAuth)).timeout(ApiConstants.timeoutDuration);
+        return _handleResponse(response);
+      }, endpoint: endpoint, allowAutoRefresh: allowAutoRefresh);
 
-  Future<dynamic> post(String endpoint, {dynamic body, Map<String, dynamic>? queryParameters, bool includeAuth = true, bool allowAutoRefresh = true}) {
-    return _sendRequest(() async {
-      final response = await _httpClient
-          .post(_buildUri(endpoint, queryParameters), headers: _buildHeaders(includeAuth: includeAuth), body: body == null ? null : jsonEncode(body))
-          .timeout(ApiConstants.timeoutDuration);
-      return _handleResponse(response);
-    }, endpoint: endpoint, allowAutoRefresh: allowAutoRefresh);
-  }
+  Future<dynamic> post(String endpoint, {dynamic body, Map<String, dynamic>? queryParameters, bool includeAuth = true, bool allowAutoRefresh = true}) =>
+      _sendRequest(() async {
+        final response = await _httpClient.post(_buildUri(endpoint, queryParameters), headers: _buildHeaders(includeAuth: includeAuth), body: body == null ? null : jsonEncode(body)).timeout(ApiConstants.timeoutDuration);
+        return _handleResponse(response);
+      }, endpoint: endpoint, allowAutoRefresh: allowAutoRefresh);
 
-  Future<dynamic> put(String endpoint, {dynamic body, Map<String, dynamic>? queryParameters, bool includeAuth = true, bool allowAutoRefresh = true}) {
-    return _sendRequest(() async {
-      final response = await _httpClient
-          .put(_buildUri(endpoint, queryParameters), headers: _buildHeaders(includeAuth: includeAuth), body: body == null ? null : jsonEncode(body))
-          .timeout(ApiConstants.timeoutDuration);
-      return _handleResponse(response);
-    }, endpoint: endpoint, allowAutoRefresh: allowAutoRefresh);
-  }
+  Future<dynamic> put(String endpoint, {dynamic body, Map<String, dynamic>? queryParameters, bool includeAuth = true, bool allowAutoRefresh = true}) =>
+      _sendRequest(() async {
+        final response = await _httpClient.put(_buildUri(endpoint, queryParameters), headers: _buildHeaders(includeAuth: includeAuth), body: body == null ? null : jsonEncode(body)).timeout(ApiConstants.timeoutDuration);
+        return _handleResponse(response);
+      }, endpoint: endpoint, allowAutoRefresh: allowAutoRefresh);
 
-  Future<dynamic> delete(String endpoint, {dynamic body, Map<String, dynamic>? queryParameters, bool includeAuth = true, bool allowAutoRefresh = true}) {
-    return _sendRequest(() async {
-      final response = await _httpClient
-          .delete(_buildUri(endpoint, queryParameters), headers: _buildHeaders(includeAuth: includeAuth), body: body == null ? null : jsonEncode(body))
-          .timeout(ApiConstants.timeoutDuration);
-      return _handleResponse(response);
-    }, endpoint: endpoint, allowAutoRefresh: allowAutoRefresh);
-  }
+  Future<dynamic> delete(String endpoint, {dynamic body, Map<String, dynamic>? queryParameters, bool includeAuth = true, bool allowAutoRefresh = true}) =>
+      _sendRequest(() async {
+        final response = await _httpClient.delete(_buildUri(endpoint, queryParameters), headers: _buildHeaders(includeAuth: includeAuth), body: body == null ? null : jsonEncode(body)).timeout(ApiConstants.timeoutDuration);
+        return _handleResponse(response);
+      }, endpoint: endpoint, allowAutoRefresh: allowAutoRefresh);
 
   Future<dynamic> _sendRequest(Future<dynamic> Function() requestFn, {required String endpoint, required bool allowAutoRefresh}) async {
     try {
@@ -91,13 +79,11 @@ class ApiClient {
     } on UnauthorizedException {
       final isAuthEndpoint = endpoint.startsWith('/api/Auth/');
       if (!allowAutoRefresh || isAuthEndpoint || _tokenStorage.refreshToken == null) rethrow;
-
       final refreshed = await _tryRefreshToken();
       if (!refreshed) {
         await _expireLocalSession();
         rethrow;
       }
-
       try {
         return await requestFn();
       } on UnauthorizedException {
@@ -133,9 +119,7 @@ class ApiClient {
     if (refreshToken == null || refreshToken.isEmpty) return false;
     refreshInProgress.value = true;
     try {
-      final response = await _httpClient
-          .post(_buildUri(ApiConstants.refresh), headers: _buildHeaders(includeAuth: false), body: jsonEncode({'refreshToken': refreshToken}))
-          .timeout(ApiConstants.timeoutDuration);
+      final response = await _httpClient.post(_buildUri(ApiConstants.refresh), headers: _buildHeaders(includeAuth: false), body: jsonEncode({'refreshToken': refreshToken})).timeout(ApiConstants.timeoutDuration);
       if (response.statusCode != 200) return false;
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) return false;
@@ -173,11 +157,9 @@ class ApiClient {
     String errorMessage = 'حدث خطأ في الخادم';
     Map<String, dynamic>? validationErrors;
     if (decodedData is Map<String, dynamic>) {
-      if (decodedData['message'] != null) {
-        errorMessage = decodedData['message'].toString();
-      } else if (decodedData['title'] != null) {
-        errorMessage = decodedData['title'].toString();
-      } else if (decodedData['errors'] is Map) {
+      if (decodedData['message'] != null) errorMessage = decodedData['message'].toString();
+      else if (decodedData['title'] != null) errorMessage = decodedData['title'].toString();
+      else if (decodedData['errors'] is Map) {
         validationErrors = Map<String, dynamic>.from(decodedData['errors'] as Map);
         final firstError = validationErrors.values.whereType<List>().expand((e) => e).firstOrNull;
         if (firstError != null) errorMessage = firstError.toString();
@@ -187,16 +169,11 @@ class ApiClient {
     }
 
     switch (statusCode) {
-      case 400:
-        throw BadRequestException(errorMessage, data: decodedData, validationErrors: validationErrors);
-      case 401:
-        throw UnauthorizedException(errorMessage);
-      case 403:
-        throw ForbiddenException(errorMessage);
-      case 404:
-        throw NotFoundException(errorMessage);
-      default:
-        throw ServerException(errorMessage.isNotEmpty ? errorMessage : 'خطأ في الخادم ($statusCode)');
+      case 400: throw BadRequestException(errorMessage, data: decodedData, validationErrors: validationErrors);
+      case 401: throw UnauthorizedException(errorMessage);
+      case 403: throw ForbiddenException(errorMessage);
+      case 404: throw NotFoundException(errorMessage);
+      default: throw ServerException(errorMessage.isNotEmpty ? errorMessage : 'خطأ في الخادم ($statusCode)');
     }
   }
 }
