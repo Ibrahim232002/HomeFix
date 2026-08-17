@@ -5,12 +5,13 @@ import '../models/api_dtos.dart';
 abstract class IPaymentRepository {
   Future<PaymentDto> getPaymentById(int id);
   Future<List<PaymentDto>> getPaymentsByRequestId(int serviceRequestId);
-  Future<PaymentDto> createPayment(CreatePaymentRequest request);
-  Future<PaymentDto> updatePayment(int id, UpdatePaymentRequest request);
+  Future<PaymentDto> setCashPayment(int serviceRequestId);
+
+  /// The current backend exposes card/gateway creation only as an Admin endpoint.
+  /// Keep these methods explicit so the UI cannot pretend a customer gateway flow exists.
   Future<InitiatePaymentResponse> initiatePayment(InitiatePaymentRequest request);
   Future<VerifyPaymentResponse> verifyPayment(int paymentId);
   Future<VerifyPaymentResponse> inquirePaymentByReference(String reference);
-  Future<PaymentDto> setCashPayment(int serviceRequestId);
 }
 
 class PaymentRepository implements IPaymentRepository {
@@ -25,45 +26,36 @@ class PaymentRepository implements IPaymentRepository {
   @override
   Future<List<PaymentDto>> getPaymentsByRequestId(int serviceRequestId) async {
     final response = await _client.get(ApiConstants.paymentsByRequest(serviceRequestId));
-    if (response is List) {
-      return response.map((item) => PaymentDto.fromJson(item as Map<String, dynamic>)).toList();
-    }
-    return [];
-  }
-
-  @override
-  Future<PaymentDto> createPayment(CreatePaymentRequest request) async {
-    final response = await _client.post(ApiConstants.payments, body: request.toJson());
-    return PaymentDto.fromJson(response as Map<String, dynamic>);
-  }
-
-  @override
-  Future<PaymentDto> updatePayment(int id, UpdatePaymentRequest request) async {
-    final response = await _client.put(ApiConstants.paymentById(id), body: request.toJson());
-    return PaymentDto.fromJson(response as Map<String, dynamic>);
-  }
-
-  @override
-  Future<InitiatePaymentResponse> initiatePayment(InitiatePaymentRequest request) async {
-    final response = await _client.post(ApiConstants.initiatePayment, body: request.toJson());
-    return InitiatePaymentResponse.fromJson(response as Map<String, dynamic>);
-  }
-
-  @override
-  Future<VerifyPaymentResponse> verifyPayment(int paymentId) async {
-    final response = await _client.get(ApiConstants.verifyPayment(paymentId));
-    return VerifyPaymentResponse.fromJson(response as Map<String, dynamic>);
-  }
-
-  @override
-  Future<VerifyPaymentResponse> inquirePaymentByReference(String reference) async {
-    final response = await _client.get(ApiConstants.inquirePaymentByReference(reference));
-    return VerifyPaymentResponse.fromJson(response as Map<String, dynamic>);
+    if (response is! List) return [];
+    return response
+        .map((item) => PaymentDto.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   @override
   Future<PaymentDto> setCashPayment(int serviceRequestId) async {
     final response = await _client.post(ApiConstants.setCashPayment(serviceRequestId));
     return PaymentDto.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<InitiatePaymentResponse> initiatePayment(InitiatePaymentRequest request) async {
+    throw UnsupportedError(
+      'Card/mobile-wallet gateway initiation is not exposed to customers by the current backend API.',
+    );
+  }
+
+  @override
+  Future<VerifyPaymentResponse> verifyPayment(int paymentId) async {
+    throw UnsupportedError(
+      'Gateway payment verification is not exposed by the current backend API.',
+    );
+  }
+
+  @override
+  Future<VerifyPaymentResponse> inquirePaymentByReference(String reference) async {
+    throw UnsupportedError(
+      'Gateway payment inquiry is not exposed by the current backend API.',
+    );
   }
 }
