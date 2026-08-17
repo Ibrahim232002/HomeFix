@@ -85,12 +85,10 @@ class _HomeShellState extends State<_HomeShell> {
         });
       }
     } else if (session.status == AuthSessionStatus.unauthenticated) {
-      if (_loadedUserId != null) {
-        _loadedUserId = null;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) appState.logout();
-        });
-      }
+      _loadedUserId = null;
+      // AuthSessionProvider owns credential/session clearing. AppState data is
+      // refreshed from the next authenticated session and is never used while
+      // this router is unauthenticated.
     }
   }
 
