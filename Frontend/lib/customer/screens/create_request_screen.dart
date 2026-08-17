@@ -20,7 +20,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   late ServiceModel _selectedService;
   AddressModel? _selectedAddress;
   final TextEditingController _problemController = TextEditingController();
-  final TextEditingController _promoController = TextEditingController();
 
   String _selectedDate = 'اليوم';
   String _selectedTime = '04:30 مساءً';
@@ -64,11 +63,8 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   @override
   void dispose() {
     _problemController.dispose();
-    _promoController.dispose();
     super.dispose();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -77,9 +73,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     final double visitFee = _selectedService.pricing.visitFee;
     final double estimatedMin = _selectedService.pricing.minPrice;
     final double estimatedMax = _selectedService.pricing.maxPrice;
-    final double discountAmount = appState.appliedPromo != null
-        ? (estimatedMin * (appState.appliedPromo!.discountPercentage / 100)).clamp(0, appState.appliedPromo!.maxDiscountAmount)
-        : 0.0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -91,7 +84,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Selected Service Preview Card
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -141,7 +133,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Address Selector Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -208,7 +199,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Problem Description Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -256,8 +246,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Photo Attachments
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.primary),
@@ -266,51 +254,19 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                       minimumSize: const Size(double.infinity, 38),
                     ),
                     icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
-                    label: const Text('إرفاق صور أو مقطع للعطل (اختياري)', style: TextStyle(fontSize: 12, fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+                    label: const Text('إرفاق صور أو مقطع للعطل (غير متاح حالياً)', style: TextStyle(fontSize: 12, fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
                     onPressed: null,
                   ),
-                  if (_attachedFiles.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 65,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _attachedFiles.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final f = _attachedFiles[index];
-                          return Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(f.url, width: 65, height: 65, fit: BoxFit.cover),
-                              ),
-                              Positioned(
-                                top: 2,
-                                right: 2,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() => _attachedFiles.removeAt(index));
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                                    child: const Icon(Icons.close, color: Colors.white, size: 14),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 6),
+                  const Text(
+                    'رفع الملفات غير متاح لأن الخادم الحالي لا يوفّر endpoint لرفع الملفات الثنائية. لن يتم حفظ مرفق وهمي.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo'),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
 
-            // Date & Time Scheduling
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -366,7 +322,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Promo Code & Price Summary Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -378,92 +333,23 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'كوبون الخصم والتسعير',
+                    'التسعير',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo'),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _promoController,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: InputDecoration(
-                            hintText: 'أدخل كود الخصم (مثال: HOME25)',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            suffixIcon: appState.appliedPromo != null
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, color: AppColors.error, size: 18),
-                                    onPressed: () {
-                                      _promoController.clear();
-                                      appState.removePromoCode();
-                                    },
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryDark,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          if (_promoController.text.trim().isNotEmpty) {
-                            appState.applyPromoCode(_promoController.text.trim());
-                          }
-                        },
-                        child: const Text('تطبيق', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  if (appState.appliedPromo != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: AppColors.successLight, borderRadius: BorderRadius.circular(8)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle_rounded, color: AppColors.successDark, size: 16),
-                          const SizedBox(width: 6),
-                          Text(
-                            'تم تطبيق ${appState.appliedPromo!.title} بنجاح!',
-                            style: const TextStyle(fontSize: 12, color: AppColors.successDark, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const Divider(height: 24),
                   _buildPriceRow('رسوم الزيارة والفحص', '${visitFee.toInt()} ${_selectedService.pricing.currency}'),
                   const SizedBox(height: 6),
                   _buildPriceRow('أجور الخدمة التقديرية', '${(estimatedMin - visitFee).toInt()} - ${(estimatedMax - visitFee).toInt()} ${_selectedService.pricing.currency}'),
-                  if (discountAmount > 0) ...[
-                    const SizedBox(height: 6),
-                    _buildPriceRow('الخصم المطبق', '-${discountAmount.toInt()} ${_selectedService.pricing.currency}', isDiscount: true),
-                  ],
                   const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'المبلغ التقديري الكلي',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo'),
-                      ),
-                      Text(
-                        '${(estimatedMin - discountAmount).toInt()} - ${(estimatedMax - discountAmount).toInt()} ${_selectedService.pricing.currency}',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primaryDark, fontFamily: 'Cairo'),
-                      ),
-                    ],
+                  const Text(
+                    'المبلغ المعروض هنا تقديري فقط. السعر النهائي وعروض الفني والخصم المعتمد تأتي من الخادم.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo'),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Submit Button
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -511,9 +397,10 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                             builder: (_) => CustomerRequestDetailScreen(requestId: newReq.id),
                           ),
                         );
-                      } catch (e) {
+                      } catch (_) {
+                        if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('حدث خطأ: $e')),
+                          const SnackBar(content: Text('تعذر إرسال الطلب. يرجى المحاولة مرة أخرى.')),
                         );
                       } finally {
                         if (mounted) setState(() => _isSubmitting = false);
