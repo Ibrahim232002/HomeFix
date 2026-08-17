@@ -5,6 +5,7 @@ import '../models/api_dtos.dart';
 abstract class IPaymentRepository {
   Future<PaymentDto> getPaymentById(int id);
   Future<List<PaymentDto>> getPaymentsByRequestId(int serviceRequestId);
+  Future<double> getPayableAmountByRequest(int serviceRequestId);
   Future<PaymentDto> setCashPayment(int serviceRequestId);
 
   /// The current backend exposes card/gateway creation only as an Admin endpoint.
@@ -30,6 +31,17 @@ class PaymentRepository implements IPaymentRepository {
     return response
         .map((item) => PaymentDto.fromJson(item as Map<String, dynamic>))
         .toList();
+  }
+
+  @override
+  Future<double> getPayableAmountByRequest(int serviceRequestId) async {
+    final response = await _client.get(ApiConstants.payableAmountByRequest(serviceRequestId));
+    if (response is! Map<String, dynamic>) {
+      throw StateError('استجابة المبلغ المستحق غير صالحة');
+    }
+    final amount = response['amount'];
+    if (amount is num) return amount.toDouble();
+    throw StateError('المبلغ المستحق غير صالح');
   }
 
   @override
