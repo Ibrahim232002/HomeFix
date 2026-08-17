@@ -1,9 +1,10 @@
 using HomeFix.API.DTOs.Conversation;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
-using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace HomeFix.API.Controllers;
 
@@ -33,57 +34,51 @@ public class ConversationsController : ControllerBase
     public async Task<ActionResult<ConversationDto>> GetById(int id)
     {
         var conversation = await _service.GetByIdAsync(id);
-
-        if (conversation == null)
-            return NotFound();
+        if (conversation == null) return NotFound();
         if (!await CanAccessAsync(conversation)) return Forbid();
-
         return Ok(MapToDto(conversation));
     }
 
     [HttpGet("request/{serviceRequestId:int}")]
-    public async Task<ActionResult<ConversationDto>> GetByRequestId(
-        int serviceRequestId)
+    public async Task<ActionResult<ConversationDto>> GetByRequestId(int serviceRequestId)
     {
-        var conversation =
-            await _service.GetByRequestIdAsync(serviceRequestId);
-
-        if (conversation == null)
-            return NotFound();
+        var conversation = await _service.GetByRequestIdAsync(serviceRequestId);
+        if (conversation == null) return NotFound();
         if (!await CanAccessAsync(conversation)) return Forbid();
-
         return Ok(MapToDto(conversation));
     }
 
     [HttpGet("customer/{customerId:int}")]
-    public async Task<ActionResult<List<ConversationDto>>>
-        GetByCustomerId(int customerId)
+    public async Task<ActionResult<List<ConversationDto>>> GetByCustomerId(int customerId)
     {
         if (!await IsCustomerOwnerAsync(customerId)) return Forbid();
-        var conversations =
-            await _service.GetByCustomerIdAsync(customerId);
-
+        var conversations = await _service.GetByCustomerIdAsync(customerId);
         return Ok(conversations.Select(MapToDto).ToList());
     }
 
     [HttpGet("technician/{technicianId:int}")]
-    public async Task<ActionResult<List<ConversationDto>>>
-        GetByTechnicianId(int technicianId)
+    public async Task<ActionResult<List<ConversationDto>>> GetByTechnicianId(int technicianId)
     {
         if (!await IsTechnicianOwnerAsync(technicianId)) return Forbid();
-        var conversations =
-            await _service.GetByTechnicianIdAsync(technicianId);
-
+        var conversations = await _service.GetByTechnicianIdAsync(technicianId);
         return Ok(conversations.Select(MapToDto).ToList());
     }
 
     [HttpPost]
-    public async Task<ActionResult<ConversationDto>> Create(
-        CreateConversationRequest request)
+    public async Task<ActionResult<ConversationDto>> Create(CreateConversationRequest request)
     {
+        if (request.ServiceRequestId <= 0)
+            return BadRequest(new { message = "A valid service request is required." });
+
         var booking = await _bookings.GetByRequestIdAsync(request.ServiceRequestId);
         if (booking == null) return BadRequest(new { message = "A confirmed booking is required before creating a conversation." });
         if (!await IsParticipantAsync(booking)) return Forbid();
+
+        // Conversation is one-per-service-request. Return the existing conversation
+        // instead of generating a duplicate request under retries.
+        var existing = await _service.GetByRequestIdAsync(request.ServiceRequestId);
+        if (existing != null)
+            return Ok(MapToDto(existing));
 
         var conversation = new Conversation
         {
@@ -93,12 +88,19 @@ public class ConversationsController : ControllerBase
             CreatedAt = DateTime.UtcNow
         };
 
-        await _service.AddAsync(conversation);
+        try
+        {
+            await _service.AddAsync(conversation);
+        }
+        catch (DbUpdateException)
+        {
+            var racedConversation = await _service.GetByRequestIdAsync(request.ServiceRequestId);
+            if (racedConversation != null)
+                return Ok(MapToDto(racedConversation));
+            throw;
+        }
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = conversation.Id },
-            MapToDto(conversation));
+        return CreatedAtAction(nameof(GetById), new { id = conversation.Id }, MapToDto(conversation));
     }
 
     private async Task<bool> IsParticipantAsync(HomeFix.DAL.Entities.Booking booking)
@@ -144,16 +146,12 @@ public class ConversationsController : ControllerBase
     private bool TryGetUserId(out int userId)
         => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
-    private static ConversationDto MapToDto(
-        Conversation conversation)
+    private static ConversationDto MapToDto(Conversation conversation) => new()
     {
-        return new ConversationDto
-        {
-            Id = conversation.Id,
-            ServiceRequestId = conversation.ServiceRequestId,
-            CustomerId = conversation.CustomerId,
-            TechnicianId = conversation.TechnicianId,
-            CreatedAt = conversation.CreatedAt
-        };
-    }
+        Id = conversation.Id,
+        ServiceRequestId = conversation.ServiceRequestId,
+        CustomerId = conversation.CustomerId,
+        TechnicianId = conversation.TechnicianId,
+        CreatedAt = conversation.CreatedAt
+    };
 }
