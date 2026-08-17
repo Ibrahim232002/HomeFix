@@ -35,7 +35,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadConversation();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadConversation();
+    });
   }
 
   @override
@@ -46,6 +48,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _loadConversation() async {
+    if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
       final conversation = await _repository.getConversationById(widget.conversation.id);
@@ -59,14 +62,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _send() async {
+    if (!mounted || _sending) return;
     final user = context.read<AuthSessionProvider>().user;
     final conversation = _conversation ?? widget.conversation;
     final text = _msgController.text.trim();
-    if (user == null || text.isEmpty || _sending) return;
+    if (user == null || text.isEmpty) return;
 
     setState(() { _sending = true; _error = null; });
     try {
       await _repository.sendMessage(conversationId: conversation.id, sender: user, text: text);
+      if (!mounted) return;
       _msgController.clear();
       final refreshed = await _repository.getConversationById(conversation.id);
       if (!mounted) return;
@@ -80,9 +85,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-      }
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
     });
   }
 
