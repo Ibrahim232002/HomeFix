@@ -1,6 +1,5 @@
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
-import '../models/api_dtos.dart';
 import '../models/booking_model.dart';
 import '../models/address_model.dart';
 
@@ -8,15 +7,10 @@ abstract class IBookingRepository {
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId);
   Future<List<BookingModel>> getBookingsByCustomer(String customerId);
   Future<BookingModel?> getBookingById(String id);
-  Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus);
+  Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus, {double? finalPrice, String? notes});
   Future<BookingModel> createBooking(BookingModel booking);
-
-  // Direct OpenAPI DTO methods
-  Future<BookingDto> getApiBookingById(int id);
-  Future<BookingDto> getApiBookingByRequest(int serviceRequestId);
-  Future<List<BookingDto>> getApiBookingsByTechnician(int technicianId);
-  Future<BookingDto> createApiBooking(CreateBookingRequest request);
-  Future<BookingDto> updateApiBooking(int id, UpdateBookingRequest request);
+  Future<void> requestVerificationCode(String bookingId, String purpose);
+  Future<BookingModel> verifyBookingCode(String bookingId, String purpose, String code);
 }
 
 class BookingRepository implements IBookingRepository {
@@ -25,150 +19,126 @@ class BookingRepository implements IBookingRepository {
   @override
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId) async {
     final intId = int.tryParse(technicianId);
-    if (intId != null) {
-      try {
-        final dtos = await getApiBookingsByTechnician(intId);
-        return dtos.map((d) => _mapDtoToModel(d)).toList();
-      } catch (_) {}
-    }
-    return [];
+    if (intId == null) return [];
+
+    final response = await _client.get(ApiConstants.bookingsByTechnician(intId));
+    if (response is! List) return [];
+    return response
+        .map((item) => _mapBooking(item as Map<String, dynamic>))
+        .toList();
   }
 
   @override
   Future<List<BookingModel>> getBookingsByCustomer(String customerId) async {
     final intId = int.tryParse(customerId);
-    if (intId != null) {
+    if (intId == null) return [];
+
+    final requests = await _client.get(ApiConstants.serviceRequestsByCustomer(intId));
+    if (requests is! List) return [];
+
+    final bookings = <BookingModel>[];
+    for (final request in requests) {
+      final requestId = (request as Map<String, dynamic>)['id'];
+      final parsedRequestId = requestId is int ? requestId : int.tryParse(requestId?.toString() ?? '');
+      if (parsedRequestId == null) continue;
+
       try {
-        // Fetch customer's service requests to check for attached bookings
-        final reqResponse = await _client.get(ApiConstants.serviceRequestsByCustomer(intId));
-        if (reqResponse is List) {
-          final List<BookingModel> customerBookings = [];
-          for (final reqJson in reqResponse) {
-            final reqDto = ServiceRequestDto.fromJson(reqJson as Map<String, dynamic>);
-            try {
-              final bookingDto = await getApiBookingByRequest(reqDto.id);
-              customerBookings.add(_mapDtoToModel(bookingDto));
-            } catch (_) {}
-          }
-          return customerBookings;
+        final response = await _client.get(ApiConstants.bookingByRequest(parsedRequestId));
+        if (response is Map<String, dynamic>) {
+          bookings.add(_mapBooking(response));
         }
-      } catch (_) {}
+      } on Exception {
+        // A service request without a booking is normal.
+      }
     }
-    return [];
+    return bookings;
   }
 
   @override
   Future<BookingModel?> getBookingById(String id) async {
     final intId = int.tryParse(id);
-    if (intId != null) {
-      try {
-        final dto = await getApiBookingById(intId);
-        return _mapDtoToModel(dto);
-      } catch (_) {}
-    }
-    return null;
+    if (intId == null) return null;
+    final response = await _client.get(ApiConstants.bookingById(intId));
+    if (response is! Map<String, dynamic>) return null;
+    return _mapBooking(response);
   }
 
   @override
-  Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
+  Future<void> updateBookingStatus(
+    String bookingId,
+    BookingStatus newStatus, {
+    double? finalPrice,
+    String? notes,
+  }) async {
     final intId = int.tryParse(bookingId);
-    if (intId != null) {
-      try {
-        final now = DateTime.now().toIso8601String();
-        await updateApiBooking(
-          intId,
-          UpdateBookingRequest(
-            acceptedAt: newStatus == BookingStatus.upcoming ? now : null,
-            startedAt: newStatus == BookingStatus.inProgress ? now : null,
-            completedAt: newStatus == BookingStatus.completed ? now : null,
-          ),
-        );
-      } catch (_) {}
-    }
+    if (intId == null) throw ArgumentError('معرف الحجز غير صالح');
+
+    await _client.post(
+      '${ApiConstants.bookingById(intId)}/transition',
+      body: {
+        'status': newStatus.nameStr,
+        if (finalPrice != null) 'finalPrice': finalPrice,
+        if (notes != null && notes.trim().isNotEmpty) 'technicianNotes': notes.trim(),
+      },
+    );
   }
 
   @override
   Future<BookingModel> createBooking(BookingModel booking) async {
-    final requestId = int.tryParse(booking.requestId);
-    final technicianId = int.tryParse(booking.technicianId);
-
-    if (requestId == null || technicianId == null) {
-      throw Exception('بيانات الحجز غير صالحة');
-    }
-
-    final dto = await createApiBooking(CreateBookingRequest(
-      serviceRequestId: requestId,
-      technicianId: technicianId,
-    ));
-    return _mapDtoToModel(dto, fallback: booking);
-  }
-
-  BookingModel _mapDtoToModel(BookingDto dto, {BookingModel? fallback}) {
-    return BookingModel(
-      id: dto.id.toString(),
-      requestId: dto.serviceRequestId.toString(),
-      serviceNameAr: fallback?.serviceNameAr ?? '',
-      customerName: fallback?.customerName ?? '',
-      customerPhone: fallback?.customerPhone ?? '',
-      technicianId: dto.technicianId.toString(),
-      technicianName: fallback?.technicianName ?? '',
-      address: fallback?.address ??
-          AddressModel(
-            id: '',
-            userId: '',
-            title: 'العنوان',
-            governorate: '',
-            city: '',
-            street: '',
-            building: '',
-            floor: '',
-            apartment: '',
-          ),
-      scheduledDate: dto.acceptedAt ?? '',
-      scheduledTime: '',
-      price: dto.finalPrice ?? 0.0,
-      status: dto.completedAt != null
-          ? BookingStatus.completed
-          : dto.startedAt != null
-              ? BookingStatus.inProgress
-              : BookingStatus.upcoming,
-      createdAt: dto.acceptedAt ?? '',
-      completedAt: dto.completedAt,
-      notes: dto.technicianNotes,
+    throw UnsupportedError(
+      'Booking creation is not available to the technician/customer client. The current backend creates bookings through the offer-acceptance workflow.',
     );
   }
 
-  // --- Direct OpenAPI Implementations ---
   @override
-  Future<BookingDto> getApiBookingById(int id) async {
-    final response = await _client.get(ApiConstants.bookingById(id));
-    return BookingDto.fromJson(response as Map<String, dynamic>);
-  }
-
-  @override
-  Future<BookingDto> getApiBookingByRequest(int serviceRequestId) async {
-    final response = await _client.get(ApiConstants.bookingByRequest(serviceRequestId));
-    return BookingDto.fromJson(response as Map<String, dynamic>);
-  }
-
-  @override
-  Future<List<BookingDto>> getApiBookingsByTechnician(int technicianId) async {
-    final response = await _client.get(ApiConstants.bookingsByTechnician(technicianId));
-    if (response is List) {
-      return response.map((item) => BookingDto.fromJson(item as Map<String, dynamic>)).toList();
+  Future<void> requestVerificationCode(String bookingId, String purpose) async {
+    final intId = int.tryParse(bookingId);
+    if (intId == null) throw ArgumentError('معرف الحجز غير صالح');
+    if (purpose != 'JobStart' && purpose != 'JobCompletion') {
+      throw ArgumentError('غرض التحقق غير صالح');
     }
-    return [];
+
+    await _client.post(
+      ApiConstants.requestBookingVerificationCode(intId),
+      queryParameters: {'purpose': purpose},
+    );
   }
 
   @override
-  Future<BookingDto> createApiBooking(CreateBookingRequest request) async {
-    final response = await _client.post(ApiConstants.bookings, body: request.toJson());
-    return BookingDto.fromJson(response as Map<String, dynamic>);
+  Future<BookingModel> verifyBookingCode(String bookingId, String purpose, String code) async {
+    final intId = int.tryParse(bookingId);
+    if (intId == null) throw ArgumentError('معرف الحجز غير صالح');
+    if (code.trim().isEmpty) throw ArgumentError('رمز التحقق مطلوب');
+
+    final response = await _client.post(
+      ApiConstants.verifyBookingCode(intId),
+      queryParameters: {'purpose': purpose},
+      body: code.trim(),
+    );
+    if (response is! Map<String, dynamic>) {
+      throw StateError('استجابة تحقق الحجز غير صالحة');
+    }
+    return _mapBooking(response);
   }
 
-  @override
-  Future<BookingDto> updateApiBooking(int id, UpdateBookingRequest request) async {
-    final response = await _client.put(ApiConstants.bookingById(id), body: request.toJson());
-    return BookingDto.fromJson(response as Map<String, dynamic>);
+  BookingModel _mapBooking(Map<String, dynamic> json) {
+    final status = BookingStatus.fromString(json['status']?.toString() ?? 'Confirmed');
+    return BookingModel(
+      id: json['id']?.toString() ?? '',
+      requestId: json['serviceRequestId']?.toString() ?? '',
+      serviceNameAr: json['serviceNameAr']?.toString() ?? '',
+      customerName: json['customerName']?.toString() ?? '',
+      customerPhone: json['customerPhone']?.toString() ?? '',
+      technicianId: json['technicianId']?.toString() ?? '',
+      technicianName: json['technicianName']?.toString() ?? '',
+      address: AddressModel.fromJson(json['address'] is Map ? json['address'] as Map<String, dynamic> : {}),
+      scheduledDate: json['acceptedAt']?.toString() ?? '',
+      scheduledTime: '',
+      price: ((json['finalPrice'] ?? json['agreedPrice']) as num?)?.toDouble() ?? 0.0,
+      status: status,
+      createdAt: json['acceptedAt']?.toString() ?? '',
+      completedAt: json['completedAt']?.toString(),
+      notes: json['technicianNotes']?.toString(),
+    );
   }
 }
