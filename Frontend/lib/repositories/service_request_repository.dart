@@ -1,6 +1,6 @@
 import '../core/constants/api_constants.dart';
-import '../core/network/api_client.dart';
 import '../models/api_dtos.dart';
+import '../models/service_request_api_dto.dart';
 import '../models/service_request_model.dart';
 import '../models/address_model.dart';
 
@@ -28,14 +28,18 @@ class ServiceRequestRepository implements IServiceRequestRepository {
     if (intId == null) return [];
     final response = await _client.get(ApiConstants.serviceRequestsByCustomer(intId));
     if (response is! List) return [];
-    return response.map((item) => _mapDto(ServiceRequestDto.fromJson(item as Map<String, dynamic>))).toList();
+    return response
+        .map((item) => _mapDto(ServiceRequestApiDto.fromJson(item as Map<String, dynamic>)))
+        .toList();
   }
 
   @override
   Future<List<ServiceRequestModel>> getAvailableRequestsForTechnicians({String? serviceId, String? governorate}) async {
     final response = await _client.get(ApiConstants.technicianAvailableRequests);
     if (response is! List) return [];
-    return response.map((item) => _mapDto(ServiceRequestDto.fromJson(item as Map<String, dynamic>))).toList();
+    return response
+        .map((item) => _mapDto(ServiceRequestApiDto.fromJson(item as Map<String, dynamic>)))
+        .toList();
   }
 
   @override
@@ -44,7 +48,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
     if (intId == null) return null;
     final response = await _client.get(ApiConstants.serviceRequestById(intId));
     if (response is! Map<String, dynamic>) return null;
-    return _mapDto(ServiceRequestDto.fromJson(response));
+    return _mapDto(ServiceRequestApiDto.fromJson(response));
   }
 
   @override
@@ -69,7 +73,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
     if (response is! Map<String, dynamic>) {
       throw StateError('استجابة إنشاء طلب الخدمة غير صالحة');
     }
-    return _mapDto(ServiceRequestDto.fromJson(response), fallback: request);
+    return _mapDto(ServiceRequestApiDto.fromJson(response), fallback: request);
   }
 
   String _normalizeDate(String value) {
@@ -150,29 +154,51 @@ class ServiceRequestRepository implements IServiceRequestRepository {
     return ServiceRequestStatusHistoryDto.fromJson(response as Map<String, dynamic>);
   }
 
-  ServiceRequestModel _mapDto(ServiceRequestDto dto, {ServiceRequestModel? fallback}) {
+  ServiceRequestModel _mapDto(ServiceRequestApiDto dto, {ServiceRequestModel? fallback}) {
+    final hasServerAddress = dto.fullAddress?.isNotEmpty == true ||
+        dto.addressLabel?.isNotEmpty == true ||
+        dto.cityName?.isNotEmpty == true;
+
     return ServiceRequestModel(
       id: dto.id.toString(),
       serviceId: dto.serviceId.toString(),
-      serviceNameAr: fallback?.serviceNameAr ?? 'طلب #${dto.serviceId}',
+      serviceNameAr: dto.serviceName?.isNotEmpty == true
+          ? dto.serviceName!
+          : fallback?.serviceNameAr ?? '',
       categoryNameAr: fallback?.categoryNameAr ?? '',
       customerId: dto.customerId.toString(),
       customerName: fallback?.customerName ?? '',
       customerPhone: fallback?.customerPhone ?? '',
-      address: fallback?.address ?? AddressModel(
-        id: dto.addressId.toString(),
-        userId: dto.customerId.toString(),
-        title: 'العنوان',
-        governorate: '',
-        city: '',
-        street: '',
-        building: '',
-        floor: '',
-        apartment: '',
-      ),
+      address: hasServerAddress
+          ? AddressModel(
+              id: dto.addressId.toString(),
+              userId: dto.customerId.toString(),
+              title: dto.addressLabel?.isNotEmpty == true ? dto.addressLabel! : 'العنوان',
+              governorate: dto.governorateName ?? '',
+              city: dto.cityName ?? '',
+              street: dto.fullAddress ?? '',
+              building: dto.buildingNumber ?? '',
+              floor: dto.floorNumber ?? '',
+              apartment: dto.apartmentNumber ?? '',
+              landmark: dto.additionalInstructions,
+              isDefault: false,
+              governorateId: dto.governorateId,
+              cityId: dto.cityId,
+            )
+          : fallback?.address ?? AddressModel(
+              id: dto.addressId.toString(),
+              userId: dto.customerId.toString(),
+              title: 'العنوان',
+              governorate: '',
+              city: '',
+              street: '',
+              building: '',
+              floor: '',
+              apartment: '',
+            ),
       problemDescription: dto.description ?? '',
-      preferredDate: dto.preferredDate?.toString() ?? '',
-      preferredTime: dto.preferredTime?.toString() ?? '',
+      preferredDate: dto.preferredDate ?? '',
+      preferredTime: dto.preferredTime ?? '',
       files: fallback?.files ?? [],
       status: ServiceRequestStatus.fromString(dto.status ?? 'Open'),
       estimatedPriceMin: dto.visitFee,
