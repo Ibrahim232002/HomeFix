@@ -1,0 +1,40 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - phase-1.5-security-audit
+  pull_request:
+    branches:
+      - phase-1.5-security-audit
+
+env:
+  DOTNET_VERSION: 8.0.x
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore API
+        run: dotnet restore Backend/HomeFix.API/HomeFix.API.csproj
+
+      - name: Restore tests
+        run: dotnet restore Backend/HomeFix.Tests/HomeFix.Tests.csproj
+
+      - name: Build API
+        run: dotnet build Backend/HomeFix.API/HomeFix.API.csproj --configuration Release --no-restore
+
+      - name: Build tests
+        run: dotnet build Backend/HomeFix.Tests/HomeFix.Tests.csproj --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test Backend/HomeFix.Tests/HomeFix.Tests.csproj --configuration Release --no-build --verbosity normal
