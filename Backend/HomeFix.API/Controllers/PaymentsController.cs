@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using HomeFix.API.DTOs.Payment;
 using HomeFix.BLL.Interfaces;
+using HomeFix.BLL.Services;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -91,15 +92,7 @@ public class PaymentsController : ControllerBase
 
         var normalizedNext = nextStatus.ToLowerInvariant();
         var normalizedCurrent = payment.Status.ToLowerInvariant();
-        var allowed = normalizedCurrent switch
-        {
-            "pending" => normalizedNext is "pending" or "paid" or "failed" or "cancelled",
-            "paid" => normalizedNext == "paid",
-            "failed" => normalizedNext == "failed",
-            "cancelled" => normalizedNext == "cancelled",
-            _ => false
-        };
-        if (!allowed)
+        if (!PaymentRules.IsAllowedStatusTransition(normalizedCurrent, normalizedNext))
             return Conflict(new { message = "Invalid payment status transition." });
 
         if (normalizedNext is "pending" or "paid")
