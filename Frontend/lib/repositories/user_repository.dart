@@ -27,11 +27,11 @@ class UserRepository implements IUserRepository {
       LoginRequest(email: email, password: password),
     );
     return UserModel(
-      id: (authResponse.userId ?? 1).toString(),
+      id: (authResponse.userId ?? 0).toString(),
       fullName: authResponse.fullName ?? 'المستخدم',
       phoneNumber: '',
       email: authResponse.email ?? email,
-      role: authResponse.role == 'Technician' ? UserRole.technician : (authResponse.role == 'Customer' ? UserRole.customer : role),
+      role: UserRole.fromString(authResponse.role ?? role.nameStr),
       createdAt: DateTime.now().toIso8601String(),
     );
   }
@@ -39,61 +39,46 @@ class UserRepository implements IUserRepository {
   @override
   Future<UserModel> register(RegisterRequest request) async {
     await _authRepo.register(request);
-    final userRole = request.role == 'Technician' ? UserRole.technician : UserRole.customer;
-    return await login(request.email, request.password, userRole);
+    throw StateError('Registration requires email verification before authentication.');
   }
 
   @override
   Future<UserModel> loginWithPhone(String phoneNumber, String otp, UserRole role) async {
-    final authResponse = await _authRepo.login(
-      LoginRequest(email: phoneNumber, password: 'password123'),
-    );
-    if (authResponse != null) {
-      return UserModel(
-        id: (authResponse.userId ?? 1).toString(),
-        fullName: authResponse.fullName ?? 'المستخدم',
-        phoneNumber: phoneNumber,
-        email: authResponse.email ?? '',
-        role: authResponse.role == 'Technician' ? UserRole.technician : UserRole.customer,
-        createdAt: DateTime.now().toIso8601String(),
-      );
-    }
-    throw Exception('فشل تسجيل الدخول. تحقق من اسم المستخدم أو رقم الهاتف وكلمة المرور');
+    throw UnsupportedError('Phone/SMS OTP login is not exposed by the current backend contract.');
   }
 
   @override
   Future<List<AddressModel>> getUserAddresses(String userId) async {
     final intUserId = int.tryParse(userId);
-    if (intUserId != null) {
-      try {
-        final dtos = await _addressRepo.getAddressesByCustomerId(intUserId);
-        return dtos
-            .map((d) => AddressModel(
-                  id: d.id.toString(),
-                  userId: d.customerId.toString(),
-                  title: d.label ?? d.buildingNumber ?? 'العنوان المسجل',
-                  governorate: '',
-                  city: '',
-                  street: d.fullAddress ?? '',
-                  building: d.buildingNumber ?? '',
-                  floor: d.floorNumber ?? '',
-                  apartment: d.apartmentNumber ?? '',
-                  isDefault: d.isDefault,
-                ))
-            .toList();
-      } catch (_) {}
-    }
-    return [];
+    if (intUserId == null) return [];
+
+    final dtos = await _addressRepo.getAddressesByCustomerId(intUserId);
+    return dtos
+        .map((d) => AddressModel(
+              id: d.id.toString(),
+              userId: d.customerId.toString(),
+              title: d.label ?? d.buildingNumber ?? 'العنوان المسجل',
+              governorate: '',
+              city: '',
+              street: d.fullAddress ?? '',
+              building: d.buildingNumber ?? '',
+              floor: d.floorNumber ?? '',
+              apartment: d.apartmentNumber ?? '',
+              isDefault: d.isDefault,
+            ))
+        .toList();
   }
 
   @override
   Future<AddressModel> addAddress(AddressModel address) async {
     final intUserId = int.tryParse(address.userId);
-    if (intUserId == null) throw Exception('معرف المستخدم غير صالح');
+    if (intUserId == null) throw ArgumentError('معرف المستخدم غير صالح');
+
+    final cityId = int.tryParse(address.city);
     final dto = await _addressRepo.createAddress(
       CreateAddressRequest(
         customerId: intUserId,
-        cityId: 1,
+        cityId: cityId,
         fullAddress: address.street,
         buildingNumber: address.building,
         floorNumber: address.floor,
