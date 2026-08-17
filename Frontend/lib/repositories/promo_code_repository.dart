@@ -8,7 +8,6 @@ abstract class IPromoCodeRepository {
   Future<List<PromoCodeDto>> getActivePromoCodes();
   Future<PromoCodeDto> createPromoCode(CreatePromoCodeRequest request);
   Future<PromoCodeDto> updatePromoCode(int id, UpdatePromoCodeRequest request);
-
   Future<UserPromoCodeDto> getUserPromoCodeById(int id);
   Future<List<UserPromoCodeDto>> getUserPromoCodesByUser(int userId);
   Future<UserPromoCodeDto> createUserPromoCode(CreateUserPromoCodeRequest request);
@@ -27,9 +26,7 @@ class PromoCodeRepository implements IPromoCodeRepository {
   Future<PromoCodeDto?> getPromoCodeByCode(String code) async {
     try {
       final response = await _client.get(ApiConstants.promoCodeByCode(code));
-      if (response is Map<String, dynamic>) {
-        return PromoCodeDto.fromJson(response);
-      }
+      if (response is Map<String, dynamic>) return PromoCodeDto.fromJson(response);
     } catch (_) {}
     return null;
   }
@@ -37,9 +34,7 @@ class PromoCodeRepository implements IPromoCodeRepository {
   @override
   Future<List<PromoCodeDto>> getActivePromoCodes() async {
     final response = await _client.get(ApiConstants.activePromoCodes, includeAuth: false);
-    if (response is List) {
-      return response.map((item) => PromoCodeDto.fromJson(item as Map<String, dynamic>)).toList();
-    }
+    if (response is List) return response.map((item) => PromoCodeDto.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
@@ -63,11 +58,7 @@ class PromoCodeRepository implements IPromoCodeRepository {
 
   @override
   Future<List<UserPromoCodeDto>> getUserPromoCodesByUser(int userId) async {
-    final response = await _client.get(ApiConstants.userPromoCodesByUser(userId));
-    if (response is List) {
-      return response.map((item) => UserPromoCodeDto.fromJson(item as Map<String, dynamic>)).toList();
-    }
-    return [];
+    throw UnsupportedError('The current backend does not expose a user-wide applied-promo listing endpoint. Use the service-request-specific endpoint.');
   }
 
   @override
