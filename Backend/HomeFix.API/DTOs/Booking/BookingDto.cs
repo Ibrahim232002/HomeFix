@@ -16,10 +16,11 @@ public class BookingDto
     public decimal? FinalPrice { get; set; }
     public string? TechnicianNotes { get; set; }
 
-    // Presentation-only fields populated from the related authorized booking graph.
     public string? ServiceName { get; set; }
+    public string? TechnicianName { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerPhone { get; set; }
+    public int? AddressId { get; set; }
     public string? AddressLabel { get; set; }
     public string? FullAddress { get; set; }
     public string? BuildingNumber { get; set; }
