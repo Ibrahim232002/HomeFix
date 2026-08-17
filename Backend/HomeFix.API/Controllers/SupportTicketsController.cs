@@ -61,9 +61,12 @@ public class SupportTicketsController : ControllerBase
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
-        if (request.ServiceRequestId > 0)
+        if (request.ServiceRequestId.HasValue)
         {
-            var serviceRequest = await _requests.GetByIdAsync(request.ServiceRequestId);
+            if (request.ServiceRequestId.Value <= 0)
+                return BadRequest(new { message = "Service request id must be greater than zero." });
+
+            var serviceRequest = await _requests.GetByIdAsync(request.ServiceRequestId.Value);
             if (serviceRequest == null)
                 return BadRequest(new { message = "Service request not found." });
 
