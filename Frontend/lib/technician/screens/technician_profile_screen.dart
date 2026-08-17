@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../auth/auth_session_provider.dart';
 import '../../common/screens/notifications_screen.dart';
 import '../../common/screens/support_center_screen.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_design_tokens.dart';
 import '../../core/theme/app_responsive.dart';
 import '../../core/widgets/homefix_button.dart';
@@ -102,7 +103,6 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final session = context.watch<AuthSessionProvider>();
-    final profile = _profile;
 
     return Scaffold(
       appBar: AppBar(
@@ -126,7 +126,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
           children: [
             AppResponsive.content(
               context,
-              child: _buildContent(context, session, profile),
+              child: _buildContent(context, session),
             ),
           ],
         ),
@@ -134,11 +134,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
     );
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    AuthSessionProvider session,
-    TechnicianProfileDto? profile,
-  ) {
+  Widget _buildContent(BuildContext context, AuthSessionProvider session) {
     if (_loading) return const HomeFixLoadingList(itemCount: 4);
 
     if (_error != null) {
@@ -149,6 +145,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
       );
     }
 
+    final profile = _profile;
     if (profile == null) {
       return const HomeFixEmptyState(
         icon: Icons.engineering_outlined,
@@ -168,7 +165,7 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
           onToggleAvailability: _toggleAvailability,
         ),
         const SizedBox(height: AppDesignTokens.space3),
-        _TechnicianProfileLinks(),
+        const _TechnicianProfileLinks(),
         const SizedBox(height: AppDesignTokens.space4),
         HomeFixButton(
           variant: HomeFixButtonVariant.text,
