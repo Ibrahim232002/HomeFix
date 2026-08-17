@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_strings.dart';
+import 'core/storage/token_storage.dart';
 import 'models/user_model.dart';
 import 'services/app_state_provider.dart';
 import 'auth/screens/auth_screen.dart';
 import 'customer/screens/customer_main_layout.dart';
 import 'technician/screens/technician_main_layout.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await TokenStorage().initialize();
   runApp(const HomeFixApp());
 }
 
