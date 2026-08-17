@@ -2,16 +2,22 @@ import 'address_model.dart';
 
 enum BookingStatus {
   upcoming,
+  arrived,
   inProgress,
+  awaitingCompletion,
   completed,
   cancelled;
 
   String get displayNameAr {
     switch (this) {
       case BookingStatus.upcoming:
-        return 'قادمة ومجدولة';
+        return 'مؤكدة';
+      case BookingStatus.arrived:
+        return 'الفني وصل';
       case BookingStatus.inProgress:
         return 'جاري العمل';
+      case BookingStatus.awaitingCompletion:
+        return 'بانتظار تأكيد الإكمال';
       case BookingStatus.completed:
         return 'مكتملة';
       case BookingStatus.cancelled:
@@ -21,12 +27,18 @@ enum BookingStatus {
 
   static BookingStatus fromString(String val) {
     switch (val.toLowerCase()) {
+      case 'arrived':
+        return BookingStatus.arrived;
       case 'inprogress':
         return BookingStatus.inProgress;
+      case 'awaitingcompletion':
+        return BookingStatus.awaitingCompletion;
       case 'completed':
         return BookingStatus.completed;
       case 'cancelled':
+      case 'canceled':
         return BookingStatus.cancelled;
+      case 'confirmed':
       default:
         return BookingStatus.upcoming;
     }
@@ -35,9 +47,13 @@ enum BookingStatus {
   String get nameStr {
     switch (this) {
       case BookingStatus.upcoming:
-        return 'Upcoming';
+        return 'Confirmed';
+      case BookingStatus.arrived:
+        return 'Arrived';
       case BookingStatus.inProgress:
         return 'InProgress';
+      case BookingStatus.awaitingCompletion:
+        return 'AwaitingCompletion';
       case BookingStatus.completed:
         return 'Completed';
       case BookingStatus.cancelled:
@@ -116,40 +132,4 @@ class BookingModel {
       notes: notes ?? this.notes,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'requestId': requestId,
-        'serviceNameAr': serviceNameAr,
-        'customerName': customerName,
-        'customerPhone': customerPhone,
-        'technicianId': technicianId,
-        'technicianName': technicianName,
-        'address': address.toJson(),
-        'scheduledDate': scheduledDate,
-        'scheduledTime': scheduledTime,
-        'price': price,
-        'status': status.nameStr,
-        'createdAt': createdAt,
-        'completedAt': completedAt,
-        'notes': notes,
-      };
-
-  factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
-        id: json['id'] ?? '',
-        requestId: json['requestId'] ?? '',
-        serviceNameAr: json['serviceNameAr'] ?? '',
-        customerName: json['customerName'] ?? '',
-        customerPhone: json['customerPhone'] ?? '',
-        technicianId: json['technicianId'] ?? '',
-        technicianName: json['technicianName'] ?? '',
-        address: AddressModel.fromJson(json['address'] ?? {}),
-        scheduledDate: json['scheduledDate'] ?? '',
-        scheduledTime: json['scheduledTime'] ?? '',
-        price: (json['price'] as num?)?.toDouble() ?? 0.0,
-        status: BookingStatus.fromString(json['status'] ?? 'Upcoming'),
-        createdAt: json['createdAt'] ?? '',
-        completedAt: json['completedAt'],
-        notes: json['notes'],
-      );
 }
