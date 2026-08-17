@@ -135,41 +135,61 @@ public class VerificationCodeService : IVerificationCodeService
         return (true, null, code);
     }
 
-    public async Task<(bool Success, string? Error)> VerifyBookingAsync(int userId, int bookingId, string purpose, string channel, string code)
+    public async Task<(bool Success, string? Error)> VerifyBookingAsync(
+        int userId,
+        int bookingId,
+        string purpose,
+        string channel,
+        string code)
     {
         var current = await _repository.GetLatestForBookingAsync(userId, bookingId, purpose, channel);
-        if (current == null) return (false, "Verification code not found.");
-        if (current.ExpiresAt <= DateTime.UtcNow) return (false, "Verification code has expired.");
-        if (current.Attempts >= 5) return (false, "Too many verification attempts.");
+        if (current == null)
+            return (false, "Verification code not found.");
 
-        current.Attempts++;
+        var now = DateTime.UtcNow;
+        if (current.ExpiresAt <= now)
+            return (false, "Verification code has expired.");
+        if (current.Attempts >= 5)
+            return (false, "Too many verification attempts.");
+
         if (!CryptographicEquals(current.CodeHash, Hash(code)))
         {
-            await _unitOfWork.SaveChangesAsync();
+            await _repository.IncrementAttemptAsync(current.Id, now);
             return (false, "Invalid verification code.");
         }
-        current.UsedAt = DateTime.UtcNow;
-        await _unitOfWork.SaveChangesAsync();
-        return (true, null);
+
+        var consumed = await _repository.TryConsumeAsync(current.Id, now);
+        return consumed == 1
+            ? (true, null)
+            : (false, "Verification code is no longer valid.");
     }
 
-    public async Task<(bool Success, string? Error)> VerifyAsync(int userId, string purpose, string channel, string code)
+    public async Task<(bool Success, string? Error)> VerifyAsync(
+        int userId,
+        string purpose,
+        string channel,
+        string code)
     {
         var current = await _repository.GetLatestAsync(userId, purpose, channel);
-        if (current == null) return (false, "Verification code not found.");
-        if (current.ExpiresAt <= DateTime.UtcNow) return (false, "Verification code has expired.");
-        if (current.Attempts >= 5) return (false, "Too many verification attempts.");
+        if (current == null)
+            return (false, "Verification code not found.");
 
-        current.Attempts++;
+        var now = DateTime.UtcNow;
+        if (current.ExpiresAt <= now)
+            return (false, "Verification code has expired.");
+        if (current.Attempts >= 5)
+            return (false, "Too many verification attempts.");
+
         if (!CryptographicEquals(current.CodeHash, Hash(code)))
         {
-            await _unitOfWork.SaveChangesAsync();
+            await _repository.IncrementAttemptAsync(current.Id, now);
             return (false, "Invalid verification code.");
         }
 
-        current.UsedAt = DateTime.UtcNow;
-        await _unitOfWork.SaveChangesAsync();
-        return (true, null);
+        var consumed = await _repository.TryConsumeAsync(current.Id, now);
+        return consumed == 1
+            ? (true, null)
+            : (false, "Verification code is no longer valid.");
     }
 
     private static string Hash(string value)
