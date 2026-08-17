@@ -59,6 +59,8 @@ class AppStateProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   bool _isLoadingPublic = false;
+  bool _publicDataLoaded = false;
+  Future<void>? _publicDataLoad;
   String? _errorMessage;
   String? _apiError;
 
@@ -119,7 +121,16 @@ class AppStateProvider extends ChangeNotifier {
   TechnicianProfileModel? get currentTechProfile => _currentTechProfile;
   int get unreadNotificationsCount => _notifications.where((n) => !n.isRead).length;
 
-  Future<void> _loadPublicData() async {
+  Future<void> _loadPublicData() {
+    final inFlight = _publicDataLoad;
+    if (inFlight != null) return inFlight;
+
+    final future = _performPublicDataLoad();
+    _publicDataLoad = future.whenComplete(() => _publicDataLoad = null);
+    return _publicDataLoad!;
+  }
+
+  Future<void> _performPublicDataLoad() async {
     _isLoadingPublic = true;
     _apiError = null;
     _notify();
@@ -135,7 +146,9 @@ class AppStateProvider extends ChangeNotifier {
       _categories = catMap.entries
           .map((entry) => CategoryModel(id: entry.key, nameAr: entry.value, nameEn: entry.value, iconName: 'Wrench', colorHex: '#0284c7', image: '', descriptionAr: entry.value))
           .toList();
+      _publicDataLoaded = true;
     } catch (e) {
+      _publicDataLoaded = false;
       _apiError = e.toString();
     } finally {
       _isLoadingPublic = false;
@@ -176,8 +189,9 @@ class AppStateProvider extends ChangeNotifier {
     _errorMessage = null;
     _notify();
     try {
-      _services = await _serviceRepo.getServices();
-      _technicians = await _techRepo.getTechnicians();
+      if (!_publicDataLoaded) {
+        await _loadPublicData();
+      }
       _conversations = await _chatRepo.getConversations(user.id);
       _notifications = await _userRepo.getUserNotifications(user.id);
       if (isCustomer) {
