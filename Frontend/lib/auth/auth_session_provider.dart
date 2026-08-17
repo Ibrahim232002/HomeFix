@@ -159,6 +159,7 @@ class AuthSessionProvider extends ChangeNotifier {
     _setStatus(AuthSessionStatus.refreshing);
     final success = await _authRepository.refreshToken();
     if (!success) {
+      await _tokenStorage.clear();
       _user = null;
       _setUnauthenticated();
       return false;
