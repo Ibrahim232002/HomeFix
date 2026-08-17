@@ -3,6 +3,7 @@ using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace HomeFix.API.Controllers;
@@ -93,6 +94,7 @@ public class BookingsController : ControllerBase
 
     [HttpPost("{id:int}/verification-code")]
     [Authorize(Roles = "Customer,Technician")]
+    [EnableRateLimiting("verification")]
     public async Task<IActionResult> IssueVerificationCode(int id, [FromQuery] string purpose)
     {
         if (purpose is not ("JobStart" or "JobCompletion"))
@@ -123,6 +125,7 @@ public class BookingsController : ControllerBase
 
     [HttpPost("{id:int}/verify-code")]
     [Authorize(Roles = "Customer,Technician")]
+    [EnableRateLimiting("verification")]
     public async Task<IActionResult> VerifyCode(int id, [FromQuery] string purpose, [FromBody] string code)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
