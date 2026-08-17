@@ -12,17 +12,19 @@ abstract class IAuthRepository {
 }
 
 class AuthRepository implements IAuthRepository {
+  AuthRepository({IAuthSessionStorage? tokenStorage})
+      : _tokenStorage = tokenStorage ?? TokenStorage();
+
   final ApiClient _client = ApiClient();
-  final TokenStorage _tokenStorage = TokenStorage();
+  final IAuthSessionStorage _tokenStorage;
 
   @override
   Future<dynamic> register(RegisterRequest request) async {
-    final response = await _client.post(
+    return _client.post(
       ApiConstants.register,
       body: request.toJson(),
       includeAuth: false,
     );
-    return response;
   }
 
   @override
@@ -32,23 +34,22 @@ class AuthRepository implements IAuthRepository {
       body: request.toJson(),
       includeAuth: false,
     );
-
-    if (response is Map<String, dynamic>) {
-      final authDto = AuthResponseDto.fromJson(response);
-      if (authDto.accessToken.isEmpty) {
-        throw Exception('استجابة تسجيل الدخول لا تحتوي على رمز وصول صالح');
-      }
-      await _tokenStorage.saveTokens(
-        accessToken: authDto.accessToken,
-        refreshToken: authDto.refreshToken,
-        userId: authDto.userId,
-        userRole: authDto.role,
-        userEmail: authDto.email ?? request.email,
-        userFullName: authDto.fullName,
-      );
-      return authDto;
+    if (response is! Map<String, dynamic>) {
+      throw Exception('استجابة تسجيل الدخول غير صالحة');
     }
-    throw Exception('استجابة تسجيل الدخول غير صالحة');
+    final authDto = AuthResponseDto.fromJson(response);
+    if (authDto.accessToken.isEmpty) {
+      throw Exception('استجابة تسجيل الدخول لا تحتوي على رمز وصول صالح');
+    }
+    await _tokenStorage.saveTokens(
+      accessToken: authDto.accessToken,
+      refreshToken: authDto.refreshToken,
+      userId: authDto.userId,
+      userRole: authDto.role,
+      userEmail: authDto.email ?? request.email,
+      userFullName: authDto.fullName,
+    );
+    return authDto;
   }
 
   @override
@@ -81,7 +82,6 @@ class AuthRepository implements IAuthRepository {
         includeAuth: false,
         allowAutoRefresh: false,
       );
-
       if (response is Map<String, dynamic>) {
         final newAccessToken = response['accessToken'] ?? response['token'];
         final newRefreshToken = response['refreshToken'];
@@ -96,13 +96,11 @@ class AuthRepository implements IAuthRepository {
     } catch (_) {
       // A failed refresh invalidates the local session.
     }
-
     await _tokenStorage.clear();
     return false;
   }
 
   @override
-  Future<dynamic> getCurrentUser() async {
-    return _client.get(ApiConstants.me);
-  }
+  Future<dynamic> getCurrentUser() =>
+      _client.get(ApiConstants.me);
 }
