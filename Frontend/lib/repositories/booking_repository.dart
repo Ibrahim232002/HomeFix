@@ -126,7 +126,7 @@ class BookingRepository implements IBookingRepository {
   BookingModel _mapBooking(Map<String, dynamic> json) {
     final acceptedAt = json['acceptedAt']?.toString() ?? '';
     final address = AddressModel(
-      id: json['serviceRequestId']?.toString() ?? '',
+      id: json['addressId']?.toString() ?? '',
       userId: '',
       title: json['addressLabel']?.toString() ?? 'العنوان',
       governorate: json['governorateName']?.toString() ?? '',
@@ -147,7 +147,7 @@ class BookingRepository implements IBookingRepository {
       customerName: json['customerName']?.toString() ?? '',
       customerPhone: json['customerPhone']?.toString() ?? '',
       technicianId: json['technicianId']?.toString() ?? '',
-      technicianName: '',
+      technicianName: json['technicianName']?.toString() ?? '',
       address: address,
       scheduledDate: acceptedAt,
       scheduledTime: '',
