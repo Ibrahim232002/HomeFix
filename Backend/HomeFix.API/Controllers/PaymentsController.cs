@@ -4,7 +4,6 @@ using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace HomeFix.API.Controllers;
 
@@ -48,6 +47,7 @@ public class PaymentsController : ControllerBase
     }
 
     [HttpPost("cash/{serviceRequestId:int}")]
+    [Authorize(Roles = "Customer")]
     public async Task<ActionResult<PaymentDto>> CreateCash(int serviceRequestId)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
@@ -62,45 +62,20 @@ public class PaymentsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<PaymentDto>> Create(CreatePaymentRequest request)
     {
-        if (request.Amount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
+        var result = await _service.CreateManualPaymentAsync(
+            request.ServiceRequestId,
+            request.Amount,
+            request.PaymentType,
+            request.PaymentMethod);
 
-        if (string.IsNullOrWhiteSpace(request.PaymentMethod) || string.IsNullOrWhiteSpace(request.PaymentType))
-            return BadRequest(new { message = "Payment type and payment method are required." });
-
-        var serviceRequest = await _requests.GetByIdAsync(request.ServiceRequestId);
-        if (serviceRequest?.Booking is null)
-            return BadRequest(new { message = "A confirmed booking is required before payment." });
-
-        var expectedAmount = serviceRequest.Booking.FinalPrice ?? serviceRequest.Booking.AgreedPrice;
-        if (!expectedAmount.HasValue || expectedAmount.Value <= 0 || expectedAmount.Value != request.Amount)
-            return BadRequest(new { message = "Payment amount must match the booking amount." });
-
-        var existingPayments = await _service.GetByRequestIdAsync(request.ServiceRequestId);
-        if (existingPayments.Any(p => p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
-                                      p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)))
-            return Conflict(new { message = "An active payment already exists for this service request." });
-
-        var payment = new Payment
+        if (!result.Success)
         {
-            ServiceRequestId = request.ServiceRequestId,
-            Amount = request.Amount,
-            PaymentType = request.PaymentType.Trim(),
-            PaymentMethod = request.PaymentMethod.Trim(),
-            Status = "Pending",
-            CreatedAt = DateTime.UtcNow
-        };
-
-        try
-        {
-            await _service.AddAsync(payment);
-        }
-        catch (DbUpdateException)
-        {
-            return Conflict(new { message = "An active payment already exists for this service request." });
+            if (result.Error?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true)
+                return Conflict(new { message = result.Error });
+            return BadRequest(new { message = result.Error });
         }
 
-        return CreatedAtAction(nameof(GetById), new { id = payment.Id }, MapToDto(payment));
+        return CreatedAtAction(nameof(GetById), new { id = result.Payment!.Id }, MapToDto(result.Payment));
     }
 
     [Authorize(Roles = "Admin")]
@@ -130,9 +105,7 @@ public class PaymentsController : ControllerBase
         if (normalizedNext is "pending" or "paid")
         {
             var conflicting = (await _service.GetByRequestIdAsync(payment.ServiceRequestId))
-                .Any(p => p.Id != payment.Id &&
-                          (p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
-                           p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase)));
+                .Any(p => p.Id != payment.Id && PaymentRules.IsActive(p));
             if (conflicting)
                 return Conflict(new { message = "Another active payment already exists for this service request." });
         }
@@ -154,7 +127,7 @@ public class PaymentsController : ControllerBase
         {
             await _service.UpdateAsync(payment);
         }
-        catch (DbUpdateException)
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException)
         {
             return Conflict(new { message = "Another active payment already exists for this service request." });
         }
