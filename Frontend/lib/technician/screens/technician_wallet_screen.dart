@@ -7,13 +7,244 @@ import '../../core/theme/app_responsive.dart';
 import '../../core/widgets/homefix_button.dart';
 import '../../core/widgets/homefix_card.dart';
 import '../../core/widgets/homefix_states.dart';
-import '../../models/wallet_model.dart';
 import '../../services/app_state_provider.dart';
 import 'technician_payouts_screen.dart';
 
-class TechnicianWalletScreen extends StatefulWidget { const TechnicianWalletScreen({super.key}); @override State<TechnicianWalletScreen> createState()=>_TechnicianWalletScreenState(); }
-class _TechnicianWalletScreenState extends State<TechnicianWalletScreen>{ bool _loading=false; bool _submitting=false; String? _error;
- Future<void> _refresh() async{setState(()=>_loading=true);try{await context.read<AppStateProvider>().refreshAuthenticatedData();}catch(e){if(mounted)setState(()=>_error=e.toString().replaceFirst('Exception: ',''));}finally{if(mounted)setState(()=>_loading=false);}}
- Future<void> _withdraw(double balance) async{if(_submitting||balance<=0)return;final amount=TextEditingController();final destination=TextEditingController();final result=await showDialog<List<String>>(context:context,builder:(context)=>AlertDialog(title:const Text('طلب سحب'),content:Column(mainAxisSize:MainAxisSize.min,children:[Text('الرصيد المتاح: ${balance.toStringAsFixed(2)} ج.م'),const SizedBox(height:AppDesignTokens.space3),TextField(controller:amount,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'المبلغ')),const SizedBox(height:AppDesignTokens.space3),TextField(controller:destination,decoration:const InputDecoration(labelText:'بيانات التحويل / البنك'))]),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(context,[amount.text.trim(),destination.text.trim()]),child:const Text('إرسال'))]));amount.dispose();destination.dispose();if(result==null)return;final value=double.tryParse(result[0]);if(value==null||value<=0||value>balance){setState(()=>_error='أدخل مبلغاً صالحاً لا يتجاوز الرصيد المتاح.');return;}setState(()=>_submitting=true);try{await context.read<AppStateProvider>().requestWithdrawal(value,result[1]);if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إنشاء طلب السحب.')));}catch(e){if(mounted)setState(()=>_error=e.toString().replaceFirst('Exception: ',''));}finally{if(mounted)setState(()=>_submitting=false);}}
- @override Widget build(BuildContext context){final wallet=context.watch<AppStateProvider>().wallet;return Scaffold(appBar:AppBar(title:const Text('المحفظة والأرباح'),actions:[IconButton(tooltip:'طلبات السحب',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const TechnicianPayoutsScreen())),icon:const Icon(Icons.payments_outlined))]),body:RefreshIndicator(onRefresh:_refresh,child:ListView(padding:AppResponsive.pagePadding(context),physics:const AlwaysScrollableScrollPhysics(),children:[AppResponsive.content(context,child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[_loading?const LinearProgressIndicator():const SizedBox.shrink(),HomeFixCard(child:Container(padding:const EdgeInsets.all(AppDesignTokens.space5),decoration:const BoxDecoration(gradient:AppColors.techGradient,borderRadius:BorderRadius.all(Radius.circular(AppDesignTokens.radiusLg))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الرصيد المتاح',style:TextStyle(color:Colors.white70)),const SizedBox(height:8),Text('${wallet?.currentBalance.toStringAsFixed(2)??'0.00'} ج.م',style:const TextStyle(color:Colors.white,fontSize:32,fontWeight:FontWeight.w800)),const SizedBox(height:AppDesignTokens.space3),Row(children:[Expanded(child:Text('إجمالي الأرباح ${wallet?.totalEarnings.toStringAsFixed(2)??'0.00'} ج.م',style:const TextStyle(color:Colors.white))),Expanded(child:Text('المسحوب ${wallet?.totalWithdrawn.toStringAsFixed(2)??'0.00'} ج.م',style:const TextStyle(color:Colors.white)))])])),const SizedBox(height:AppDesignTokens.space3),if(_error!=null)HomeFixErrorState(title:'تعذر تنفيذ العملية',message:_error,onRetry:_refresh),HomeFixButton(expanded:true,loading:_submitting,label:'طلب سحب الأرباح',icon:Icons.arrow_circle_up_rounded,onPressed:wallet==null||wallet.currentBalance<=0?null:()=>_withdraw(wallet.currentBalance)),const SizedBox(height:AppDesignTokens.space4),Text('آخر الحركات',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:AppDesignTokens.space2),if(wallet==null||wallet.transactions.isEmpty)const HomeFixEmptyState(icon:Icons.account_balance_wallet_outlined,title:'لا توجد معاملات',message:'ستظهر هنا حركات الرصيد والأرباح بعد اكتمال الأعمال. ') else ...wallet.transactions.take(10).map((tx)=>Padding(padding:const EdgeInsets.only(bottom:AppDesignTokens.space2),child:HomeFixCard(child:ListTile(contentPadding:EdgeInsets.zero,leading:CircleAvatar(backgroundColor:AppColors.successLight,child:const Icon(Icons.trending_up_rounded,color:AppColors.successDark)),title:Text(tx.titleAr),subtitle:Text('${tx.date} • ${tx.descriptionAr}'),trailing:Text('${tx.amount.toStringAsFixed(2)} ج.م',style:const TextStyle(fontWeight:FontWeight.w800,color:AppColors.successDark)))))]))])));}
+class TechnicianWalletScreen extends StatefulWidget {
+  const TechnicianWalletScreen({super.key});
+
+  @override
+  State<TechnicianWalletScreen> createState() => _TechnicianWalletScreenState();
+}
+
+class _TechnicianWalletScreenState extends State<TechnicianWalletScreen> {
+  bool _loading = false;
+  bool _submitting = false;
+  String? _error;
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await context.read<AppStateProvider>().refreshAuthenticatedData();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _withdraw(double balance) async {
+    if (_submitting || balance <= 0) return;
+
+    final amount = TextEditingController();
+    final destination = TextEditingController();
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('طلب سحب'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('الرصيد المتاح: ${balance.toStringAsFixed(2)} ج.م'),
+            const SizedBox(height: AppDesignTokens.space3),
+            TextField(
+              controller: amount,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'المبلغ'),
+            ),
+            const SizedBox(height: AppDesignTokens.space3),
+            TextField(
+              controller: destination,
+              decoration: const InputDecoration(labelText: 'بيانات التحويل / البنك'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              [amount.text.trim(), destination.text.trim()],
+            ),
+            child: const Text('إرسال'),
+          ),
+        ],
+      ),
+    );
+    amount.dispose();
+    destination.dispose();
+
+    if (result == null || result.length < 2) return;
+    final value = double.tryParse(result[0]);
+    if (value == null || value <= 0 || value > balance) {
+      setState(() => _error = 'أدخل مبلغاً صالحاً لا يتجاوز الرصيد المتاح.');
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await context.read<AppStateProvider>().requestWithdrawal(value, result[1]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إنشاء طلب السحب.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final wallet = context.watch<AppStateProvider>().wallet;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('المحفظة والأرباح'),
+        actions: [
+          IconButton(
+            tooltip: 'طلبات السحب',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TechnicianPayoutsScreen()),
+            ),
+            icon: const Icon(Icons.payments_outlined),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          padding: AppResponsive.pagePadding(context),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            AppResponsive.content(
+              context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_loading) const LinearProgressIndicator(),
+                  HomeFixCard(
+                    child: Container(
+                      padding: const EdgeInsets.all(AppDesignTokens.space5),
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.techGradient,
+                        borderRadius: BorderRadius.all(
+                          Radius.circular(AppDesignTokens.radiusLg),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'الرصيد المتاح',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${wallet?.currentBalance.toStringAsFixed(2) ?? '0.00'} ج.م',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: AppDesignTokens.space3),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'إجمالي الأرباح ${wallet?.totalEarnings.toStringAsFixed(2) ?? '0.00'} ج.م',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'المسحوب ${wallet?.totalWithdrawn.toStringAsFixed(2) ?? '0.00'} ج.م',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppDesignTokens.space3),
+                  if (_error != null)
+                    HomeFixErrorState(
+                      title: 'تعذر تنفيذ العملية',
+                      message: _error,
+                      onRetry: _refresh,
+                    ),
+                  HomeFixButton(
+                    expanded: true,
+                    loading: _submitting,
+                    label: 'طلب سحب الأرباح',
+                    icon: Icons.arrow_circle_up_rounded,
+                    onPressed: wallet == null || wallet.currentBalance <= 0
+                        ? null
+                        : () => _withdraw(wallet.currentBalance),
+                  ),
+                  const SizedBox(height: AppDesignTokens.space4),
+                  Text('آخر الحركات', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: AppDesignTokens.space2),
+                  if (wallet == null || wallet.transactions.isEmpty)
+                    const HomeFixEmptyState(
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: 'لا توجد معاملات',
+                      message: 'ستظهر هنا حركات الرصيد والأرباح بعد اكتمال الأعمال.',
+                    )
+                  else
+                    ...wallet.transactions.take(10).map(
+                          (tx) => Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppDesignTokens.space2,
+                            ),
+                            child: HomeFixCard(
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const CircleAvatar(
+                                  backgroundColor: AppColors.successLight,
+                                  child: Icon(
+                                    Icons.trending_up_rounded,
+                                    color: AppColors.successDark,
+                                  ),
+                                ),
+                                title: Text(tx.titleAr),
+                                subtitle: Text('${tx.date} • ${tx.descriptionAr}'),
+                                trailing: Text(
+                                  '${tx.amount.toStringAsFixed(2)} ج.م',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.successDark,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
