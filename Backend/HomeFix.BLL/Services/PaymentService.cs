@@ -2,6 +2,7 @@ using HomeFix.BLL.Interfaces;
 using HomeFix.DAL;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
+using System.Data;
 
 namespace HomeFix.BLL.Services;
 
@@ -46,12 +47,10 @@ public class PaymentService : IPaymentService
         if (!amount.HasValue || amount.Value <= 0)
             return (false, "The booking does not have a valid agreed price.", null);
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
 
         var existingPayments = await _repository.GetByRequestIdAsync(serviceRequestId);
 
-        // A successful payment means the service request is already paid.
-        // Never create a second payment, even if the existing payment used a different method.
         var paid = existingPayments.FirstOrDefault(p =>
             p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase));
 
@@ -61,7 +60,6 @@ public class PaymentService : IPaymentService
             return (true, null, paid);
         }
 
-        // Reuse an existing pending cash payment rather than creating another one.
         var pendingCash = existingPayments.FirstOrDefault(p =>
             p.PaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase) &&
             p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
@@ -72,7 +70,6 @@ public class PaymentService : IPaymentService
             return (true, null, pendingCash);
         }
 
-        // Do not allow two payment flows to remain open for the same request.
         var pendingPayment = existingPayments.FirstOrDefault(p =>
             p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
 
