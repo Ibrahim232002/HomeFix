@@ -13,26 +13,36 @@ public class BookingRepository
         _context = context;
     }
 
+    private IQueryable<Booking> WithPresentationGraph(IQueryable<Booking> query)
+        => query
+            .Include(b => b.Technician)
+            .Include(b => b.ServiceRequest)
+                .ThenInclude(r => r.Service)
+            .Include(b => b.ServiceRequest)
+                .ThenInclude(r => r.Address)
+                    .ThenInclude(a => a.City)
+            .Include(b => b.ServiceRequest)
+                .ThenInclude(r => r.Address)
+                    .ThenInclude(a => a.Governorate)
+            .Include(b => b.ServiceRequest)
+                .ThenInclude(r => r.Customer)
+                    .ThenInclude(c => c.User);
+
     public async Task<Booking?> GetByIdAsync(int id)
     {
-        return await _context.Bookings
-            .Include(b => b.ServiceRequest)
-            .Include(b => b.Technician)
+        return await WithPresentationGraph(_context.Bookings)
             .FirstOrDefaultAsync(b => b.Id == id);
     }
 
     public async Task<Booking?> GetByRequestIdAsync(int serviceRequestId)
     {
-        return await _context.Bookings
-            .Include(b => b.Technician)
-            .Include(b => b.ServiceRequest)
+        return await WithPresentationGraph(_context.Bookings)
             .FirstOrDefaultAsync(b => b.ServiceRequestId == serviceRequestId);
     }
 
     public async Task<List<Booking>> GetByTechnicianIdAsync(int technicianId)
     {
-        return await _context.Bookings
-            .Include(b => b.ServiceRequest)
+        return await WithPresentationGraph(_context.Bookings)
             .Where(b => b.TechnicianId == technicianId)
             .OrderByDescending(b => b.Id)
             .ToListAsync();
