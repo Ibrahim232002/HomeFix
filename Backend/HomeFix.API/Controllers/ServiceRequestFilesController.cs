@@ -1,9 +1,9 @@
 using HomeFix.API.DTOs.ServiceRequestFile;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 
 namespace HomeFix.API.Controllers;
 
@@ -33,29 +33,24 @@ public class ServiceRequestFilesController : ControllerBase
     public async Task<ActionResult<ServiceRequestFileDto>> GetById(int id)
     {
         var file = await _service.GetByIdAsync(id);
-
-        if (file == null)
-            return NotFound();
+        if (file == null) return NotFound();
         if (!await CanAccessRequestAsync(file.ServiceRequestId)) return Forbid();
-
         return Ok(MapToDto(file));
     }
 
     [HttpGet("request/{serviceRequestId:int}")]
-    public async Task<ActionResult<List<ServiceRequestFileDto>>> GetByRequestId(
-        int serviceRequestId)
+    public async Task<ActionResult<List<ServiceRequestFileDto>>> GetByRequestId(int serviceRequestId)
     {
         if (!await CanAccessRequestAsync(serviceRequestId)) return Forbid();
         var files = await _service.GetByRequestIdAsync(serviceRequestId);
-
         return Ok(files.Select(MapToDto).ToList());
     }
 
     [HttpPost]
-    public async Task<ActionResult<ServiceRequestFileDto>> Create(
-        CreateServiceRequestFileRequest request)
+    public async Task<ActionResult<ServiceRequestFileDto>> Create(CreateServiceRequestFileRequest request)
     {
         if (!await CanAccessRequestAsync(request.ServiceRequestId)) return Forbid();
+
         var file = new ServiceRequestFile
         {
             ServiceRequestId = request.ServiceRequestId,
@@ -65,58 +60,63 @@ public class ServiceRequestFilesController : ControllerBase
         };
 
         await _service.AddAsync(file);
-
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = file.Id },
-            MapToDto(file));
+        return CreatedAtAction(nameof(GetById), new { id = file.Id }, MapToDto(file));
     }
 
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
         var file = await _service.GetByIdAsync(id);
-
-        if (file == null)
-            return NotFound();
-        if (!await CanAccessRequestAsync(file.ServiceRequestId)) return Forbid();
+        if (file == null) return NotFound();
+        if (!await CanModifyFileAsync(file.ServiceRequestId)) return Forbid();
 
         await _service.DeleteAsync(file);
-
         return NoContent();
     }
 
     private async Task<bool> CanAccessRequestAsync(int serviceRequestId)
     {
         if (User.IsInRole("Admin")) return true;
+
         var request = await _requests.GetByIdAsync(serviceRequestId);
         if (request == null || !TryGetUserId(out var userId)) return false;
+
         if (User.IsInRole("Customer"))
         {
             var customer = await _customers.GetByUserIdAsync(userId);
             return customer != null && customer.Id == request.CustomerId;
         }
+
         if (User.IsInRole("Technician"))
         {
             var technician = await _technicians.GetByUserIdAsync(userId);
             return technician != null && request.Booking?.TechnicianId == technician.Id;
         }
+
         return false;
+    }
+
+    private async Task<bool> CanModifyFileAsync(int serviceRequestId)
+    {
+        if (User.IsInRole("Admin")) return true;
+        if (!User.IsInRole("Customer")) return false;
+
+        var request = await _requests.GetByIdAsync(serviceRequestId);
+        if (request == null || !TryGetUserId(out var userId)) return false;
+
+        var customer = await _customers.GetByUserIdAsync(userId);
+        return customer != null && customer.Id == request.CustomerId;
     }
 
     private bool TryGetUserId(out int userId)
         => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
-    private static ServiceRequestFileDto MapToDto(
-        ServiceRequestFile file)
+    private static ServiceRequestFileDto MapToDto(ServiceRequestFile file) => new()
     {
-        return new ServiceRequestFileDto
-        {
-            Id = file.Id,
-            ServiceRequestId = file.ServiceRequestId,
-            FileUrl = file.FileUrl,
-            FileType = file.FileType,
-            UploadedAt = file.UploadedAt
-        };
-    }
+        Id = file.Id,
+        ServiceRequestId = file.ServiceRequestId,
+        FileUrl = file.FileUrl,
+        FileType = file.FileType,
+        UploadedAt = file.UploadedAt
+    };
 }
