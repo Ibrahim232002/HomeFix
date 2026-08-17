@@ -1,9 +1,9 @@
 using HomeFix.API.DTOs.Message;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 
 namespace HomeFix.API.Controllers;
 
@@ -33,54 +33,59 @@ public class MessagesController : ControllerBase
     public async Task<ActionResult<MessageDto>> GetById(int id)
     {
         var message = await _service.GetByIdAsync(id);
-
-        if (message == null)
-            return NotFound();
+        if (message == null) return NotFound();
         var conversation = await _conversations.GetByIdAsync(message.ConversationId);
         if (conversation == null || !await CanAccessAsync(conversation)) return Forbid();
-
         return Ok(MapToDto(message));
     }
 
     [HttpGet("conversation/{conversationId:int}")]
-    public async Task<ActionResult<List<MessageDto>>>
-        GetByConversationId(int conversationId)
+    public async Task<ActionResult<List<MessageDto>>> GetByConversationId(int conversationId)
     {
         var conversation = await _conversations.GetByIdAsync(conversationId);
         if (conversation == null) return NotFound();
         if (!await CanAccessAsync(conversation)) return Forbid();
-        var messages =
-            await _service.GetByConversationIdAsync(conversationId);
-
+        var messages = await _service.GetByConversationIdAsync(conversationId);
         return Ok(messages.Select(MapToDto).ToList());
     }
 
     [HttpPost]
-    public async Task<ActionResult<MessageDto>> Create(
-        CreateMessageRequest request)
+    public async Task<ActionResult<MessageDto>> Create(CreateMessageRequest request)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
+        if (request.ConversationId <= 0) return BadRequest(new { message = "A valid conversation is required." });
+
         var conversation = await _conversations.GetByIdAsync(request.ConversationId);
         if (conversation == null) return NotFound();
         if (!await CanAccessAsync(conversation)) return Forbid();
+
+        var messageText = request.MessageText?.Trim();
+        var attachmentUrl = request.AttachmentUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(messageText) && string.IsNullOrWhiteSpace(attachmentUrl))
+            return BadRequest(new { message = "Message text or an attachment is required." });
+        if (messageText?.Length > 2000)
+            return BadRequest(new { message = "Message text is too long." });
+        if (attachmentUrl?.Length > 500)
+            return BadRequest(new { message = "Attachment URL is too long." });
+        if (!string.IsNullOrWhiteSpace(attachmentUrl) &&
+            (!Uri.TryCreate(attachmentUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
+            return BadRequest(new { message = "Attachment URL must be a valid HTTPS URL." });
+        if (!string.IsNullOrWhiteSpace(request.AttachmentType) && request.AttachmentType.Trim().Length > 20)
+            return BadRequest(new { message = "Attachment type is too long." });
 
         var message = new Message
         {
             ConversationId = request.ConversationId,
             SenderId = userId,
-            MessageText = request.MessageText,
-            AttachmentUrl = request.AttachmentUrl,
-            AttachmentType = request.AttachmentType,
+            MessageText = messageText,
+            AttachmentUrl = attachmentUrl,
+            AttachmentType = string.IsNullOrWhiteSpace(request.AttachmentType) ? null : request.AttachmentType.Trim(),
             IsRead = false,
             SentAt = DateTime.UtcNow
         };
 
         await _service.AddAsync(message);
-
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = message.Id },
-            MapToDto(message));
+        return CreatedAtAction(nameof(GetById), new { id = message.Id }, MapToDto(message));
     }
 
     private async Task<bool> CanAccessAsync(HomeFix.DAL.Entities.Conversation conversation)
@@ -103,18 +108,15 @@ public class MessagesController : ControllerBase
     private bool TryGetUserId(out int userId)
         => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
-    private static MessageDto MapToDto(Message message)
+    private static MessageDto MapToDto(Message message) => new()
     {
-        return new MessageDto
-        {
-            Id = message.Id,
-            ConversationId = message.ConversationId,
-            SenderId = message.SenderId,
-            MessageText = message.MessageText,
-            AttachmentUrl = message.AttachmentUrl,
-            AttachmentType = message.AttachmentType,
-            IsRead = message.IsRead,
-            SentAt = message.SentAt
-        };
-    }
+        Id = message.Id,
+        ConversationId = message.ConversationId,
+        SenderId = message.SenderId,
+        MessageText = message.MessageText,
+        AttachmentUrl = message.AttachmentUrl,
+        AttachmentType = message.AttachmentType,
+        IsRead = message.IsRead,
+        SentAt = message.SentAt
+    };
 }
