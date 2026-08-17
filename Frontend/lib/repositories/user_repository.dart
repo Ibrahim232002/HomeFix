@@ -23,16 +23,14 @@ class UserRepository implements IUserRepository {
 
   @override
   Future<UserModel> login(String email, String password, UserRole role) async {
-    final authResponse = await _authRepo.login(
-      LoginRequest(email: email, password: password),
-    );
+    final authResponse = await _authRepo.login(LoginRequest(email: email, password: password));
     return UserModel(
       id: (authResponse.userId ?? 0).toString(),
       fullName: authResponse.fullName ?? 'المستخدم',
       phoneNumber: '',
       email: authResponse.email ?? email,
       role: UserRole.fromString(authResponse.role ?? role.nameStr),
-      createdAt: DateTime.now().toIso8601String(),
+      createdAt: '',
     );
   }
 
@@ -51,7 +49,6 @@ class UserRepository implements IUserRepository {
   Future<List<AddressModel>> getUserAddresses(String userId) async {
     final intUserId = int.tryParse(userId);
     if (intUserId == null) return [];
-
     final dtos = await _addressRepo.getAddressesByCustomerId(intUserId);
     return dtos
         .map((d) => AddressModel(
@@ -75,7 +72,6 @@ class UserRepository implements IUserRepository {
   Future<AddressModel> addAddress(AddressModel address) async {
     final intUserId = int.tryParse(address.userId);
     if (intUserId == null) throw ArgumentError('معرف المستخدم غير صالح');
-
     final dto = await _addressRepo.createAddress(
       CreateAddressRequest(
         customerId: intUserId,
@@ -90,17 +86,12 @@ class UserRepository implements IUserRepository {
         cityId: address.cityId,
       ),
     );
-
     return address.copyWith(id: dto.id.toString());
   }
 
   @override
-  Future<List<NotificationModel>> getUserNotifications(String userId) async {
-    return _notifRepo.getUserNotifications(userId);
-  }
+  Future<List<NotificationModel>> getUserNotifications(String userId) async => _notifRepo.getUserNotifications(userId);
 
   @override
-  Future<void> markNotificationAsRead(String notificationId) async {
-    await _notifRepo.markAsRead(notificationId);
-  }
+  Future<void> markNotificationAsRead(String notificationId) async => _notifRepo.markAsRead(notificationId);
 }
