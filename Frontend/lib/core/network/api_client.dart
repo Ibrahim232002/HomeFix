@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
 import '../constants/api_constants.dart';
 import '../storage/token_storage.dart';
 import 'api_exception.dart';
@@ -14,20 +16,20 @@ class ApiClient {
 
   final http.Client _httpClient = http.Client();
   final TokenStorage _tokenStorage = TokenStorage();
+  final ValueNotifier<bool> refreshInProgress = ValueNotifier<bool>(false);
+
   Future<bool>? _refreshOperation;
+  VoidCallback? onSessionExpired;
 
   Uri _buildUri(String endpoint, [Map<String, dynamic>? queryParameters]) {
     final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
-    final fullUrl = '${ApiConstants.baseUrl}$cleanEndpoint';
-    final uri = Uri.parse(fullUrl);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$cleanEndpoint');
+    if (queryParameters == null || queryParameters.isEmpty) return uri;
 
-    if (queryParameters != null && queryParameters.isNotEmpty) {
-      final stringParams = queryParameters.map(
-        (key, value) => MapEntry(key, value?.toString() ?? ''),
-      );
-      return uri.replace(queryParameters: stringParams);
-    }
-    return uri;
+    final stringParams = queryParameters.map(
+      (key, value) => MapEntry(key, value?.toString() ?? ''),
+    );
+    return uri.replace(queryParameters: stringParams);
   }
 
   Map<String, String> _buildHeaders({
@@ -42,11 +44,7 @@ class ApiClient {
     if (includeAuth && _tokenStorage.hasToken) {
       headers['Authorization'] = 'Bearer ${_tokenStorage.accessToken}';
     }
-
-    if (customHeaders != null) {
-      headers.addAll(customHeaders);
-    }
-
+    if (customHeaders != null) headers.addAll(customHeaders);
     return headers;
   }
 
@@ -55,13 +53,14 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
     bool includeAuth = true,
     bool allowAutoRefresh = true,
-  }) async {
+  }) {
     return _sendRequest(
       () async {
-        final uri = _buildUri(endpoint, queryParameters);
-        final headers = _buildHeaders(includeAuth: includeAuth);
         final response = await _httpClient
-            .get(uri, headers: headers)
+            .get(
+              _buildUri(endpoint, queryParameters),
+              headers: _buildHeaders(includeAuth: includeAuth),
+            )
             .timeout(ApiConstants.timeoutDuration);
         return _handleResponse(response);
       },
@@ -76,14 +75,15 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
     bool includeAuth = true,
     bool allowAutoRefresh = true,
-  }) async {
+  }) {
     return _sendRequest(
       () async {
-        final uri = _buildUri(endpoint, queryParameters);
-        final headers = _buildHeaders(includeAuth: includeAuth);
-        final encodedBody = body != null ? jsonEncode(body) : null;
         final response = await _httpClient
-            .post(uri, headers: headers, body: encodedBody)
+            .post(
+              _buildUri(endpoint, queryParameters),
+              headers: _buildHeaders(includeAuth: includeAuth),
+              body: body == null ? null : jsonEncode(body),
+            )
             .timeout(ApiConstants.timeoutDuration);
         return _handleResponse(response);
       },
@@ -98,14 +98,15 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
     bool includeAuth = true,
     bool allowAutoRefresh = true,
-  }) async {
+  }) {
     return _sendRequest(
       () async {
-        final uri = _buildUri(endpoint, queryParameters);
-        final headers = _buildHeaders(includeAuth: includeAuth);
-        final encodedBody = body != null ? jsonEncode(body) : null;
         final response = await _httpClient
-            .put(uri, headers: headers, body: encodedBody)
+            .put(
+              _buildUri(endpoint, queryParameters),
+              headers: _buildHeaders(includeAuth: includeAuth),
+              body: body == null ? null : jsonEncode(body),
+            )
             .timeout(ApiConstants.timeoutDuration);
         return _handleResponse(response);
       },
@@ -120,14 +121,15 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
     bool includeAuth = true,
     bool allowAutoRefresh = true,
-  }) async {
+  }) {
     return _sendRequest(
       () async {
-        final uri = _buildUri(endpoint, queryParameters);
-        final headers = _buildHeaders(includeAuth: includeAuth);
-        final encodedBody = body != null ? jsonEncode(body) : null;
         final response = await _httpClient
-            .delete(uri, headers: headers, body: encodedBody)
+            .delete(
+              _buildUri(endpoint, queryParameters),
+              headers: _buildHeaders(includeAuth: includeAuth),
+              body: body == null ? null : jsonEncode(body),
+            )
             .timeout(ApiConstants.timeoutDuration);
         return _handleResponse(response);
       },
@@ -151,11 +153,16 @@ class ApiClient {
 
       final refreshed = await _tryRefreshToken();
       if (!refreshed) {
-        await _tokenStorage.clear();
+        await _expireLocalSession();
         rethrow;
       }
 
-      return await requestFn();
+      try {
+        return await requestFn();
+      } on UnauthorizedException {
+        await _expireLocalSession();
+        rethrow;
+      }
     } on SocketException catch (e) {
       throw NetworkException('تعذر الاتصال بالخادم: ${e.message}');
     } on TimeoutException {
@@ -176,9 +183,7 @@ class ApiClient {
     final operation = _refreshTokenInternal();
     _refreshOperation = operation;
     operation.whenComplete(() {
-      if (identical(_refreshOperation, operation)) {
-        _refreshOperation = null;
-      }
+      if (identical(_refreshOperation, operation)) _refreshOperation = null;
     });
     return operation;
   }
@@ -187,21 +192,23 @@ class ApiClient {
     final refreshToken = _tokenStorage.refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) return false;
 
+    refreshInProgress.value = true;
     try {
-      final uri = _buildUri(ApiConstants.refresh);
-      final headers = _buildHeaders(includeAuth: false);
-      final body = jsonEncode({'refreshToken': refreshToken});
       final response = await _httpClient
-          .post(uri, headers: headers, body: body)
+          .post(
+            _buildUri(ApiConstants.refresh),
+            headers: _buildHeaders(includeAuth: false),
+            body: jsonEncode({'refreshToken': refreshToken}),
+          )
           .timeout(ApiConstants.timeoutDuration);
 
       if (response.statusCode != 200) return false;
 
-      final data = jsonDecode(response.body);
-      if (data is! Map<String, dynamic>) return false;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return false;
 
-      final newAccessToken = data['accessToken'] ?? data['token'];
-      final newRefreshToken = data['refreshToken'];
+      final newAccessToken = decoded['accessToken'] ?? decoded['token'];
+      final newRefreshToken = decoded['refreshToken'];
       if (newAccessToken == null || newRefreshToken == null) return false;
 
       await _tokenStorage.saveTokens(
@@ -210,9 +217,16 @@ class ApiClient {
       );
       return true;
     } catch (e) {
-      debugPrint('HomeFix session refresh failed: ${e.runtimeType}');
+      if (kDebugMode) debugPrint('HomeFix session refresh failed: ${e.runtimeType}');
       return false;
+    } finally {
+      refreshInProgress.value = false;
     }
+  }
+
+  Future<void> _expireLocalSession() async {
+    await _tokenStorage.clear();
+    onSessionExpired?.call();
   }
 
   dynamic _handleResponse(http.Response response) {
@@ -228,9 +242,7 @@ class ApiClient {
       }
     }
 
-    if (statusCode >= 200 && statusCode < 300) {
-      return decodedData;
-    }
+    if (statusCode >= 200 && statusCode < 300) return decodedData;
 
     String errorMessage = 'حدث خطأ في الخادم';
     Map<String, dynamic>? validationErrors;
@@ -242,10 +254,8 @@ class ApiClient {
         errorMessage = decodedData['title'].toString();
       } else if (decodedData['errors'] is Map) {
         validationErrors = Map<String, dynamic>.from(decodedData['errors'] as Map);
-        final firstError = validationErrors.values.firstOrNull;
-        if (firstError is List && firstError.isNotEmpty) {
-          errorMessage = firstError.first.toString();
-        }
+        final firstError = validationErrors.values.whereType<List>().expand((e) => e).firstOrNull;
+        if (firstError != null) errorMessage = firstError.toString();
       }
     } else if (decodedData is String && decodedData.isNotEmpty) {
       errorMessage = decodedData;
@@ -253,11 +263,7 @@ class ApiClient {
 
     switch (statusCode) {
       case 400:
-        throw BadRequestException(
-          errorMessage,
-          data: decodedData,
-          validationErrors: validationErrors,
-        );
+        throw BadRequestException(errorMessage, data: decodedData, validationErrors: validationErrors);
       case 401:
         throw UnauthorizedException(errorMessage);
       case 403:
