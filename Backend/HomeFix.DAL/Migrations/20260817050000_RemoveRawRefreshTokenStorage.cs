@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using HomeFix.DAL.Data;
 
@@ -12,9 +13,6 @@ public partial class RemoveRawRefreshTokenStorage : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        // Preserve existing refresh-token validity while migrating away from plaintext
-        // token storage. TokenHash is already populated by current application versions,
-        // but this backfill also handles legacy rows safely.
         migrationBuilder.Sql(@"
 UPDATE dbo.RefreshTokens
 SET TokenHash = CONVERT(varchar(128), HASHBYTES('SHA2_256', Token), 2)
