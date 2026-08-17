@@ -15,9 +15,20 @@ enum AuthSessionStatus {
 }
 
 class AuthSessionProvider extends ChangeNotifier {
-  final AuthRepository _authRepository = AuthRepository();
-  final TokenStorage _tokenStorage = TokenStorage();
-  final ApiClient _apiClient = ApiClient();
+  AuthSessionProvider({
+    IAuthRepository? authRepository,
+    IAuthSessionStorage? tokenStorage,
+    ApiClient? apiClient,
+  })  : _tokenStorage = tokenStorage ?? TokenStorage(),
+        _apiClient = apiClient ?? ApiClient(),
+        _authRepository = authRepository ?? AuthRepository(tokenStorage: tokenStorage ?? TokenStorage()) {
+    _apiClient.refreshInProgress.addListener(_handleRefreshStateChanged);
+    _apiClient.onSessionExpired = _handleSessionExpired;
+  }
+
+  final IAuthRepository _authRepository;
+  final IAuthSessionStorage _tokenStorage;
+  final ApiClient _apiClient;
 
   AuthSessionStatus _status = AuthSessionStatus.restoringSession;
   UserModel? _user;
@@ -25,24 +36,17 @@ class AuthSessionProvider extends ChangeNotifier {
   String? _infoMessage;
   bool _disposed = false;
 
-  AuthSessionProvider() {
-    _apiClient.refreshInProgress.addListener(_handleRefreshStateChanged);
-    _apiClient.onSessionExpired = _handleSessionExpired;
-  }
-
   AuthSessionStatus get status => _status;
   UserModel? get user => _user;
   String? get errorMessage => _errorMessage;
   String? get infoMessage => _infoMessage;
   bool get isRestoringSession => _status == AuthSessionStatus.restoringSession;
-  bool get isAuthenticated => _status == AuthSessionStatus.authenticated ||
-      _status == AuthSessionStatus.refreshing;
+  bool get isAuthenticated => _status == AuthSessionStatus.authenticated || _status == AuthSessionStatus.refreshing;
   bool get isRefreshing => _status == AuthSessionStatus.refreshing;
   UserRole get role => _user?.role ?? UserRole.customer;
 
   Future<void> restoreSession() async {
     if (_status != AuthSessionStatus.restoringSession) return;
-
     try {
       await _tokenStorage.initialize();
       final hasRefresh = _tokenStorage.refreshToken?.isNotEmpty == true;
@@ -70,9 +74,7 @@ class AuthSessionProvider extends ChangeNotifier {
   Future<bool> login(String email, String password) async {
     _clearMessages();
     try {
-      final response = await _authRepository.login(
-        LoginRequest(email: email.trim(), password: password),
-      );
+      final response = await _authRepository.login(LoginRequest(email: email.trim(), password: password));
       _user = _userFromAuthResponse(response);
       _setStatus(AuthSessionStatus.authenticated);
       return true;
@@ -92,19 +94,14 @@ class AuthSessionProvider extends ChangeNotifier {
   }) async {
     _clearMessages();
     try {
-      final response = await _authRepository.register(
-        RegisterRequest(
-          fullName: fullName.trim(),
-          email: email.trim(),
-          phoneNumber: phoneNumber.trim(),
-          password: password,
-          role: role.nameStr,
-        ),
-      );
-
-      final requiresVerification = response is Map<String, dynamic>
-          ? response['requiresEmailVerification'] == true
-          : false;
+      final response = await _authRepository.register(RegisterRequest(
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phoneNumber: phoneNumber.trim(),
+        password: password,
+        role: role.nameStr,
+      ));
+      final requiresVerification = response is Map<String, dynamic> ? response['requiresEmailVerification'] == true : false;
       _infoMessage = requiresVerification
           ? 'تم إنشاء الحساب. يرجى تأكيد البريد الإلكتروني ثم تسجيل الدخول.'
           : 'تم إنشاء الحساب. يمكنك تسجيل الدخول الآن.';
@@ -183,14 +180,12 @@ class AuthSessionProvider extends ChangeNotifier {
   Future<UserModel?> _loadCurrentUser() async {
     final response = await _authRepository.getCurrentUser();
     if (response is! Map<String, dynamic>) return null;
-
     final id = response['userId']?.toString();
     if (id == null || id.isEmpty) return null;
 
     final role = UserRole.fromString(response['role']?.toString() ?? 'Customer');
     final name = response['name']?.toString() ?? _tokenStorage.userFullName ?? '';
     final email = response['email']?.toString() ?? _tokenStorage.userEmail ?? '';
-
     await _tokenStorage.saveTokens(
       accessToken: _tokenStorage.accessToken ?? '',
       userId: int.tryParse(id),
@@ -209,22 +204,18 @@ class AuthSessionProvider extends ChangeNotifier {
     );
   }
 
-  UserModel _userFromAuthResponse(AuthResponseDto response) {
-    return UserModel(
-      id: (response.userId ?? _tokenStorage.userId ?? 0).toString(),
-      fullName: response.fullName ?? _tokenStorage.userFullName ?? '',
-      email: response.email ?? _tokenStorage.userEmail ?? '',
-      phoneNumber: '',
-      role: UserRole.fromString(response.role ?? 'Customer'),
-      createdAt: '',
-    );
-  }
+  UserModel _userFromAuthResponse(AuthResponseDto response) => UserModel(
+        id: (response.userId ?? _tokenStorage.userId ?? 0).toString(),
+        fullName: response.fullName ?? _tokenStorage.userFullName ?? '',
+        email: response.email ?? _tokenStorage.userEmail ?? '',
+        phoneNumber: '',
+        role: UserRole.fromString(response.role ?? 'Customer'),
+        createdAt: '',
+      );
 
   void _handleRefreshStateChanged() {
     if (_apiClient.refreshInProgress.value) {
-      if (_status == AuthSessionStatus.authenticated) {
-        _setStatus(AuthSessionStatus.refreshing);
-      }
+      if (_status == AuthSessionStatus.authenticated) _setStatus(AuthSessionStatus.refreshing);
     } else if (_status == AuthSessionStatus.refreshing && _tokenStorage.hasToken) {
       _setStatus(AuthSessionStatus.authenticated);
     }
