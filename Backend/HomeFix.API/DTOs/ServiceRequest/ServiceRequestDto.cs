@@ -1,4 +1,4 @@
-﻿namespace HomeFix.API.DTOs.ServiceRequest;
+namespace HomeFix.API.DTOs.ServiceRequest;
 
 public class ServiceRequestDto
 {
@@ -17,4 +17,21 @@ public class ServiceRequestDto
 
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+
+    // Read-only presentation fields. Mutable values remain sourced from the request itself.
+    public string? ServiceName { get; set; }
+    public string? ServiceDescription { get; set; }
+    public string? ServiceImageUrl { get; set; }
+    public int? EstimatedDurationMinutes { get; set; }
+
+    public string? AddressLabel { get; set; }
+    public string? FullAddress { get; set; }
+    public string? BuildingNumber { get; set; }
+    public string? FloorNumber { get; set; }
+    public string? ApartmentNumber { get; set; }
+    public string? AdditionalInstructions { get; set; }
+    public int? GovernorateId { get; set; }
+    public int? CityId { get; set; }
+    public string? GovernorateName { get; set; }
+    public string? CityName { get; set; }
 }
