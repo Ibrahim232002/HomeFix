@@ -151,8 +151,6 @@ public class BookingsController : ControllerBase
                 return BadRequest(new { message = "Customer completion confirmation is required." });
         }
 
-        // Validate role and state before consuming the code. Otherwise an authorized
-        // participant could waste a valid code with the wrong operation/state.
         var result = await _verificationCodes.VerifyBookingAsync(userId, id, purpose, "Email", code);
         if (!result.Success) return BadRequest(new { message = result.Error });
 
@@ -190,8 +188,29 @@ public class BookingsController : ControllerBase
 
     private static BookingDto MapToDto(Booking booking) => new()
     {
-        Id = booking.Id, ServiceRequestId = booking.ServiceRequestId, TechnicianId = booking.TechnicianId, Status = booking.Status,
-        AgreedPrice = booking.AgreedPrice, AcceptedAt = booking.AcceptedAt, ArrivedAt = booking.ArrivedAt, StartedAt = booking.StartedAt,
-        CompletedAt = booking.CompletedAt, FinalPrice = booking.FinalPrice, TechnicianNotes = booking.TechnicianNotes
+        Id = booking.Id,
+        ServiceRequestId = booking.ServiceRequestId,
+        TechnicianId = booking.TechnicianId,
+        Status = booking.Status,
+        AgreedPrice = booking.AgreedPrice,
+        AcceptedAt = booking.AcceptedAt,
+        ArrivedAt = booking.ArrivedAt,
+        StartedAt = booking.StartedAt,
+        CompletedAt = booking.CompletedAt,
+        FinalPrice = booking.FinalPrice,
+        TechnicianNotes = booking.TechnicianNotes,
+        ServiceName = booking.ServiceRequest?.Service?.Name,
+        CustomerName = booking.ServiceRequest?.Customer?.User?.FullName,
+        CustomerPhone = booking.ServiceRequest?.Customer?.User?.PhoneNumber,
+        AddressLabel = booking.ServiceRequest?.Address?.Label,
+        FullAddress = booking.ServiceRequest?.Address?.FullAddress,
+        BuildingNumber = booking.ServiceRequest?.Address?.BuildingNumber,
+        FloorNumber = booking.ServiceRequest?.Address?.FloorNumber,
+        ApartmentNumber = booking.ServiceRequest?.Address?.ApartmentNumber,
+        AdditionalInstructions = booking.ServiceRequest?.Address?.AdditionalInstructions,
+        GovernorateId = booking.ServiceRequest?.Address?.GovernorateId,
+        CityId = booking.ServiceRequest?.Address?.CityId,
+        GovernorateName = booking.ServiceRequest?.Address?.Governorate?.Name,
+        CityName = booking.ServiceRequest?.Address?.City?.Name,
     };
 }
