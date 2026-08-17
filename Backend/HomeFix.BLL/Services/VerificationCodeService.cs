@@ -33,10 +33,15 @@ public class VerificationCodeService : IVerificationCodeService
     public async Task<(bool Success, string? Error)> IssueAsync(int userId, string purpose, string channel)
     {
         var recent = await _repository.GetRecentAsync(userId, purpose, channel, DateTime.UtcNow.AddMinutes(-1));
-        if (recent.Count > 0) return (false, "Please wait before requesting another verification code.");
+        if (recent.Count > 0)
+            return (false, "Please wait before requesting another verification code.");
 
         var user = await _userRepository.GetByIdAsync(userId);
-        if (user == null) return (false, "User not found.");
+        if (user == null)
+            return (false, "User not found.");
+
+        if (!channel.Equals("Email", StringComparison.OrdinalIgnoreCase))
+            return (false, "The requested verification delivery channel is not configured.");
 
         var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
         var entity = new VerificationCode
@@ -53,35 +58,80 @@ public class VerificationCodeService : IVerificationCodeService
         await _repository.AddAsync(entity);
         await _unitOfWork.SaveChangesAsync();
 
-        if (channel.Equals("Email", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            try
-            {
-                await _emailService.SendCodeAsync(user.Email, code, purpose);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send {Purpose} verification code to user {UserId}.", purpose, userId);
-                await _repository.DeleteAsync(entity);
-                await _unitOfWork.SaveChangesAsync();
-                return (false, "Verification email could not be sent. Check the server email configuration.");
-            }
+            await _emailService.SendCodeAsync(user.Email, code, purpose);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                "Failed to send {Purpose} verification code for user {UserId}. ExceptionType: {ExceptionType}",
+                purpose,
+                userId,
+                ex.GetType().FullName);
+
+            await _repository.DeleteAsync(entity);
+            await _unitOfWork.SaveChangesAsync();
+            return (false, "Verification email could not be sent. Check the server email configuration.");
         }
 
         return (true, null);
     }
 
-    public async Task<(bool Success, string? Error, string? DevelopmentCode)> IssueForBookingAsync(int userId, int bookingId, string purpose, string channel)
+    public async Task<(bool Success, string? Error, string? DevelopmentCode)> IssueForBookingAsync(
+        int userId,
+        int bookingId,
+        string purpose,
+        string channel)
     {
-        if (purpose is not ("JobStart" or "JobCompletion")) return (false, "Invalid verification purpose.", null);
+        if (purpose is not ("JobStart" or "JobCompletion"))
+            return (false, "Invalid verification purpose.", null);
+
+        if (!channel.Equals("Email", StringComparison.OrdinalIgnoreCase))
+            return (false, "The requested verification delivery channel is not configured.", null);
+
+        var recent = await _repository.GetRecentAsync(userId, purpose, channel, DateTime.UtcNow.AddMinutes(-1));
+        if (recent.Count > 0)
+            return (false, "Please wait before requesting another verification code.", null);
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null)
+            return (false, "User not found.", null);
+
         var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
         var entity = new VerificationCode
         {
-            UserId = userId, BookingId = bookingId, CodeHash = Hash(code), Purpose = purpose, Channel = channel,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(10), Attempts = 0, CreatedAt = DateTime.UtcNow
+            UserId = userId,
+            BookingId = bookingId,
+            CodeHash = Hash(code),
+            Purpose = purpose,
+            Channel = channel,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            Attempts = 0,
+            CreatedAt = DateTime.UtcNow
         };
+
         await _repository.AddAsync(entity);
         await _unitOfWork.SaveChangesAsync();
+
+        try
+        {
+            await _emailService.SendCodeAsync(user.Email, code, purpose);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                "Failed to send booking {Purpose} code for booking {BookingId}, user {UserId}. ExceptionType: {ExceptionType}",
+                purpose,
+                bookingId,
+                userId,
+                ex.GetType().FullName);
+
+            await _repository.DeleteAsync(entity);
+            await _unitOfWork.SaveChangesAsync();
+            return (false, "Booking verification code could not be delivered. Check the server email configuration.", null);
+        }
+
         return (true, null, code);
     }
 
@@ -91,6 +141,7 @@ public class VerificationCodeService : IVerificationCodeService
         if (current == null) return (false, "Verification code not found.");
         if (current.ExpiresAt <= DateTime.UtcNow) return (false, "Verification code has expired.");
         if (current.Attempts >= 5) return (false, "Too many verification attempts.");
+
         current.Attempts++;
         if (!CryptographicEquals(current.CodeHash, Hash(code)))
         {
