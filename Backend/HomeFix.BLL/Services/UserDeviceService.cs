@@ -27,7 +27,8 @@ public class UserDeviceService : IUserDeviceService
         if (string.IsNullOrWhiteSpace(platform))
             throw new ArgumentException("Platform is required.", nameof(platform));
 
-        var existing = await _repository.GetByTokenAsync(deviceToken.Trim());
+        var normalizedToken = deviceToken.Trim();
+        var existing = await _repository.GetByTokenAsync(normalizedToken);
         var now = DateTime.UtcNow;
 
         if (existing is null)
@@ -35,7 +36,7 @@ public class UserDeviceService : IUserDeviceService
             existing = new UserDevice
             {
                 UserId = userId,
-                DeviceToken = deviceToken.Trim(),
+                DeviceToken = normalizedToken,
                 Platform = platform.Trim(),
                 IsActive = true,
                 CreatedAt = now,
@@ -45,7 +46,9 @@ public class UserDeviceService : IUserDeviceService
         }
         else
         {
-            existing.UserId = userId;
+            if (existing.UserId != userId)
+                throw new InvalidOperationException("This device token is already registered to another account.");
+
             existing.Platform = platform.Trim();
             existing.IsActive = true;
             existing.LastSeenAt = now;
@@ -58,7 +61,8 @@ public class UserDeviceService : IUserDeviceService
 
     public async Task<bool> DeactivateAsync(int userId, string deviceToken)
     {
-        var existing = await _repository.GetByTokenAsync(deviceToken.Trim());
+        var normalizedToken = deviceToken.Trim();
+        var existing = await _repository.GetByTokenAsync(normalizedToken);
         if (existing is null || existing.UserId != userId)
             return false;
 
