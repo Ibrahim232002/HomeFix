@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/status_badge.dart';
 import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/status_badge.dart';
 import '../../models/booking_model.dart';
 import '../../services/app_state_provider.dart';
-import '../../common/screens/chat_detail_screen.dart';
 
 class TechnicianBookingsScreen extends StatefulWidget {
-  const TechnicianBookingsScreen({Key? key}) : super(key: key);
+  const TechnicianBookingsScreen({super.key});
 
   @override
   State<TechnicianBookingsScreen> createState() => _TechnicianBookingsScreenState();
@@ -16,202 +16,192 @@ class TechnicianBookingsScreen extends StatefulWidget {
 
 class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  late final TabController _tabs;
+  final Set<String> _busy = <String>{};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabs.dispose();
     super.dispose();
   }
 
-  List<BookingModel> _filterBookings(List<BookingModel> all, int index) {
+  List<BookingModel> _filter(List<BookingModel> all, int index) {
     switch (index) {
-      case 0: // Upcoming
-        return all.where((b) => b.status == BookingStatus.upcoming).toList();
-      case 1: // In progress
-        return all.where((b) => b.status == BookingStatus.inProgress).toList();
-      case 2: // Completed
-        return all.where((b) => b.status == BookingStatus.completed).toList();
+      case 0:
+        return all.where((b) => b.status == BookingStatus.upcoming || b.status == BookingStatus.arrived).toList();
+      case 1:
+        return all.where((b) => b.status == BookingStatus.inProgress || b.status == BookingStatus.awaitingCompletion).toList();
+      case 2:
+        return all.where((b) => b.status == BookingStatus.completed || b.status == BookingStatus.cancelled).toList();
       default:
         return all;
     }
   }
 
+  Future<void> _transition(BuildContext context, BookingModel booking, BookingStatus next) async {
+    if (_busy.contains(booking.id)) return;
+    setState(() => _busy.add(booking.id));
+    try {
+      await context.read<AppStateProvider>().updateBookingStatus(booking.id, next);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تم تحديث حالة الحجز إلى ${next.displayNameAr}.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _busy.remove(booking.id));
+    }
+  }
+
+  Future<void> _issueAndVerifyStart(BuildContext context, BookingModel booking) async {
+    final codeController = TextEditingController();
+    var busy = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('تأكيد بدء العمل'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('سيتم إرسال رمز التحقق إلى بريدك الإلكتروني المرتبط بالحساب.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: codeController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'رمز التحقق'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: busy ? null : () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      setDialogState(() => busy = true);
+                      try {
+                        await context.read<AppStateProvider>().requestVerificationCode(booking.id, 'JobStart');
+                        if (dialogContext.mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('تم إرسال رمز التحقق.')));
+                        }
+                      } catch (e) {
+                        if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(e.toString())));
+                      } finally {
+                        if (dialogContext.mounted) setDialogState(() => busy = false);
+                      }
+                    },
+              child: const Text('إرسال الرمز'),
+            ),
+            ElevatedButton(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      if (codeController.text.trim().isEmpty) return;
+                      setDialogState(() => busy = true);
+                      try {
+                        await context.read<AppStateProvider>().verifyBookingCode(booking.id, 'JobStart', codeController.text.trim());
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                      } catch (e) {
+                        if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(e.toString())));
+                      } finally {
+                        if (dialogContext.mounted) setDialogState(() => busy = false);
+                      }
+                    },
+              child: const Text('تأكيد'),
+            ),
+          ],
+        ),
+      ),
+    );
+    codeController.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
+    final bookings = context.watch<AppStateProvider>().bookings;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('جدول المواعيد والحجوزات'),
+        title: const Text('الحجوزات'),
         bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.technicianPrimary,
-          unselectedLabelColor: AppColors.textMuted,
-          indicatorColor: AppColors.technicianPrimary,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 13),
+          controller: _tabs,
           tabs: const [
             Tab(text: 'القادمة'),
-            Tab(text: 'قيد التنفيذ'),
+            Tab(text: 'التنفيذ'),
             Tab(text: 'المكتملة'),
           ],
         ),
       ),
       body: TabBarView(
-        controller: _tabController,
-        children: List.generate(3, (tabIndex) {
-          final bookings = _filterBookings(appState.bookings, tabIndex);
-
-          if (bookings.isEmpty) {
+        controller: _tabs,
+        children: List.generate(3, (index) {
+          final list = _filter(bookings, index);
+          if (list.isEmpty) {
             return const EmptyStateWidget(
-              icon: Icons.event_busy_rounded,
-              title: 'لا توجد حجوزات في هذا التبويب',
-              description: 'يمكنك قبول طلبات صيانة جديدة من قائمة الطلبات المتاحة لتعبئة جدولك.',
+              icon: Icons.event_busy_outlined,
+              title: 'لا توجد حجوزات',
+              description: 'ستظهر الحجوزات بعد قبول العميل لأحد عروضك.',
             );
           }
-
-          return ListView.builder(
+          return ListView.separated(
             padding: const EdgeInsets.all(16),
-            itemCount: bookings.length,
-            itemBuilder: (context, index) {
-              final b = bookings[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, i) {
+              final booking = list[i];
+              final busy = _busy.contains(booking.id);
+              return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'حجز #${b.id}',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo'),
-                          ),
-                          StatusBadge.fromBookingStatus(b.status),
+                          Text('حجز #${booking.id}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                          StatusBadge.fromBookingStatus(booking.status),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        b.serviceNameAr,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'العميل: ${b.customerName}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-                      ),
+                      const SizedBox(height: 8),
+                      Text(booking.serviceNameAr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 6),
+                      Text('العميل: ${booking.customerName}'),
+                      const SizedBox(height: 8),
+                      Text('الموعد: ${booking.scheduledDate} ${booking.scheduledTime}'.trim()),
+                      const SizedBox(height: 8),
+                      Text('السعر: ${booking.price.toStringAsFixed(2)} ج.م'),
                       const SizedBox(height: 12),
-
-                      // Schedule & Address Card
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.scaffoldBackground,
-                          borderRadius: BorderRadius.circular(12),
+                      if (booking.status == BookingStatus.upcoming)
+                        ElevatedButton(
+                          onPressed: busy ? null : () => _transition(context, booking, BookingStatus.arrived),
+                          child: busy ? const CircularProgressIndicator() : const Text('وصلت إلى الموقع'),
                         ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.schedule_rounded, size: 16, color: AppColors.technicianPrimary),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'الموعد: ${b.scheduledDate} (${b.scheduledTime})',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on_rounded, size: 16, color: AppColors.technicianPrimary),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    '${b.address.city} - ${b.address.fullAddressDescription}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                      if (booking.status == BookingStatus.arrived)
+                        ElevatedButton(
+                          onPressed: busy ? null : () => _issueAndVerifyStart(context, booking),
+                          child: const Text('تأكيد بدء العمل'),
                         ),
-                      ),
-                      const Divider(height: 24),
-
-                      // Actions
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'المبلغ: ${b.price.toInt()} ج.م',
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.technicianDark, fontFamily: 'Cairo'),
-                          ),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.technicianPrimary),
-                                onPressed: () {
-                                  appState.setTechnicianNavIndex(0); // or start conversation
-                                },
-                              ),
-                              if (b.status == BookingStatus.upcoming) ...[
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.technicianPrimary,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  onPressed: () {
-                                    appState.updateBookingStatus(b.id, BookingStatus.inProgress);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('تم بدء تنفيذ المهمة!')),
-                                    );
-                                  },
-                                  child: const Text('بدء العمل', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-                                ),
-                              ] else if (b.status == BookingStatus.inProgress) ...[
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.successDark,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  onPressed: () {
-                                    appState.updateBookingStatus(b.id, BookingStatus.completed);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('تم إنهاء المهمة وإيداع الأجر في المحفظة!')),
-                                    );
-                                  },
-                                  child: const Text('إنهاء المهمة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
+                      if (booking.status == BookingStatus.inProgress)
+                        ElevatedButton(
+                          onPressed: busy ? null : () => _transition(context, booking, BookingStatus.awaitingCompletion),
+                          child: const Text('إنهاء أعمال الفني وطلب تأكيد العميل'),
+                        ),
+                      if (booking.status == BookingStatus.awaitingCompletion)
+                        const Text(
+                          'بانتظار تأكيد العميل لإكمال الحجز.',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
                     ],
                   ),
                 ),
