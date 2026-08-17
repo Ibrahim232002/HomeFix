@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/network/api_exception.dart';
 import '../../models/booking_model.dart';
 import '../../repositories/booking_repository.dart';
 import '../../services/app_state_provider.dart';
@@ -27,6 +28,8 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
     _load();
   }
 
+  String _safeError(Object error) => error is ApiException ? error.message : 'تعذر تحميل أو تحديث الحجز. يرجى المحاولة مرة أخرى.';
+
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
@@ -34,7 +37,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
       if (!mounted) return;
       setState(() => _booking = booking);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = _safeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -79,7 +82,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                   }
                 } catch (e) {
                   if (dialogContext.mounted) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_safeError(e))));
                   }
                 } finally {
                   setDialogState(() => dialogBusy = false);
@@ -120,9 +123,9 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(booking.serviceNameAr, style: const TextStyle(fontWeight: FontWeight.w800)),
+                                  Text(booking.serviceNameAr.isEmpty ? 'الخدمة المرتبطة بالطلب' : booking.serviceNameAr, style: const TextStyle(fontWeight: FontWeight.w800)),
                                   const SizedBox(height: 8),
-                                  Text('العميل: ${booking.customerName}'),
+                                  if (booking.customerName.isNotEmpty) Text('العميل: ${booking.customerName}'),
                                   Text('السعر: ${booking.price.toStringAsFixed(2)} ج.م'),
                                   if (booking.notes?.isNotEmpty == true) Text(booking.notes!),
                                 ],
