@@ -1,547 +1,231 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../common/widgets/review_dialog.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/service_request_model.dart';
 import '../../services/app_state_provider.dart';
-import '../../common/screens/chat_detail_screen.dart';
-import '../../common/widgets/review_dialog.dart';
+import 'customer_booking_screen.dart';
+import 'customer_offers_screen.dart';
 import 'customer_payment_screen.dart';
 
 class CustomerRequestDetailScreen extends StatelessWidget {
   final String requestId;
 
-  const CustomerRequestDetailScreen({Key? key, required this.requestId}) : super(key: key);
-
-  int _getStatusStepIndex(ServiceRequestStatus status) {
-    switch (status) {
-      case ServiceRequestStatus.pending:
-        return 0;
-      case ServiceRequestStatus.accepted:
-        return 1;
-      case ServiceRequestStatus.scheduled:
-        return 2;
-      case ServiceRequestStatus.inProgress:
-        return 3;
-      case ServiceRequestStatus.completed:
-        return 4;
-      case ServiceRequestStatus.cancelled:
-        return -1;
-    }
-  }
+  const CustomerRequestDetailScreen({super.key, required this.requestId});
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
-    final request = appState.customerRequests.firstWhere(
-      (r) => r.id == requestId,
-      orElse: () => appState.customerRequests.first,
-    );
+    final appState = context.watch<AppStateProvider>();
+    ServiceRequestModel? request;
+    for (final item in appState.customerRequests) {
+      if (item.id == requestId) {
+        request = item;
+        break;
+      }
+    }
 
-    final currentStep = _getStatusStepIndex(request.status);
+    if (request == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text('طلب #$requestId')),
+        body: const Center(child: Text('لم يتم العثور على الطلب.')),
+      );
+    }
+
+    final hasBooking = request.status == ServiceRequestStatus.accepted ||
+        request.status == ServiceRequestStatus.scheduled ||
+        request.status == ServiceRequestStatus.inProgress ||
+        request.status == ServiceRequestStatus.completed;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('طلب #${request.id}'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      appBar: AppBar(title: Text('طلب #${request.id}')),
+      body: RefreshIndicator(
+        onRefresh: appState.refreshAuthenticatedData,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            // Status Header Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
+            _card(
+              context,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        request.serviceNameAr,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'Cairo',
+                      Expanded(
+                        child: Text(
+                          request.serviceNameAr,
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                         ),
                       ),
                       StatusBadge.fromRequestStatus(request.status),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'تاريخ الطلب: ${request.createdAt}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontFamily: 'Cairo'),
-                  ),
-                  const Divider(height: 24),
-
-                  // Progress Timeline
-                  if (request.status != ServiceRequestStatus.cancelled) ...[
-                    const Text(
-                      'مراحل تنفيذ الطلب',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'Cairo',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _buildStepItem('تم الطلب', 0, currentStep),
-                        _buildStepDivider(0, currentStep),
-                        _buildStepItem('تم القبول', 1, currentStep),
-                        _buildStepDivider(1, currentStep),
-                        _buildStepItem('مجدول', 2, currentStep),
-                        _buildStepDivider(2, currentStep),
-                        _buildStepItem('جاري العمل', 3, currentStep),
-                        _buildStepDivider(3, currentStep),
-                        _buildStepItem('مكتمل', 4, currentStep),
-                      ],
-                    ),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.errorLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline, color: AppColors.errorDark, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'تم إلغاء هذا الطلب. السبب: ${request.cancellationReason ?? "بواسطة العميل"}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.errorDark,
-                                fontFamily: 'Cairo',
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 8),
+                  Text('تاريخ الطلب: ${request.createdAt}'),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-
-            // Assigned Technician Card (if assigned)
-            if (request.technicianName != null) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'الفني المختص المعتمد',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'Cairo',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundImage: NetworkImage(request.technicianAvatar ?? ''),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                request.technicianName!,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  fontFamily: 'Cairo',
-                                ),
-                              ),
-                              Text(
-                                request.technicianPhone ?? '+20 10 9876 5432',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                  fontFamily: 'Cairo',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primarySurface,
-                            foregroundColor: AppColors.primary,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.chat_bubble_rounded, size: 16),
-                          label: const Text('محادثة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
-                          onPressed: () async {
-                            final tech = appState.technicians.firstWhere(
-                              (t) => t.userId == request.technicianId,
-                              orElse: () => appState.technicians.first,
-                            );
-                            final conv = await appState.startConversationWithTechnician(
-                              technician: tech,
-                              serviceNameAr: request.serviceNameAr,
-                              requestId: request.id,
-                            );
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChatDetailScreen(conversation: conv),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Problem Details Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
+            const SizedBox(height: 12),
+            _card(
+              context,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'تفاصيل العطل والخدمة',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  const Text('تفاصيل الخدمة', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Text(request.problemDescription),
+                  const SizedBox(height: 12),
+                  Text('الموعد المطلوب: ${request.preferredDate} (${request.preferredTime})'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _card(
+              context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('العنوان', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Text(request.address.fullAddressDescription),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _card(
+              context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('التسعير', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
                   Text(
-                    request.problemDescription,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                      fontFamily: 'Cairo',
-                    ),
+                    request.finalPrice != null
+                        ? '${request.finalPrice!.toStringAsFixed(2)} ج.م'
+                        : request.estimatedPriceMin > 0
+                            ? '${request.estimatedPriceMin.toStringAsFixed(2)} ج.م رسوم/سعر مرجعي'
+                            : 'السعر النهائي يحدده عرض الفني.',
                   ),
-                  if (request.files.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    const Text(
-                      'الصور المرفقة:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo'),
-                    ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'لا يتم اعتبار أي قيمة محسوبة محلياً مبلغاً نهائياً؛ السعر النهائي يعتمد على بيانات الخادم.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (request.status == ServiceRequestStatus.pending)
+              _action(
+                context,
+                icon: Icons.local_offer_outlined,
+                label: 'عرض عروض الفنيين',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CustomerOffersScreen(requestId: request!.id)),
+                ),
+              ),
+            if (hasBooking)
+              _action(
+                context,
+                icon: Icons.event_available_outlined,
+                label: 'تفاصيل الحجز والتحقق',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CustomerBookingScreen(requestId: request!.id)),
+                ),
+              ),
+            if (request.status != ServiceRequestStatus.cancelled)
+              _action(
+                context,
+                icon: Icons.payments_outlined,
+                label: 'الدفع',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CustomerPaymentScreen(request: request!)),
+                ),
+              ),
+            if (request.status == ServiceRequestStatus.completed) ...[
+              const SizedBox(height: 4),
+              ElevatedButton.icon(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => ReviewDialog(
+                    requestId: request!.id,
+                    technicianId: request.technicianId ?? '',
+                    technicianName: request.technicianName ?? 'فني الصيانة',
+                    serviceNameAr: request.serviceNameAr,
+                  ),
+                ),
+                icon: const Icon(Icons.star_rounded),
+                label: const Text('تقييم الخدمة'),
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (request.files.isNotEmpty)
+              _card(
+                context,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('الملفات المرفقة', style: TextStyle(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 8),
                     SizedBox(
-                      height: 80,
+                      height: 90,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: request.files.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final f = request.files[index];
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(
-                              f.url,
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
+                        itemBuilder: (_, index) => ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            request.files[index].url,
+                            width: 90,
+                            height: 90,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox(
+                              width: 90,
+                              height: 90,
+                              child: Icon(Icons.insert_drive_file_outlined),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
                     ),
                   ],
-                  const Divider(height: 24),
-                  Row(
-                    children: [
-                      const Icon(Icons.schedule_rounded, size: 16, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'الموعد المفضل: ${request.preferredDate} (${request.preferredTime})',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Address Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.location_pin, color: AppColors.primary, size: 18),
-                      SizedBox(width: 6),
-                      Text(
-                        'عنوان تقديم الخدمة',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'Cairo',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    request.address.title,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, fontFamily: 'Cairo'),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    request.address.fullAddressDescription,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Invoice / Price Breakdown Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'تفاصيل الفاتورة والحساب',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildPriceRow('رسوم الكشف والزيارة', '80.00 ج.م'),
-                  const SizedBox(height: 6),
-                  _buildPriceRow('أجور الفحص وخدمة الصيانة', '${((request.finalPrice ?? request.estimatedPriceMin) - 80).clamp(0, 9999).toInt()}.00 ج.م'),
-                  if (request.notes != null && request.notes!.contains('خصم')) ...[
-                    const SizedBox(height: 6),
-                    _buildPriceRow('خصم كود الترويج', '-50.00 ج.م', isDiscount: true),
-                  ],
-                  const Divider(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'المبلغ الإجمالي المتوقع',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'Cairo',
-                        ),
-                      ),
-                      Text(
-                        request.finalPrice != null
-                            ? '${request.finalPrice!.toInt()} ج.م'
-                            : '${request.estimatedPriceMin.toInt()} - ${request.estimatedPriceMax.toInt()} ج.م',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primaryDark,
-                          fontFamily: 'Cairo',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Payment Action Banner / Button
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.payment_rounded, color: AppColors.primary, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'خيارات السداد الإلكتروني والنقدي',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'ادفع عبر بوابة Paymob (بطاقات Visa / MasterCard / ميزة والمحافظ الإلكترونية كفودافون كاش) أو نقداً بعد إتمام الخدمة.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Cairo', height: 1.4),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    icon: const Icon(Icons.credit_card_rounded, size: 18),
-                    label: const Text(
-                      'سداد التكلفة / اختيار طريقة الدفع',
-                      style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CustomerPaymentScreen(request: request),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Action Buttons
-            if (request.status == ServiceRequestStatus.completed)
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                icon: const Icon(Icons.star_rounded, color: Colors.white),
-                label: const Text('تقييم تجربة الخدمة', style: TextStyle(fontSize: 15, fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => ReviewDialog(
-                      requestId: request.id,
-                      technicianId: request.technicianId ?? '',
-                      technicianName: request.technicianName ?? 'فني الصيانة',
-                      serviceNameAr: request.serviceNameAr,
-                    ),
-                  );
-                },
               ),
-            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStepItem(String title, int stepIdx, int currentStep) {
-    final isDone = currentStep >= stepIdx;
-    final isCurrent = currentStep == stepIdx;
-
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: isDone ? AppColors.primary : Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isDone ? AppColors.primary : AppColors.border,
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: isDone
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : Text(
-                      '${stepIdx + 1}',
-                      style: const TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-              color: isDone ? AppColors.primaryDark : AppColors.textMuted,
-              fontFamily: 'Cairo',
-            ),
-          ),
-        ],
+  Widget _card(BuildContext context, {required Widget child}) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: child,
       ),
     );
   }
 
-  Widget _buildStepDivider(int stepIdx, int currentStep) {
-    final isDone = currentStep > stepIdx;
-    return Container(
-      width: 16,
-      height: 2,
-      color: isDone ? AppColors.primary : AppColors.border,
-      margin: const EdgeInsets.only(bottom: 16),
-    );
-  }
-
-  Widget _buildPriceRow(String label, String amount, {bool isDiscount = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(fontSize: 12, color: isDiscount ? AppColors.successDark : AppColors.textSecondary, fontFamily: 'Cairo')),
-        Text(amount, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDiscount ? AppColors.successDark : AppColors.textPrimary, fontFamily: 'Cairo')),
-      ],
+  Widget _action(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+      ),
     );
   }
 }
