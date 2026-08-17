@@ -83,7 +83,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
           }
         },
         child: _loading
-            ? const ListView(padding: EdgeInsets.all(AppDesignTokens.space4), children: [HomeFixSkeletonList(itemCount: 5)])
+            ? ListView(padding: const EdgeInsets.all(AppDesignTokens.space4), children: [const HomeFixSkeletonList(itemCount: 5)])
             : _error != null
                 ? ListView(
                     padding: const EdgeInsets.all(AppDesignTokens.space4),
