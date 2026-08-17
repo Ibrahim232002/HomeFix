@@ -38,29 +38,46 @@ android {
     val releaseKeyAlias = signingValue("keyAlias", "HOMEFIX_KEY_ALIAS")
     val releaseKeyPassword = signingValue("keyPassword", "HOMEFIX_KEY_PASSWORD")
 
+    val releaseSigningConfigured =
+        releaseStoreFile != null &&
+        releaseStorePassword != null &&
+        releaseKeyAlias != null &&
+        releaseKeyPassword != null
+
+    val releaseBuildRequested = gradle.startParameter.taskNames.any {
+        it.contains("Release", ignoreCase = true)
+    }
+
     signingConfigs {
         create("release") {
-            if (releaseStoreFile != null && releaseStorePassword != null &&
-                releaseKeyAlias != null && releaseKeyPassword != null) {
-                storeFile = file(releaseStoreFile)
-                storePassword = releaseStorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
+            if (releaseSigningConfigured) {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword!!
+                keyAlias = releaseKeyAlias!!
+                keyPassword = releaseKeyPassword!!
             }
         }
     }
 
     buildTypes {
+        debug {
+            // Use the normal Android/Flutter debug signing configuration.
+            signingConfig = signingConfigs.getByName("debug")
+        }
+
         release {
-            if (releaseStoreFile == null || releaseStorePassword == null ||
-                releaseKeyAlias == null || releaseKeyPassword == null) {
+            if (!releaseSigningConfigured && releaseBuildRequested) {
                 throw GradleException(
                     "Release signing is not configured. Set HOMEFIX_KEYSTORE_PATH, " +
                         "HOMEFIX_KEYSTORE_PASSWORD, HOMEFIX_KEY_ALIAS and HOMEFIX_KEY_PASSWORD, " +
                         "or provide android/key.properties locally."
                 )
             }
-            signingConfig = signingConfigs.getByName("release")
+
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+
             isMinifyEnabled = false
             isShrinkResources = false
         }
