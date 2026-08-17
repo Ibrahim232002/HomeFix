@@ -16,6 +16,7 @@ public class BookingRepository
     private IQueryable<Booking> WithPresentationGraph(IQueryable<Booking> query)
         => query
             .Include(b => b.Technician)
+                .ThenInclude(t => t.User)
             .Include(b => b.ServiceRequest)
                 .ThenInclude(r => r.Service)
             .Include(b => b.ServiceRequest)
