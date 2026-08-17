@@ -2,6 +2,8 @@ using HomeFix.BLL.Interfaces;
 using HomeFix.DAL;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
+using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace HomeFix.BLL.Services;
 
@@ -44,17 +46,61 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
         if (offer.ServiceRequest.Customer.UserId != customerUserId) return (false, "You are not allowed to accept this offer.");
         if (offer.Status != "Pending") return (false, "Offer is no longer available.");
         if (offer.ExpiresAt.HasValue && offer.ExpiresAt <= DateTime.UtcNow) return (false, "Offer has expired.");
-        await using var tx = await _unitOfWork.BeginTransactionAsync();
-        var existingBooking = await _bookingRepository.GetByRequestIdAsync(offer.ServiceRequestId);
-        if (existingBooking != null) return (false, "This request already has a booking.");
-        offer.Status = "Accepted"; offer.RespondedAt = DateTime.UtcNow;
-        var otherOffers = await _offerRepository.GetByRequestIdAsync(offer.ServiceRequestId);
-        foreach (var other in otherOffers.Where(x => x.Id != offer.Id && x.Status == "Pending")) { other.Status = "Rejected"; other.RespondedAt = DateTime.UtcNow; }
-        offer.ServiceRequest.Status = "Accepted"; offer.ServiceRequest.UpdatedAt = DateTime.UtcNow;
-        await _bookingRepository.AddAsync(new Booking { ServiceRequestId = offer.ServiceRequestId, TechnicianId = offer.TechnicianId, Status = "Confirmed", AgreedPrice = offer.ProposedPrice, FinalPrice = null, AcceptedAt = DateTime.UtcNow });
-        await _unitOfWork.SaveChangesAsync();
-        await tx.CommitAsync();
-        return (true, null);
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            var existingBooking = await _bookingRepository.GetByRequestIdAsync(offer.ServiceRequestId);
+            if (existingBooking != null)
+            {
+                await tx.RollbackAsync();
+                return (false, "This request already has a booking.");
+            }
+
+            // Re-read the offer inside the serialized transaction so concurrent acceptance
+            // cannot leave more than one accepted offer/booking for the same request.
+            var currentOffer = await _offerRepository.GetByIdAsync(offerId);
+            if (currentOffer == null || currentOffer.Status != "Pending")
+            {
+                await tx.RollbackAsync();
+                return (false, "Offer is no longer available.");
+            }
+            if (currentOffer.ExpiresAt.HasValue && currentOffer.ExpiresAt <= DateTime.UtcNow)
+            {
+                await tx.RollbackAsync();
+                return (false, "Offer has expired.");
+            }
+
+            currentOffer.Status = "Accepted";
+            currentOffer.RespondedAt = DateTime.UtcNow;
+            var otherOffers = await _offerRepository.GetByRequestIdAsync(currentOffer.ServiceRequestId);
+            foreach (var other in otherOffers.Where(x => x.Id != currentOffer.Id && x.Status == "Pending"))
+            {
+                other.Status = "Rejected";
+                other.RespondedAt = DateTime.UtcNow;
+            }
+
+            currentOffer.ServiceRequest.Status = "Accepted";
+            currentOffer.ServiceRequest.UpdatedAt = DateTime.UtcNow;
+            await _bookingRepository.AddAsync(new Booking
+            {
+                ServiceRequestId = currentOffer.ServiceRequestId,
+                TechnicianId = currentOffer.TechnicianId,
+                Status = "Confirmed",
+                AgreedPrice = currentOffer.ProposedPrice,
+                FinalPrice = null,
+                AcceptedAt = DateTime.UtcNow
+            });
+
+            await _unitOfWork.SaveChangesAsync();
+            await tx.CommitAsync();
+            return (true, null);
+        }
+        catch (DbUpdateException)
+        {
+            await tx.RollbackAsync();
+            return (false, "The offer could not be accepted because the request was updated concurrently. Please retry.");
+        }
     }
 
     public async Task<(bool Success, string? Error)> RejectAsync(int offerId, int customerUserId)
