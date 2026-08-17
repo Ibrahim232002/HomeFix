@@ -26,17 +26,65 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
     public async Task<(bool Success, string? Error, ServiceRequestOffer? Offer)> CreateAsync(int requestId, int technicianId, decimal proposedPrice, string? note)
     {
         if (proposedPrice <= 0) return (false, "Proposed price must be greater than zero.", null);
-        var request = await _requestRepository.GetByIdAsync(requestId);
-        if (request == null) return (false, "Service request not found.", null);
-        if (request.Status is not ("Pending" or "Open" or "OfferPending")) return (false, "This request is not accepting offers.", null);
-        if (!await _technicianRepository.IsEligibleForRequestAsync(technicianId, request.ServiceId, request.Address.CityId)) return (false, "Technician is not eligible for this request.", null);
-        if (await _offerRepository.ExistsForTechnicianAsync(requestId, technicianId)) return (false, "Technician already has a pending offer for this request.", null);
-        var offer = new ServiceRequestOffer { ServiceRequestId = requestId, TechnicianId = technicianId, ProposedPrice = proposedPrice, TechnicianNote = note, Status = "Pending", CreatedAt = DateTime.UtcNow, ExpiresAt = DateTime.UtcNow.AddHours(24) };
-        await _offerRepository.AddAsync(offer);
-        if (request.Status == "Open" || request.Status == "Pending") request.Status = "OfferPending";
-        request.UpdatedAt = DateTime.UtcNow;
-        await _unitOfWork.SaveChangesAsync();
-        return (true, null, offer);
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            var request = await _requestRepository.GetByIdAsync(requestId);
+            if (request == null)
+            {
+                await tx.RollbackAsync();
+                return (false, "Service request not found.", null);
+            }
+
+            if (request.Status is not ("Pending" or "Open" or "OfferPending"))
+            {
+                await tx.RollbackAsync();
+                return (false, "This request is not accepting offers.", null);
+            }
+
+            if (!await _technicianRepository.IsEligibleForRequestAsync(technicianId, request.ServiceId, request.Address.CityId))
+            {
+                await tx.RollbackAsync();
+                return (false, "Technician is not eligible for this request.", null);
+            }
+
+            // Re-check inside the serialized transaction so concurrent submissions
+            // cannot create duplicate pending offers for the same technician/request pair.
+            if (await _offerRepository.ExistsForTechnicianAsync(requestId, technicianId))
+            {
+                await tx.RollbackAsync();
+                return (false, "Technician already has a pending offer for this request.", null);
+            }
+
+            var offer = new ServiceRequestOffer
+            {
+                ServiceRequestId = requestId,
+                TechnicianId = technicianId,
+                ProposedPrice = proposedPrice,
+                TechnicianNote = note,
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddHours(24)
+            };
+
+            await _offerRepository.AddAsync(offer);
+            if (request.Status == "Open" || request.Status == "Pending") request.Status = "OfferPending";
+            request.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+            await tx.CommitAsync();
+            return (true, null, offer);
+        }
+        catch (DbUpdateException)
+        {
+            await tx.RollbackAsync();
+            return (false, "The offer could not be created because the request was updated concurrently. Please retry.", null);
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<(bool Success, string? Error)> AcceptAsync(int offerId, int customerUserId)
