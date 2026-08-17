@@ -124,20 +124,36 @@ class BookingRepository implements IBookingRepository {
   }
 
   BookingModel _mapBooking(Map<String, dynamic> json) {
+    final acceptedAt = json['acceptedAt']?.toString() ?? '';
+    final address = AddressModel(
+      id: json['serviceRequestId']?.toString() ?? '',
+      userId: '',
+      title: json['addressLabel']?.toString() ?? 'العنوان',
+      governorate: json['governorateName']?.toString() ?? '',
+      city: json['cityName']?.toString() ?? '',
+      street: json['fullAddress']?.toString() ?? '',
+      building: json['buildingNumber']?.toString() ?? '',
+      floor: json['floorNumber']?.toString() ?? '',
+      apartment: json['apartmentNumber']?.toString() ?? '',
+      landmark: json['additionalInstructions']?.toString(),
+      governorateId: (json['governorateId'] as num?)?.toInt(),
+      cityId: (json['cityId'] as num?)?.toInt(),
+    );
+
     return BookingModel(
       id: json['id']?.toString() ?? '',
       requestId: json['serviceRequestId']?.toString() ?? '',
-      serviceNameAr: json['serviceNameAr']?.toString() ?? '',
+      serviceNameAr: json['serviceName']?.toString() ?? '',
       customerName: json['customerName']?.toString() ?? '',
       customerPhone: json['customerPhone']?.toString() ?? '',
       technicianId: json['technicianId']?.toString() ?? '',
-      technicianName: json['technicianName']?.toString() ?? '',
-      address: AddressModel.fromJson(json['address'] is Map ? json['address'] as Map<String, dynamic> : {}),
-      scheduledDate: json['acceptedAt']?.toString() ?? '',
+      technicianName: '',
+      address: address,
+      scheduledDate: acceptedAt,
       scheduledTime: '',
       price: ((json['finalPrice'] ?? json['agreedPrice']) as num?)?.toDouble() ?? 0.0,
       status: BookingStatus.fromString(json['status']?.toString() ?? 'Confirmed'),
-      createdAt: json['acceptedAt']?.toString() ?? '',
+      createdAt: acceptedAt,
       completedAt: json['completedAt']?.toString(),
       notes: json['technicianNotes']?.toString(),
     );
