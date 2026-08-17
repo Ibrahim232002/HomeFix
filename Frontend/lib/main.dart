@@ -20,28 +20,30 @@ class HomeFixApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider<AuthSessionProvider>(
-          create: (_) => AuthSessionProvider()..restoreSession(),
-        ),
-        ChangeNotifierProvider<AppStateProvider>(
-          create: (_) => AppStateProvider(),
-        ),
-      ],
+    return ChangeNotifierProvider<AuthSessionProvider>(
+      create: (_) => AuthSessionProvider()..restoreSession(),
       child: Consumer<AuthSessionProvider>(
-        builder: (context, session, child) {
-          return MaterialApp(
-            title: AppStrings.appName,
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            builder: (context, widget) {
-              return Directionality(
-                textDirection: TextDirection.rtl,
-                child: widget ?? const SizedBox.shrink(),
-              );
+        builder: (context, session, _) {
+          return ChangeNotifierProxyProvider<AuthSessionProvider, AppStateProvider>(
+            create: (_) => AppStateProvider(session: session),
+            update: (_, nextSession, appState) {
+              appState!.bindSession(nextSession);
+              return appState;
             },
-            home: _getHomeScreen(session),
+            child: Builder(
+              builder: (_) => MaterialApp(
+                title: AppStrings.appName,
+                debugShowCheckedModeBanner: false,
+                theme: AppTheme.lightTheme,
+                builder: (context, widget) {
+                  return Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: widget ?? const SizedBox.shrink(),
+                  );
+                },
+                home: _getHomeScreen(session),
+              ),
+            ),
           );
         },
       ),
