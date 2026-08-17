@@ -34,7 +34,7 @@ class ServiceDetailScreen extends StatelessWidget {
                       const SizedBox(height: AppDesignTokens.space5),
                       Row(
                         children: [
-                          HomeFixStatusChip(label: service.categoryNameAr, color: AppColors.primary),
+                          HomeFixStatusChip(label: service.categoryNameAr, tone: HomeFixStatusTone.info),
                           const Spacer(),
                           Row(
                             children: [
