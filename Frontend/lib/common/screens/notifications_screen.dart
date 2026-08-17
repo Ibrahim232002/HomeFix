@@ -109,16 +109,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
       ]);
     } else if (_notifications.isEmpty) {
-      body = ListView(children: const [
-        SizedBox(height: 180),
-        Center(
-          child: EmptyStateWidget(
-            icon: Icons.notifications_off_outlined,
-            title: 'لا توجد إشعارات',
-            description: 'ستظهر هنا التنبيهات القادمة من الخادم.',
+      body = ListView(
+        children: [
+          const SizedBox(height: 180),
+          Center(
+            child: EmptyStateWidget(
+              icon: Icons.notifications_off_outlined,
+              title: 'لا توجد إشعارات',
+              description: 'ستظهر هنا التنبيهات القادمة من الخادم.',
+            ),
           ),
-        ),
-      ]);
+        ],
+      );
     } else {
       body = ListView.separated(
         padding: const EdgeInsets.all(16),
