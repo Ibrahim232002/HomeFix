@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace HomeFix.DAL.Migrations;
 
+[Migration("20260817040000_ProductionHardening")]
 public partial class ProductionHardening : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
