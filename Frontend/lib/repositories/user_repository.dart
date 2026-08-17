@@ -58,13 +58,15 @@ class UserRepository implements IUserRepository {
               id: d.id.toString(),
               userId: d.customerId.toString(),
               title: d.label ?? d.buildingNumber ?? 'العنوان المسجل',
-              governorate: '',
-              city: '',
+              governorate: d.governorateId?.toString() ?? '',
+              city: d.cityId?.toString() ?? '',
               street: d.fullAddress ?? '',
               building: d.buildingNumber ?? '',
               floor: d.floorNumber ?? '',
               apartment: d.apartmentNumber ?? '',
               isDefault: d.isDefault,
+              governorateId: d.governorateId,
+              cityId: d.cityId,
             ))
         .toList();
   }
@@ -74,18 +76,21 @@ class UserRepository implements IUserRepository {
     final intUserId = int.tryParse(address.userId);
     if (intUserId == null) throw ArgumentError('معرف المستخدم غير صالح');
 
-    final cityId = int.tryParse(address.city);
     final dto = await _addressRepo.createAddress(
       CreateAddressRequest(
         customerId: intUserId,
-        cityId: cityId,
+        label: address.title,
         fullAddress: address.street,
         buildingNumber: address.building,
         floorNumber: address.floor,
         apartmentNumber: address.apartment,
+        additionalInstructions: address.landmark,
         isDefault: address.isDefault,
+        governorateId: address.governorateId,
+        cityId: address.cityId,
       ),
     );
+
     return address.copyWith(id: dto.id.toString());
   }
 
