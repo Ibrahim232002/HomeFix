@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using HomeFix.DAL.Data;
 
 #nullable disable
 
 namespace HomeFix.DAL.Migrations;
 
+[DbContext(typeof(HomeFixDbContext))]
 [Migration("20260817040000_ProductionHardening")]
 public partial class ProductionHardening : Migration
 {
