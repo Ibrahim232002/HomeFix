@@ -61,8 +61,8 @@ class ServiceRequestRepository implements IServiceRequestRepository {
         'serviceId': serviceId,
         'addressId': addressId,
         'description': request.problemDescription.trim(),
-        'preferredDate': request.preferredDate,
-        'preferredTime': request.preferredTime,
+        'preferredDate': _normalizeDate(request.preferredDate),
+        'preferredTime': _normalizeTime(request.preferredTime),
       },
     );
 
@@ -72,25 +72,51 @@ class ServiceRequestRepository implements IServiceRequestRepository {
     return _mapDto(ServiceRequestDto.fromJson(response), fallback: request);
   }
 
+  String _normalizeDate(String value) {
+    final trimmed = value.trim();
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) return trimmed;
+
+    final now = DateTime.now();
+    if (trimmed == 'اليوم') return _dateOnly(now);
+    if (trimmed == 'غداً' || trimmed == 'غدا') return _dateOnly(now.add(const Duration(days: 1)));
+    if (trimmed == 'بعد غد' || trimmed == 'بعد غدا') return _dateOnly(now.add(const Duration(days: 2)));
+    throw FormatException('تاريخ الزيارة غير صالح: $value');
+  }
+
+  String _normalizeTime(String value) {
+    final trimmed = value.trim();
+    if (RegExp(r'^\d{2}:\d{2}(:\d{2})?$').hasMatch(trimmed)) {
+      return trimmed.length == 5 ? '$trimmed:00' : trimmed;
+    }
+
+    final match = RegExp(r'^(\d{1,2}):(\d{2})\s*(صباحاً|صباحا|مساءً|مساء|ظهراً|ظهرا)$').firstMatch(trimmed);
+    if (match == null) throw FormatException('توقيت الزيارة غير صالح: $value');
+
+    var hour = int.parse(match.group(1)!);
+    final minute = match.group(2)!;
+    final period = match.group(3)!;
+    final isPm = period.contains('مساء') || period.contains('ظهر');
+    if (isPm && hour < 12) hour += 12;
+    if (!isPm && hour == 12) hour = 0;
+    return '${hour.toString().padLeft(2, '0')}:$minute:00';
+  }
+
+  String _dateOnly(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
   @override
   Future<void> updateStatus(String requestId, ServiceRequestStatus newStatus, {String? notes, String? updatedBy}) async {
-    throw UnsupportedError(
-      'Service request status changes are controlled by the current backend workflow and are not a customer/technician PUT operation.',
-    );
+    throw UnsupportedError('Service request status changes are controlled by the current backend workflow.');
   }
 
   @override
   Future<void> cancelRequest(String requestId, String reason) async {
-    throw UnsupportedError(
-      'Request cancellation is not exposed by the current ServiceRequests API contract.',
-    );
+    throw UnsupportedError('Request cancellation is not exposed by the current ServiceRequests API contract.');
   }
 
   @override
   Future<void> assignTechnician(String requestId, String technicianId, String technicianName) async {
-    throw UnsupportedError(
-      'Technician assignment is performed by offer acceptance on the current backend.',
-    );
+    throw UnsupportedError('Technician assignment is performed by offer acceptance on the current backend.');
   }
 
   @override
@@ -125,7 +151,6 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   }
 
   ServiceRequestModel _mapDto(ServiceRequestDto dto, {ServiceRequestModel? fallback}) {
-    final status = ServiceRequestStatus.fromString(dto.status ?? 'Open');
     return ServiceRequestModel(
       id: dto.id.toString(),
       serviceId: dto.serviceId.toString(),
@@ -149,7 +174,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       preferredDate: dto.preferredDate?.toString() ?? '',
       preferredTime: dto.preferredTime?.toString() ?? '',
       files: fallback?.files ?? [],
-      status: status,
+      status: ServiceRequestStatus.fromString(dto.status ?? 'Open'),
       estimatedPriceMin: dto.visitFee,
       estimatedPriceMax: dto.visitFee,
       finalPrice: fallback?.finalPrice,
