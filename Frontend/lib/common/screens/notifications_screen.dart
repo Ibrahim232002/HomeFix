@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../auth/auth_session_provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../models/notification_model.dart';
 import '../../repositories/notification_repository.dart';
@@ -27,6 +28,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _load();
   }
 
+  String _safeError(Object error) => error is ApiException ? error.message : 'تعذر تحميل الإشعارات. يرجى المحاولة مرة أخرى.';
+
   Future<void> _load() async {
     final user = context.read<AuthSessionProvider>().user;
     if (user == null) return;
@@ -45,7 +48,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = _safeError(e);
       });
     }
   }
@@ -62,7 +65,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         setState(() => _notifications = updated);
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = _safeError(e));
     }
   }
 
@@ -84,7 +87,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!mounted) return;
       setState(() {
         _markingAll = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = _safeError(e);
       });
     }
   }
@@ -93,7 +96,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     Widget body;
     if (_loading) {
-      body = ListView(children: const [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))]);
+      body = const ListView(children: [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))]);
     } else if (_error != null) {
       body = ListView(children: [
         Padding(
