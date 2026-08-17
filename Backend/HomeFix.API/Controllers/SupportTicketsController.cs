@@ -93,8 +93,8 @@ public class SupportTicketsController : ControllerBase
         {
             UserId = userId,
             ServiceRequestId = request.ServiceRequestId,
-            Subject = request.Subject?.Trim(),
-            Description = request.Description?.Trim(),
+            Subject = request.Subject?.Trim() ?? string.Empty,
+            Description = request.Description?.Trim() ?? string.Empty,
             Priority = string.IsNullOrWhiteSpace(request.Priority) ? "Medium" : request.Priority.Trim(),
             Status = "Open",
             CreatedAt = DateTime.UtcNow
@@ -111,7 +111,7 @@ public class SupportTicketsController : ControllerBase
         if (ticket == null) return NotFound();
         if (!CanAccess(ticket.UserId)) return Forbid();
 
-        ticket.Description = request.Description?.Trim();
+        ticket.Description = request.Description?.Trim() ?? string.Empty;
         if (User.IsInRole("Admin"))
         {
             ticket.Status = request.Status?.Trim() ?? ticket.Status;
