@@ -1,5 +1,6 @@
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
+import '../core/network/api_exception.dart';
 import '../models/booking_model.dart';
 import '../models/address_model.dart';
 
