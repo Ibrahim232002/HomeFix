@@ -1,5 +1,6 @@
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
+import '../core/network/api_exception.dart';
 import '../models/api_dtos.dart';
 
 abstract class IPromoCodeRepository {
@@ -9,6 +10,7 @@ abstract class IPromoCodeRepository {
   Future<PromoCodeDto> createPromoCode(CreatePromoCodeRequest request);
   Future<PromoCodeDto> updatePromoCode(int id, UpdatePromoCodeRequest request);
   Future<UserPromoCodeDto> getUserPromoCodeById(int id);
+  Future<UserPromoCodeDto?> getUserPromoCodeByRequest(int serviceRequestId);
   Future<List<UserPromoCodeDto>> getUserPromoCodesByUser(int userId);
   Future<UserPromoCodeDto> createUserPromoCode(CreateUserPromoCodeRequest request);
 }
@@ -54,6 +56,17 @@ class PromoCodeRepository implements IPromoCodeRepository {
   Future<UserPromoCodeDto> getUserPromoCodeById(int id) async {
     final response = await _client.get(ApiConstants.userPromoCodeById(id));
     return UserPromoCodeDto.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<UserPromoCodeDto?> getUserPromoCodeByRequest(int serviceRequestId) async {
+    try {
+      final response = await _client.get(ApiConstants.userPromoCodesByRequest(serviceRequestId));
+      if (response is Map<String, dynamic>) return UserPromoCodeDto.fromJson(response);
+      return null;
+    } on NotFoundException {
+      return null;
+    }
   }
 
   @override
