@@ -30,27 +30,80 @@ class HomeFixApp extends StatelessWidget {
               appState!.bindSession(nextSession);
               return appState;
             },
-            child: Builder(
-              builder: (_) => MaterialApp(
-                title: AppStrings.appName,
-                debugShowCheckedModeBanner: false,
-                theme: AppTheme.lightTheme,
-                builder: (context, widget) {
-                  return Directionality(
-                    textDirection: TextDirection.rtl,
-                    child: widget ?? const SizedBox.shrink(),
-                  );
-                },
-                home: _getHomeScreen(session),
-              ),
+            child: MaterialApp(
+              title: AppStrings.appName,
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              builder: (context, widget) {
+                return Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: widget ?? const SizedBox.shrink(),
+                );
+              },
+              home: const _HomeShell(),
             ),
           );
         },
       ),
     );
   }
+}
 
-  Widget _getHomeScreen(AuthSessionProvider session) {
+class _HomeShell extends StatefulWidget {
+  const _HomeShell();
+
+  @override
+  State<_HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<_HomeShell> {
+  AuthSessionProvider? _session;
+  String? _loadedUserId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = context.read<AuthSessionProvider>();
+    if (!identical(_session, session)) {
+      _session?.removeListener(_handleSessionChanged);
+      _session = session;
+      _session!.addListener(_handleSessionChanged);
+    }
+    _handleSessionChanged();
+  }
+
+  void _handleSessionChanged() {
+    final session = _session;
+    if (session == null) return;
+
+    final appState = context.read<AppStateProvider>();
+    if (session.status == AuthSessionStatus.authenticated && session.user != null) {
+      if (_loadedUserId != session.user!.id) {
+        _loadedUserId = session.user!.id;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) appState.refreshAuthenticatedData();
+        });
+      }
+    } else if (session.status == AuthSessionStatus.unauthenticated) {
+      if (_loadedUserId != null) {
+        _loadedUserId = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) appState.logout();
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _session?.removeListener(_handleSessionChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.watch<AuthSessionProvider>();
+
     switch (session.status) {
       case AuthSessionStatus.restoringSession:
         return const _SessionRestoringScreen();
