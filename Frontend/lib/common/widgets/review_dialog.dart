@@ -8,6 +8,7 @@ import '../../core/theme/app_responsive.dart';
 import '../../core/widgets/homefix_button.dart';
 import '../../core/widgets/homefix_card.dart';
 import '../../core/widgets/homefix_states.dart';
+import '../../repositories/review_repository.dart';
 import '../../services/app_state_provider.dart';
 
 class ReviewDialog extends StatefulWidget {
@@ -16,19 +17,14 @@ class ReviewDialog extends StatefulWidget {
   final String technicianName;
   final String serviceNameAr;
 
-  const ReviewDialog({
-    super.key,
-    required this.requestId,
-    required this.technicianId,
-    required this.technicianName,
-    required this.serviceNameAr,
-  });
+  const ReviewDialog({super.key, required this.requestId, required this.technicianId, required this.technicianName, required this.serviceNameAr});
 
   @override
   State<ReviewDialog> createState() => _ReviewDialogState();
 }
 
 class _ReviewDialogState extends State<ReviewDialog> {
+  final ReviewRepository _repository = ReviewRepository();
   double _rating = 5;
   final TextEditingController _commentController = TextEditingController();
   bool _loading = true;
@@ -55,12 +51,12 @@ class _ReviewDialogState extends State<ReviewDialog> {
       return;
     }
     try {
-      // Backend returns the existing review for the request when one exists.
-      await context.read<AppStateProvider>().getReviewByRequest(requestId);
+      await _repository.getReviewByRequest(requestId);
       if (mounted) setState(() { _alreadyReviewed = true; _loading = false; });
-    } catch (_) {
-      // A missing review is the normal state; provider exposes the backend result.
+    } on NotFoundException {
       if (mounted) setState(() { _alreadyReviewed = false; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e is ApiException ? e.message : 'تعذر التحقق من حالة التقييم.'; });
     }
   }
 
@@ -68,13 +64,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
     if (_submitting || _alreadyReviewed || _rating < 1 || _rating > 5) return;
     setState(() { _submitting = true; _error = null; });
     try {
-      await context.read<AppStateProvider>().submitReview(
-        requestId: widget.requestId,
-        technicianId: widget.technicianId,
-        rating: _rating,
-        comment: _commentController.text.trim(),
-        serviceNameAr: widget.serviceNameAr,
-      );
+      await context.read<AppStateProvider>().submitReview(requestId: widget.requestId, technicianId: widget.technicianId, rating: _rating, comment: _commentController.text.trim(), serviceNameAr: widget.serviceNameAr);
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
@@ -131,10 +121,12 @@ class _ReviewDialogState extends State<ReviewDialog> {
                           ]),
                         ),
         ),
-        actions: _loading || _alreadyReviewed ? [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق'))] : [
-          TextButton(onPressed: _submitting ? null : () => Navigator.pop(context), child: const Text('إلغاء')),
-          HomeFixButton(expanded: false, loading: _submitting, label: 'إرسال التقييم', icon: Icons.send_rounded, onPressed: _submit),
-        ],
+        actions: _loading || _alreadyReviewed
+            ? [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق'))]
+            : [
+                TextButton(onPressed: _submitting ? null : () => Navigator.pop(context), child: const Text('إلغاء')),
+                HomeFixButton(expanded: false, loading: _submitting, label: 'إرسال التقييم', icon: Icons.send_rounded, onPressed: _submit),
+              ],
       ),
     );
   }
