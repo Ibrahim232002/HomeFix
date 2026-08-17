@@ -1,99 +1,112 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/empty_state.dart';
+import '../../core/theme/app_responsive.dart';
+import '../../core/widgets/homefix_card.dart';
+import '../../core/widgets/homefix_states.dart';
+import '../../models/user_model.dart';
 import '../../services/app_state_provider.dart';
 import 'chat_detail_screen.dart';
 
-class ChatListScreen extends StatelessWidget {
-  const ChatListScreen({Key? key}) : super(key: key);
+class ChatListScreen extends StatefulWidget {
+  const ChatListScreen({super.key});
+
+  @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      await context.read<AppStateProvider>().refreshAuthenticatedData();
+      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString().replaceFirst('Exception: ', ''); });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
+    final appState = context.watch<AppStateProvider>();
     final conversations = appState.conversations;
+    final isCustomer = appState.currentUser?.role == UserRole.customer;
+    final unreadCount = conversations.fold<int>(0, (sum, item) => sum + (isCustomer ? item.unreadCountCustomer : item.unreadCountTechnician));
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('المحادثات والرسائل'),
+        title: const Text('المحادثات'),
+        actions: [
+          if (unreadCount > 0)
+            Padding(padding: const EdgeInsetsDirectional.only(end: 16), child: Center(child: Text('$unreadCount غير مقروء', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)))),
+        ],
       ),
-      body: conversations.isEmpty
-          ? const EmptyStateWidget(
-              icon: Icons.chat_bubble_outline_rounded,
-              title: 'لا توجد محادثات جارية حالياً',
-              description: 'يمكنك بدء محادثة مباشرة مع الفنيين المختصين عبر صفحات الطلبات والخدمات.',
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: conversations.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final conv = conversations[index];
-                final isCustomer = appState.isCustomer;
-                final otherName = isCustomer ? conv.technicianName : conv.customerName;
-                final otherAvatar = isCustomer ? conv.technicianAvatar : conv.customerAvatar;
-
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatDetailScreen(conversation: conv),
-                        ),
-                      );
-                    },
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundImage: (otherAvatar != null && otherAvatar.isNotEmpty) ? NetworkImage(otherAvatar) : null,
-                    ),
-                    title: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          otherName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'Cairo',
-                          ),
-                        ),
-                        Text(
-                          conv.lastMessageTime,
-                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo'),
-                        ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (conv.serviceNameAr != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            conv.serviceNameAr!,
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary, fontFamily: 'Cairo'),
-                          ),
-                        ],
-                        const SizedBox(height: 4),
-                        Text(
-                          conv.lastMessage,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: AppResponsive.pagePadding(context),
+            children: [
+              AppResponsive.content(
+                context,
+                child: _loading
+                    ? const HomeFixLoadingList(itemCount: 4)
+                    : _error != null
+                        ? HomeFixErrorState(title: 'تعذر تحميل المحادثات', message: _error, onRetry: _load)
+                        : conversations.isEmpty
+                            ? const SizedBox(height: 420, child: HomeFixEmptyState(icon: Icons.chat_bubble_outline_rounded, title: 'لا توجد محادثات', message: 'ستظهر هنا محادثاتك مع الفنيين بعد بدء التواصل من الطلبات المدعومة.'))
+                            : Column(
+                                children: conversations.map((conversation) {
+                                  final otherName = isCustomer ? conversation.technicianName : conversation.customerName;
+                                  final otherAvatar = isCustomer ? conversation.technicianAvatar : conversation.customerAvatar;
+                                  final unread = isCustomer ? conversation.unreadCountCustomer : conversation.unreadCountTechnician;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: HomeFixCard(
+                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatDetailScreen(conversation: conversation))).then((_) => _load()),
+                                      child: Row(children: [
+                                        CircleAvatar(
+                                          radius: 26,
+                                          backgroundColor: AppColors.primarySurface,
+                                          backgroundImage: otherAvatar?.isNotEmpty == true ? NetworkImage(otherAvatar!) : null,
+                                          child: otherAvatar?.isNotEmpty == true ? null : const Icon(Icons.person_outline_rounded, color: AppColors.primary),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                          Row(children: [Expanded(child: Text(otherName.isEmpty ? 'المحادثة' : otherName, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: unread > 0 ? FontWeight.w800 : FontWeight.w700))), Text(conversation.lastMessageTime, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textMuted))]),
+                                          if (conversation.serviceNameAr?.isNotEmpty == true) Padding(padding: const EdgeInsets.only(top: 3), child: Text(conversation.serviceNameAr!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700))),
+                                          const SizedBox(height: 4),
+                                          Text(conversation.lastMessage.isEmpty ? 'لا توجد رسالة بعد' : conversation.lastMessage, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+                                        ])),
+                                        if (unread > 0)
+                                          Container(
+                                            margin: const EdgeInsetsDirectional.only(start: 10),
+                                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                            alignment: Alignment.center,
+                                            decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                                            child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                                          ),
+                                      ]),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
