@@ -10,7 +10,6 @@ abstract class ITechnicianRepository {
   Future<List<TechnicianProfileModel>> getTechniciansByService(String serviceId);
   Future<void> updateAvailability(String technicianId, bool isAvailable);
   Future<void> toggleOnlineStatus(String technicianId);
-
   Future<TechnicianProfileDto> getApiTechnicianProfileById(int id);
   Future<TechnicianProfileDto> getApiTechnicianProfileByUserId(int userId);
   Future<List<TechnicianProfileDto>> getApiActiveTechnicians();
@@ -61,7 +60,16 @@ class TechnicianRepository implements ITechnicianRepository {
   Future<TechnicianProfileModel?> getTechnicianById(String id) async {
     final intId = int.tryParse(id);
     if (intId == null) return null;
-    return _mapProfile(await getApiTechnicianProfileById(intId));
+    try {
+      return _mapProfile(await getApiTechnicianProfileById(intId));
+    } catch (_) {
+      // Some callers hold a UserId rather than a TechnicianProfile.Id.
+      try {
+        return _mapProfile(await getApiTechnicianProfileByUserId(intId));
+      } catch (_) {
+        return null;
+      }
+    }
   }
 
   @override
@@ -91,7 +99,7 @@ class TechnicianRepository implements ITechnicianRepository {
   Future<void> toggleOnlineStatus(String technicianId) async {
     final tech = await getTechnicianById(technicianId);
     if (tech == null) throw StateError('Technician profile not found');
-    await updateAvailability(technicianId, !tech.isAvailable);
+    await updateAvailability(tech.id, !tech.isAvailable);
   }
 
   @override
