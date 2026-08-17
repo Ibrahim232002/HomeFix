@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../models/service_request_offer_model.dart';
 import '../../services/app_state_provider.dart';
@@ -25,6 +26,11 @@ class _CustomerOffersScreenState extends State<CustomerOffersScreen> {
     _future = context.read<AppStateProvider>().loadOffersForRequest(widget.requestId);
   }
 
+  String _safeError(Object error, {String fallback = 'حدث خطأ أثناء تنفيذ العملية. يرجى المحاولة مرة أخرى.'}) {
+    if (error is ApiException) return error.message;
+    return fallback;
+  }
+
   Future<void> _accept(ServiceRequestOfferModel offer) async {
     if (_busyOffers.contains(offer.id)) return;
     setState(() => _busyOffers.add(offer.id));
@@ -40,7 +46,7 @@ class _CustomerOffersScreenState extends State<CustomerOffersScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_safeError(e))));
       }
     } finally {
       if (mounted) setState(() => _busyOffers.remove(offer.id));
@@ -59,7 +65,7 @@ class _CustomerOffersScreenState extends State<CustomerOffersScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_safeError(e))));
       }
     } finally {
       if (mounted) setState(() => _busyOffers.remove(offer.id));
@@ -81,7 +87,7 @@ class _CustomerOffersScreenState extends State<CustomerOffersScreen> {
             return EmptyStateWidget(
               icon: Icons.cloud_off_outlined,
               title: 'تعذر تحميل العروض',
-              description: snapshot.error.toString(),
+              description: _safeError(snapshot.error!),
               actionText: 'إعادة المحاولة',
               onAction: () => setState(() {
                 _future = context.read<AppStateProvider>().loadOffersForRequest(widget.requestId);
