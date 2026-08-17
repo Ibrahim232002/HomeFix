@@ -2,13 +2,13 @@ name: Frontend CI
 
 on:
   push:
-    paths:
-      - 'Frontend/**'
-      - '.github/workflows/frontend-ci.yml'
+    branches:
+      - frontend-ui-redesign
   pull_request:
     paths:
       - 'Frontend/**'
       - '.github/workflows/frontend-ci.yml'
+  workflow_dispatch:
 
 jobs:
   flutter:
