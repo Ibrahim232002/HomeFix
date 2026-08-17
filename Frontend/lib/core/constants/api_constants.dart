@@ -1,11 +1,14 @@
 class ApiConstants {
-  /// Configure with --dart-define=HOMEFIX_API_URL=...
-  static const String defaultBaseUrl = String.fromEnvironment(
-    'HOMEFIX_API_URL',
-    defaultValue: 'http://192.168.1.4:5045',
-  );
+  /// Required at build/run time: --dart-define=HOMEFIX_API_URL=https://api.example.com
+  static const String defaultBaseUrl = String.fromEnvironment('HOMEFIX_API_URL');
 
-  static String get baseUrl => defaultBaseUrl;
+  static String get baseUrl {
+    if (defaultBaseUrl.isEmpty) {
+      throw StateError('HOMEFIX_API_URL is not configured.');
+    }
+    return defaultBaseUrl;
+  }
+
   static const Duration timeoutDuration = Duration(seconds: 30);
 
   static const String register = '/api/Auth/register';
@@ -18,7 +21,6 @@ class ApiConstants {
   static const String addresses = '/api/Addresses';
   static String addressById(int id) => '/api/Addresses/$id';
   static String addressesByCustomer(int customerId) => '/api/Addresses/customer/$customerId';
-
   static const String cities = '/api/Cities';
   static String cityById(int id) => '/api/Cities/$id';
   static String citiesByGovernorate(int governorateId) => '/api/Cities/governorate/$governorateId';
