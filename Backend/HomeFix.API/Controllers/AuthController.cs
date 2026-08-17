@@ -48,9 +48,7 @@ public class AuthController : ControllerBase
     {
         var result = await _authService.ValidateLoginAsync(request.Email, request.Password);
         if (!result.Success)
-        {
             return Unauthorized(new { message = result.Error, requiresEmailVerification = result.User?.IsEmailVerified == false });
-        }
         return Ok(await BuildAuthResponseAsync(result.User!));
     }
 
@@ -59,13 +57,14 @@ public class AuthController : ControllerBase
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(RefreshTokenRequest request)
     {
-        var result = await _authService.ValidateRefreshTokenAsync(request.RefreshToken);
+        var result = await _authService.RotateRefreshTokenAsync(request.RefreshToken);
         if (!result.Success) return Unauthorized(new { message = result.Error });
 
-        await _authService.RevokeRefreshTokenAsync(request.RefreshToken);
-        var refreshToken = await _authService.CreateRefreshTokenAsync(result.User!);
-
-        return Ok(new { accessToken = _jwtService.GenerateAccessToken(result.User!), refreshToken });
+        return Ok(new
+        {
+            accessToken = _jwtService.GenerateAccessToken(result.User!),
+            refreshToken = result.RefreshToken
+        });
     }
 
     [Authorize]
