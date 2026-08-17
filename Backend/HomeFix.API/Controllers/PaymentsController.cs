@@ -47,6 +47,21 @@ public class PaymentsController : ControllerBase
         return Ok(payments.Select(MapToDto).ToList());
     }
 
+    [HttpGet("request/{serviceRequestId:int}/payable")]
+    public async Task<IActionResult> GetPayableAmount(int serviceRequestId)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var result = await _service.GetPayableAmountAsync(serviceRequestId, userId);
+        if (!result.Success || !result.Amount.HasValue)
+            return BadRequest(new { message = result.Error });
+
+        return Ok(new
+        {
+            serviceRequestId,
+            amount = result.Amount.Value,
+        });
+    }
+
     [HttpPost("cash/{serviceRequestId:int}")]
     [Authorize(Roles = "Customer")]
     public async Task<ActionResult<PaymentDto>> CreateCash(int serviceRequestId)
