@@ -1,261 +1,284 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_colors.dart';
-import '../../core/widgets/status_badge.dart';
-import '../../core/widgets/rating_stars.dart';
-import '../../models/technician_document_model.dart';
-import '../../services/app_state_provider.dart';
 
-class TechnicianProfileScreen extends StatelessWidget {
+import '../../auth/auth_session_provider.dart';
+import '../../common/screens/notifications_screen.dart';
+import '../../common/screens/support_center_screen.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../models/api_dtos.dart';
+import '../../repositories/technician_repository.dart';
+
+class TechnicianProfileScreen extends StatefulWidget {
   const TechnicianProfileScreen({Key? key}) : super(key: key);
 
-  void _showUploadDocDialog(BuildContext context) {
-    final titleController = TextEditingController();
-    final numController = TextEditingController();
+  @override
+  State<TechnicianProfileScreen> createState() => _TechnicianProfileScreenState();
+}
 
-    showDialog(
+class _TechnicianProfileScreenState extends State<TechnicianProfileScreen> {
+  final ITechnicianRepository _repository = TechnicianRepository();
+  TechnicianProfileDto? _profile;
+  List<TechnicianServiceAreaDto> _areas = const [];
+  List<TechnicianDocumentDto> _documents = const [];
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  int? get _userId => int.tryParse(context.read<AuthSessionProvider>().user?.id ?? '');
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final userId = _userId;
+    if (userId == null) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final profile = await _repository.getApiTechnicianProfileByUserId(userId);
+      final areas = await _repository.getServiceAreas(profile.id);
+      final documents = await _repository.getDocuments(profile.id);
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _areas = areas;
+        _documents = documents;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _editProfile() async {
+    if (_profile == null || _saving) return;
+    final bioController = TextEditingController(text: _profile!.bio ?? '');
+    final yearsController = TextEditingController(text: (_profile!.yearsOfExperience ?? 0).toString());
+    final imageController = TextEditingController(text: _profile!.profileImageUrl ?? '');
+
+    final values = await showDialog<List<String>>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('رفع وثيقة أو شهادة مهنية', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'عنوان الوثيقة أو الترخيص'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: numController,
-                  decoration: const InputDecoration(labelText: 'رقم الشهادة / الترخيص'),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.technicianLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.file_upload_outlined, color: AppColors.technicianPrimary),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'إرفاق الملف بصيغة PDF أو صورة',
-                          style: TextStyle(fontSize: 12, color: AppColors.technicianPrimary, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+      builder: (context) => AlertDialog(
+        title: const Text('تعديل الملف المهني'),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(controller: bioController, maxLines: 4, decoration: const InputDecoration(labelText: 'النبذة المهنية')),
+              const SizedBox(height: 10),
+              TextField(controller: yearsController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سنوات الخبرة')),
+              const SizedBox(height: 10),
+              TextField(controller: imageController, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط صورة الملف المهني')),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.technicianPrimary),
-              onPressed: () {
-                if (titleController.text.trim().isEmpty) return;
-                Provider.of<AppStateProvider>(context, listen: false).uploadDocument(
-                  titleAr: titleController.text.trim(),
-                  titleEn: 'Professional Document',
-                  documentType: 'Certificate',
-                  documentNumber: numController.text.trim(),
-                  fileUrl: null,
-                );
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم رفع الوثيقة بنجاح وجاري مراجعتها من قبل الإدارة.')),
-                );
-              },
-              child: const Text('إرسال للمراجعة', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
-            ),
-          ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, [bioController.text.trim(), yearsController.text.trim(), imageController.text.trim()]), child: const Text('حفظ')),
+        ],
       ),
     );
+    bioController.dispose();
+    yearsController.dispose();
+    imageController.dispose();
+    if (values == null) return;
+
+    setState(() => _saving = true);
+    try {
+      final updated = await _repository.updateApiTechnicianProfile(
+        _profile!.id,
+        UpdateTechnicianProfileRequest(
+          bio: values[0],
+          yearsOfExperience: int.tryParse(values[1]),
+          profileImageUrl: values[2].isEmpty ? null : values[2],
+          isAvailable: _profile!.isAvailable,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+        _saving = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _toggleAvailability() async {
+    if (_profile == null || _saving) return;
+    setState(() => _saving = true);
+    try {
+      final updated = await _repository.updateApiTechnicianProfile(
+        _profile!.id,
+        UpdateTechnicianProfileRequest(isAvailable: !_profile!.isAvailable),
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+        _saving = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _addArea() async {
+    if (_profile == null) return;
+    final controller = TextEditingController();
+    final cityId = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إضافة منطقة خدمة'),
+        content: TextField(controller: controller, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'معرف المدينة')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, int.tryParse(controller.text.trim())), child: const Text('إضافة')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (cityId == null || cityId <= 0) return;
+    try {
+      await _repository.addServiceArea(CreateTechnicianServiceAreaRequest(technicianId: _profile!.id, cityId: cityId));
+      await _load();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _deleteArea(TechnicianServiceAreaDto area) async {
+    try {
+      await _repository.deleteServiceArea(area.technicianId, area.cityId);
+      await _load();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
-    final tech = appState.currentTechProfile;
-
+    final session = context.watch<AuthSessionProvider>();
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('الملف المهني للفني'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      appBar: AppBar(title: const Text('الملف المهني للفني')),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            // Tech Header Card
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundImage: (tech?.avatarUrl != null && tech!.avatarUrl!.isNotEmpty) ? NetworkImage(tech!.avatarUrl!) : null,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        tech?.fullName ?? '',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.verified_rounded, size: 18, color: AppColors.technicianPrimary),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    tech?.phoneNumber ?? '',
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      RatingStarsWidget(rating: tech?.rating ?? 0.0, reviewCount: tech?.reviewCount ?? 0),
-                      const SizedBox(width: 16),
-                      Text(
-                        '${tech?.completedJobsCount ?? 0} عمل منجز',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontFamily: 'Cairo'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Official Verification Documents Section
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'الوثائق والشهادات المعتمدة',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.add_rounded, size: 18, color: AppColors.technicianPrimary),
-                        label: const Text('إضافة وثيقة', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: AppColors.technicianPrimary)),
-                        onPressed: () => _showUploadDocDialog(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (appState.technicianDocuments.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'لم يتم رفع وثائق أو شهادات مهنية بعد.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-                      ),
-                    )
-                  else
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: appState.technicianDocuments.length,
-                      separatorBuilder: (_, __) => const Divider(height: 16),
-                      itemBuilder: (context, index) {
-                        final doc = appState.technicianDocuments[index];
-                        return Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.scaffoldBackground,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.description_outlined, color: AppColors.technicianPrimary, size: 20),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    doc.titleAr,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, fontFamily: 'Cairo'),
-                                  ),
-                                  if (doc.documentNumber != null && doc.documentNumber!.isNotEmpty)
-                                    Text(
-                                      'رقم: ${doc.documentNumber}',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo'),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            StatusBadge.fromDocumentStatus(doc.status),
-                          ],
-                        );
-                      },
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-
-
-            // Logout
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: ListTile(
-                onTap: () => appState.logout(),
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.errorLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
+            if (_error != null)
+              Card(
+                color: AppColors.errorLight,
+                child: ListTile(
+                  leading: const Icon(Icons.error_outline, color: AppColors.errorDark),
+                  title: Text(_error!),
+                  trailing: TextButton(onPressed: _load, child: const Text('إعادة المحاولة')),
                 ),
-                title: const Text(
-                  'تسجيل الخروج',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.error, fontFamily: 'Cairo'),
-                ),
-                trailing: const Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
               ),
-            ),
-            const SizedBox(height: 24),
+            if (_loading)
+              const SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))
+            else if (_profile == null)
+              const SizedBox(height: 260, child: EmptyStateWidget(icon: Icons.engineering_outlined, title: 'تعذر تحميل الملف المهني', description: 'تحقق من الاتصال ثم حاول مرة أخرى.'))
+            else ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 42,
+                        backgroundImage: _profile!.profileImageUrl?.isNotEmpty == true ? NetworkImage(_profile!.profileImageUrl!) : null,
+                        child: _profile!.profileImageUrl?.isNotEmpty == true ? null : const Icon(Icons.engineering, size: 42),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(session.user?.fullName ?? 'الفني', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text(session.user?.email ?? '', style: const TextStyle(color: AppColors.textSecondary)),
+                      const SizedBox(height: 10),
+                      Text('التقييم ${_profile!.averageRating.toStringAsFixed(1)} • ${_profile!.totalJobs} عمل مكتمل', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Text('سنوات الخبرة: ${_profile!.yearsOfExperience ?? 0}', style: const TextStyle(color: AppColors.textSecondary)),
+                      const SizedBox(height: 10),
+                      if ((_profile!.bio ?? '').isNotEmpty) Text(_profile!.bio!, textAlign: TextAlign.center),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: OutlinedButton.icon(onPressed: _saving ? null : _editProfile, icon: const Icon(Icons.edit), label: const Text('تعديل'))),
+                          const SizedBox(width: 10),
+                          Expanded(child: ElevatedButton.icon(onPressed: _saving ? null : _toggleAvailability, icon: Icon(_profile!.isAvailable ? Icons.pause_circle : Icons.play_circle), label: Text(_profile!.isAvailable ? 'غير متاح' : 'متاح'))),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(title: const Text('حالة التحقق'), subtitle: Text(_profile!.isVerified ? 'تم اعتماد الملف' : 'لم يتم اعتماد الملف بعد'), leading: Icon(_profile!.isVerified ? Icons.verified : Icons.pending_outlined)),
+                    const Divider(height: 1),
+                    ListTile(title: const Text('مناطق الخدمة'), subtitle: Text('${_areas.length} منطقة مسجلة'), trailing: IconButton(onPressed: _addArea, icon: const Icon(Icons.add))),
+                    if (_areas.isEmpty)
+                      const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد مناطق خدمة مسجلة حالياً.'))
+                    else
+                      ..._areas.map((area) => ListTile(title: Text('مدينة #${area.cityId}'), trailing: IconButton(onPressed: () => _deleteArea(area), icon: const Icon(Icons.delete_outline))))
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const ListTile(title: Text('الوثائق والمستندات'), subtitle: Text('حالة الوثائق القادمة من الخادم')),
+                    if (_documents.isEmpty)
+                      const Padding(padding: EdgeInsets.all(16), child: Text('لا توجد وثائق مسجلة. رفع الملفات غير مدعوم فعلياً لأن الـAPI الحالي يقبل رابط ملف فقط ولا يوفر endpoint لرفع binary data.'))
+                    else
+                      ..._documents.map((document) => ListTile(
+                            title: Text(document.documentType ?? 'وثيقة'),
+                            subtitle: Text(document.status ?? 'Pending'),
+                            trailing: document.documentUrl?.isNotEmpty == true ? const Icon(Icons.link) : null,
+                          )),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(leading: const Icon(Icons.notifications_outlined), title: const Text('الإشعارات'), trailing: const Icon(Icons.chevron_left), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
+                    const Divider(height: 1),
+                    ListTile(leading: const Icon(Icons.support_agent), title: const Text('الدعم الفني'), trailing: const Icon(Icons.chevron_left), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportCenterScreen()))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.logout, color: AppColors.error),
+                  title: const Text('تسجيل الخروج', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+                  onTap: () => session.logout(),
+                ),
+              ),
+            ],
           ],
         ),
       ),
