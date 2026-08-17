@@ -93,6 +93,13 @@ public class AuthService : IAuthService
         if (user == null || !_passwordHasher.Verify(password, user.PasswordHash)) return (false, "Invalid email or password.", null);
         if (!user.IsActive) return (false, "User account is inactive.", null);
         if (!user.IsEmailVerified) return (false, "Email address is not verified.", user);
+
+        if (_passwordHasher.NeedsRehash(user.PasswordHash))
+        {
+            user.PasswordHash = _passwordHasher.Hash(password);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
         return (true, null, user);
     }
 
