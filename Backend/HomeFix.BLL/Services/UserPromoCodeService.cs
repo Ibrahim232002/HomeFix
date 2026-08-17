@@ -2,6 +2,7 @@ using HomeFix.DAL;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace HomeFix.BLL.Services;
 
@@ -22,7 +23,7 @@ public class UserPromoCodeService : IUserPromoCodeService
         _repository = repository;
         _requestRepository = requestRepository;
         _promoCodeRepository = promoCodeRepository;
-    }
+        }
 
     public Task<UserPromoCode?> GetByIdAsync(int id)
         => _repository.GetByIdAsync(id);
@@ -38,8 +39,8 @@ public class UserPromoCodeService : IUserPromoCodeService
         var request = await _requestRepository.GetByIdAsync(serviceRequestId);
         if (request is null)
             return (false, "Service request not found.", null);
-        if (request.CustomerId <= 0)
-            return (false, "The service request is not linked to a valid customer.", null);
+        if (request.CustomerId <= 0 || request.Customer?.UserId != userId)
+            return (false, "Service request not found.", null);
 
         var existing = await _repository.GetByRequestIdAsync(serviceRequestId);
         if (existing is not null)
@@ -73,7 +74,6 @@ public class UserPromoCodeService : IUserPromoCodeService
         await using var tx = await _unitOfWork.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         try
         {
-            // Re-check inside the transaction so concurrent requests cannot both apply a promo.
             if (await _repository.GetByRequestIdAsync(serviceRequestId) is not null)
             {
                 await tx.RollbackAsync();
@@ -101,6 +101,14 @@ public class UserPromoCodeService : IUserPromoCodeService
             await tx.CommitAsync();
 
             return (true, null, userPromoCode);
+        }
+        catch (DbUpdateException)
+        {
+            await tx.RollbackAsync();
+            var raced = await _repository.GetByRequestIdAsync(serviceRequestId);
+            if (raced is not null)
+                return (false, "A promo code has already been applied to this service request.", null);
+            throw;
         }
         catch
         {
