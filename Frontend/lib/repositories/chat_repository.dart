@@ -5,7 +5,7 @@ import '../models/chat_model.dart';
 import '../models/user_model.dart';
 
 abstract class IChatRepository {
-  Future<List<ConversationModel>> getConversations(String userId, UserRole role);
+  Future<List<ConversationModel>> getConversations(String userId, [UserRole? role]);
   Future<ConversationModel?> getConversationById(String id);
   Future<MessageModel> sendMessage({
     required String conversationId,
@@ -49,12 +49,25 @@ class ChatRepository implements IChatRepository {
     return null;
   }
 
-  @override
-  Future<List<ConversationModel>> getConversations(String userId, UserRole role) async {
-    final profileId = await _resolveProfileId(userId, role);
-    if (profileId == null) return [];
+  Future<(int, UserRole)?> _resolveProfileWithRole(String userId, UserRole? requestedRole) async {
+    final roles = requestedRole == null
+        ? const [UserRole.customer, UserRole.technician]
+        : [requestedRole];
+    for (final role in roles) {
+      final profileId = await _resolveProfileId(userId, role);
+      if (profileId != null) return (profileId, role);
+    }
+    return null;
+  }
 
-    final dtos = await getApiConversationsByProfile(profileId, role);
+  @override
+  Future<List<ConversationModel>> getConversations(String userId, [UserRole? role]) async {
+    final resolved = await _resolveProfileWithRole(userId, role);
+    if (resolved == null) return [];
+    final profileId = resolved.$1;
+    final effectiveRole = resolved.$2;
+
+    final dtos = await getApiConversationsByProfile(profileId, effectiveRole);
     final result = <ConversationModel>[];
     for (final dto in dtos) {
       final msgDtos = await getApiMessagesByConversation(dto.id);
@@ -65,8 +78,8 @@ class ChatRepository implements IChatRepository {
                 senderId: m.senderId.toString(),
                 senderName: m.senderId.toString() == userId ? 'أنت' : 'مشارك آخر',
                 senderRole: m.senderId.toString() == userId
-                    ? role
-                    : (role == UserRole.customer ? UserRole.technician : UserRole.customer),
+                    ? effectiveRole
+                    : (effectiveRole == UserRole.customer ? UserRole.technician : UserRole.customer),
                 text: m.messageText ?? '',
                 createdAt: m.sentAt,
                 isRead: m.isRead,
