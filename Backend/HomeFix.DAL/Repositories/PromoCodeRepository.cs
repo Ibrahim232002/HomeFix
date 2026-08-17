@@ -1,4 +1,4 @@
-﻿using HomeFix.DAL.Data;
+using HomeFix.DAL.Data;
 using HomeFix.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +31,16 @@ public class PromoCodeRepository
             .Where(p => p.IsActive)
             .ToListAsync();
     }
+
+    public Task<int> TryReserveUseAsync(int promoCodeId, DateTime now) =>
+        _context.PromoCodes
+            .Where(p => p.Id == promoCodeId &&
+                        p.IsActive &&
+                        p.StartDate <= now &&
+                        p.EndDate >= now &&
+                        (!p.MaxUses.HasValue || p.UsedCount < p.MaxUses.Value))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(p => p.UsedCount, p => p.UsedCount + 1));
 
     public async Task AddAsync(PromoCode promoCode)
     {
