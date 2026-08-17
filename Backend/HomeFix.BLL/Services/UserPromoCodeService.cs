@@ -23,7 +23,7 @@ public class UserPromoCodeService : IUserPromoCodeService
         _repository = repository;
         _requestRepository = requestRepository;
         _promoCodeRepository = promoCodeRepository;
-        }
+    }
 
     public Task<UserPromoCode?> GetByIdAsync(int id)
         => _repository.GetByIdAsync(id);
@@ -39,11 +39,11 @@ public class UserPromoCodeService : IUserPromoCodeService
         var request = await _requestRepository.GetByIdAsync(serviceRequestId);
         if (request is null)
             return (false, "Service request not found.", null);
-        if (request.CustomerId <= 0 || request.Customer?.UserId != userId)
+        if (request.CustomerId <= 0 || !PromoApplicationRules.BelongsToAuthenticatedCustomer(request, userId))
             return (false, "Service request not found.", null);
 
         var existing = await _repository.GetByRequestIdAsync(serviceRequestId);
-        if (existing is not null)
+        if (PromoApplicationRules.HasExistingApplication(existing))
             return (false, "A promo code has already been applied to this service request.", null);
 
         var promo = await _promoCodeRepository.GetByIdAsync(promoCodeId);
@@ -74,7 +74,7 @@ public class UserPromoCodeService : IUserPromoCodeService
         await using var tx = await _unitOfWork.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         try
         {
-            if (await _repository.GetByRequestIdAsync(serviceRequestId) is not null)
+            if (PromoApplicationRules.HasExistingApplication(await _repository.GetByRequestIdAsync(serviceRequestId)))
             {
                 await tx.RollbackAsync();
                 return (false, "A promo code has already been applied to this service request.", null);
