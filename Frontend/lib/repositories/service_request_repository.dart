@@ -1,4 +1,5 @@
 import '../core/constants/api_constants.dart';
+import '../core/network/api_client.dart';
 import '../models/api_dtos.dart';
 import '../models/service_request_api_dto.dart';
 import '../models/service_request_model.dart';
