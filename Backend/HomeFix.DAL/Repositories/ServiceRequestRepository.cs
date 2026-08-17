@@ -19,7 +19,11 @@ public class ServiceRequestRepository
             .Include(r => r.Customer)
             .Include(r => r.Service)
             .Include(r => r.Address)
+                .ThenInclude(a => a.City)
+            .Include(r => r.Address)
+                .ThenInclude(a => a.Governorate)
             .Include(r => r.Booking)
+            .Include(r => r.UserPromoCode)
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
@@ -28,6 +32,9 @@ public class ServiceRequestRepository
         return await _context.ServiceRequests
             .Include(r => r.Service)
             .Include(r => r.Address)
+                .ThenInclude(a => a.City)
+            .Include(r => r.Address)
+                .ThenInclude(a => a.Governorate)
             .Where(r => r.CustomerId == customerId)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
@@ -36,6 +43,11 @@ public class ServiceRequestRepository
     public async Task<List<ServiceRequest>> GetByStatusAsync(string status)
     {
         return await _context.ServiceRequests
+            .Include(r => r.Service)
+            .Include(r => r.Address)
+                .ThenInclude(a => a.City)
+            .Include(r => r.Address)
+                .ThenInclude(a => a.Governorate)
             .Where(r => r.Status == status)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
@@ -46,6 +58,9 @@ public class ServiceRequestRepository
         return await _context.ServiceRequests
             .Include(r => r.Service)
             .Include(r => r.Address)
+                .ThenInclude(a => a.City)
+            .Include(r => r.Address)
+                .ThenInclude(a => a.Governorate)
             .Where(r => r.Status == "Pending" || r.Status == "Open" || r.Status == "OfferPending")
             .Where(r => r.Address.CityId != null)
             .Where(r => _context.TechnicianProfiles.Any(t =>
