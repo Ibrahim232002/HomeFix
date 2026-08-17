@@ -35,7 +35,10 @@ class AuthRepository implements IAuthRepository {
 
     if (response is Map<String, dynamic>) {
       final authDto = AuthResponseDto.fromJson(response);
-      _tokenStorage.saveTokens(
+      if (authDto.accessToken.isEmpty) {
+        throw Exception('استجابة تسجيل الدخول لا تحتوي على رمز وصول صالح');
+      }
+      await _tokenStorage.saveTokens(
         accessToken: authDto.accessToken,
         refreshToken: authDto.refreshToken,
         userId: authDto.userId,
@@ -51,47 +54,55 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> logout() async {
     final refreshToken = _tokenStorage.refreshToken;
-    if (refreshToken != null) {
-      try {
+    try {
+      if (refreshToken != null && refreshToken.isNotEmpty) {
         await _client.post(
           ApiConstants.logout,
           body: RefreshTokenRequest(refreshToken: refreshToken).toJson(),
         );
-      } catch (_) {
-        // Silently clear local session on logout error
       }
+    } finally {
+      await _tokenStorage.clear();
     }
-    _tokenStorage.clear();
   }
 
   @override
   Future<bool> refreshToken() async {
     final refreshToken = _tokenStorage.refreshToken;
-    if (refreshToken == null) return false;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _tokenStorage.clear();
+      return false;
+    }
 
     try {
       final response = await _client.post(
         ApiConstants.refresh,
         body: RefreshTokenRequest(refreshToken: refreshToken).toJson(),
         includeAuth: false,
+        allowAutoRefresh: false,
       );
 
       if (response is Map<String, dynamic>) {
-        final newToken = response['token'] ?? response['accessToken'];
-        if (newToken != null) {
-          _tokenStorage.updateAccessToken(newToken.toString());
+        final newAccessToken = response['accessToken'] ?? response['token'];
+        final newRefreshToken = response['refreshToken'];
+        if (newAccessToken != null && newRefreshToken != null) {
+          await _tokenStorage.saveTokens(
+            accessToken: newAccessToken.toString(),
+            refreshToken: newRefreshToken.toString(),
+          );
           return true;
         }
       }
-      return false;
     } catch (_) {
-      return false;
+      // A failed refresh invalidates the local session.
     }
+
+    await _tokenStorage.clear();
+    return false;
   }
 
   @override
   Future<dynamic> getCurrentUser() async {
-    final response = await _client.get(ApiConstants.me);
-    return response;
+    return _client.get(ApiConstants.me);
   }
 }
