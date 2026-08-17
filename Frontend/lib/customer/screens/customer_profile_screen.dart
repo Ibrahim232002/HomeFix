@@ -1,215 +1,193 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_colors.dart';
-import '../../services/app_state_provider.dart';
-import 'customer_addresses_screen.dart';
-import '../../common/screens/notifications_screen.dart';
 
-class CustomerProfileScreen extends StatelessWidget {
+import '../../auth/auth_session_provider.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../models/api_dtos.dart';
+import '../../repositories/customer_profile_repository.dart';
+import '../../services/app_state_provider.dart';
+import '../../common/screens/notifications_screen.dart';
+import '../../common/screens/support_center_screen.dart';
+import 'customer_addresses_screen.dart';
+
+class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({Key? key}) : super(key: key);
 
   @override
+  State<CustomerProfileScreen> createState() => _CustomerProfileScreenState();
+}
+
+class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
+  final ICustomerProfileRepository _repository = CustomerProfileRepository();
+  CustomerProfileDto? _profile;
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final userId = int.tryParse(context.read<AuthSessionProvider>().user?.id ?? '');
+    if (userId == null) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final profile = await _repository.getProfileByUserId(userId);
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _editProfileImage() async {
+    final controller = TextEditingController(text: _profile?.profileImageUrl ?? '');
+    final url = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('رابط صورة الملف الشخصي'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(hintText: 'https://...'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('حفظ')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (url == null || _profile == null) return;
+
+    setState(() => _saving = true);
+    try {
+      final updated = await _repository.updateProfile(
+        _profile!.id,
+        UpdateCustomerProfileRequest(profileImageUrl: url.isEmpty ? null : url),
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+        _saving = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
-    final user = appState.currentUser;
+    final session = context.watch<AuthSessionProvider>();
+    final appState = context.watch<AppStateProvider>();
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('الملف الشخصي'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      appBar: AppBar(title: const Text('الملف الشخصي')),
+      body: RefreshIndicator(
+        onRefresh: _loadProfile,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            // Profile Card
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            if (_error != null)
+              Card(
+                color: AppColors.errorLight,
+                child: ListTile(
+                  leading: const Icon(Icons.error_outline, color: AppColors.errorDark),
+                  title: Text(_error!),
+                  trailing: TextButton(onPressed: _loadProfile, child: const Text('إعادة المحاولة')),
+                ),
               ),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundImage: (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty)
-                        ? NetworkImage(user!.avatarUrl!)
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user?.fullName ?? '',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    user?.phoneNumber ?? '',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primarySurface,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'عميل مميز ⭐️',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                        fontFamily: 'Cairo',
+            if (_loading)
+              const SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))
+            else if (_profile == null)
+              const SizedBox(height: 260, child: EmptyStateWidget(icon: Icons.person_outline, title: 'تعذر تحميل الملف الشخصي', description: 'تحقق من الاتصال ثم حاول مرة أخرى.'))
+            else ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 42,
+                            backgroundImage: _profile!.profileImageUrl?.isNotEmpty == true
+                                ? NetworkImage(_profile!.profileImageUrl!)
+                                : null,
+                            child: _profile!.profileImageUrl?.isNotEmpty == true ? null : const Icon(Icons.person, size: 42),
+                          ),
+                          IconButton.filled(
+                            onPressed: _saving ? null : _editProfileImage,
+                            icon: const Icon(Icons.edit, size: 18),
+                          ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      Text(session.user?.fullName ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text(session.user?.email ?? '', style: const TextStyle(color: AppColors.textSecondary)),
+                      const SizedBox(height: 4),
+                      const Text('الاسم والبريد الإلكتروني يديرهما نظام الحساب الحالي. تحديث صورة الملف الشخصي متاح من الخادم.', style: TextStyle(fontSize: 11, color: AppColors.textMuted), textAlign: TextAlign.center),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Settings Menu List
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
+              const SizedBox(height: 16),
+              Card(
+                child: Column(
+                  children: [
+                    _menu(context, Icons.location_on_outlined, 'عناويني المحفوظة', '${appState.savedAddresses.length} عناوين', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerAddressesScreen()))),
+                    const Divider(height: 1),
+                    _menu(context, Icons.notifications_none_rounded, 'الإشعارات', '${appState.unreadNotificationsCount} غير مقروء', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
+                    const Divider(height: 1),
+                    _menu(context, Icons.support_agent, 'الدعم الفني', 'فتح ومتابعة تذاكر الدعم', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportCenterScreen()))),
+                    const Divider(height: 1),
+                    _menu(context, Icons.payments_outlined, 'الدفع', 'الدفع النقدي مدعوم حالياً', () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بوابة الدفع الإلكتروني غير متاحة حالياً في عقد الـAPI')))),
+                  ],
+                ),
               ),
-              child: Column(
-                children: [
-                  _buildMenuItem(
-                    icon: Icons.location_on_outlined,
-                    title: 'عناويني المحفوظة',
-                    subtitle: '${appState.savedAddresses.length} عناوين مضافة',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CustomerAddressesScreen()),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _buildMenuItem(
-                    icon: Icons.notifications_none_rounded,
-                    title: 'الإشعارات والتنبيهات',
-                    subtitle: '${appState.notifications.length} إشعار',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _buildMenuItem(
-                    icon: Icons.credit_card_rounded,
-                    title: 'طرق الدفع والبطاقات',
-                    subtitle: 'فيزا، ماستركارد، ميزة، فودافون كاش، كاش',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('طرق الدفع متاحة في النسخة الكاملة')),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _buildMenuItem(
-                    icon: Icons.language_rounded,
-                    title: 'لغة التطبيق',
-                    subtitle: 'العربية (الافتراضية)',
-                    onTap: () {},
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _buildMenuItem(
-                    icon: Icons.headset_mic_outlined,
-                    title: 'مركز المساعدة وخدمة العملاء',
-                    subtitle: 'تواصل معنا على مدار الساعة',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('فريق الدعم الفني في خدمتك دائماً')),
-                      );
-                    },
-                  ),
-                ],
+              const SizedBox(height: 16),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.logout, color: AppColors.error),
+                  title: const Text('تسجيل الخروج', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+                  onTap: () => session.logout(),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-
-
-
-            // Logout Button
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: _buildMenuItem(
-                icon: Icons.logout_rounded,
-                iconColor: AppColors.error,
-                title: 'تسجيل الخروج',
-                titleColor: AppColors.error,
-                onTap: () => appState.logout(),
-              ),
-            ),
-            const SizedBox(height: 24),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMenuItem({
-    required IconData icon,
-    Color? iconColor,
-    required String title,
-    Color? titleColor,
-    String? subtitle,
-    required VoidCallback onTap,
-  }) {
+  Widget _menu(BuildContext context, IconData icon, String title, String subtitle, VoidCallback onTap) {
     return ListTile(
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_left_rounded),
       onTap: onTap,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: (iconColor ?? AppColors.primary).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: titleColor ?? AppColors.textPrimary,
-          fontFamily: 'Cairo',
-        ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo'),
-            )
-          : null,
-      trailing: const Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
     );
   }
 }
