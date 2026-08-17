@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/booking_model.dart';
@@ -44,6 +45,8 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
     }
   }
 
+  String _safeError(Object error) => error is ApiException ? error.message : 'تعذر تحديث الحجز. يرجى المحاولة مرة أخرى.';
+
   Future<void> _transition(BuildContext context, BookingModel booking, BookingStatus next) async {
     if (_busy.contains(booking.id)) return;
     setState(() => _busy.add(booking.id));
@@ -55,7 +58,7 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
         );
       }
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_safeError(e))));
     } finally {
       if (mounted) setState(() => _busy.remove(booking.id));
     }
@@ -94,7 +97,7 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
                           ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('تم إرسال رمز التحقق.')));
                         }
                       } catch (e) {
-                        if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(e.toString())));
+                        if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_safeError(e))));
                       } finally {
                         if (dialogContext.mounted) setDialogState(() => busy = false);
                       }
@@ -111,7 +114,7 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
                         await context.read<AppStateProvider>().verifyBookingCode(booking.id, 'JobStart', codeController.text.trim());
                         if (dialogContext.mounted) Navigator.pop(dialogContext);
                       } catch (e) {
-                        if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(e.toString())));
+                        if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_safeError(e))));
                       } finally {
                         if (dialogContext.mounted) setDialogState(() => busy = false);
                       }
@@ -174,9 +177,9 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(booking.serviceNameAr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                      Text(booking.serviceNameAr.isEmpty ? 'الخدمة المرتبطة بالطلب' : booking.serviceNameAr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 6),
-                      Text('العميل: ${booking.customerName}'),
+                      if (booking.customerName.isNotEmpty) Text('العميل: ${booking.customerName}'),
                       const SizedBox(height: 8),
                       Text('الموعد: ${booking.scheduledDate} ${booking.scheduledTime}'.trim()),
                       const SizedBox(height: 8),
