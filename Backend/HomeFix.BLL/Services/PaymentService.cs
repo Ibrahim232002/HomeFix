@@ -48,22 +48,16 @@ public class PaymentService : IPaymentService
             return (false, "The booking does not have a valid agreed price.", null);
 
         await using var transaction = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
-
         var existingPayments = await _repository.GetByRequestIdAsync(serviceRequestId);
 
-        var paid = existingPayments.FirstOrDefault(p =>
-            p.Status.Equals("Paid", StringComparison.OrdinalIgnoreCase));
-
+        var paid = PaymentRules.FindPaid(existingPayments);
         if (paid is not null)
         {
             await transaction.CommitAsync();
             return (true, null, paid);
         }
 
-        var pendingCash = existingPayments.FirstOrDefault(p =>
-            p.PaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase) &&
-            p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
-
+        var pendingCash = PaymentRules.FindPendingCash(existingPayments);
         if (pendingCash is not null)
         {
             await transaction.CommitAsync();
@@ -72,7 +66,6 @@ public class PaymentService : IPaymentService
 
         var pendingPayment = existingPayments.FirstOrDefault(p =>
             p.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
-
         if (pendingPayment is not null)
         {
             await transaction.CommitAsync();
