@@ -1,254 +1,144 @@
 import 'package:flutter/material.dart';
+
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/rating_stars.dart';
+import '../../core/theme/app_design_tokens.dart';
+import '../../core/theme/app_responsive.dart';
+import '../../core/widgets/homefix_button.dart';
+import '../../core/widgets/homefix_card.dart';
+import '../../core/widgets/homefix_states.dart';
+import '../../core/widgets/homefix_status_chip.dart';
 import '../../models/service_model.dart';
 import 'create_request_screen.dart';
 
 class ServiceDetailScreen extends StatelessWidget {
+  const ServiceDetailScreen({super.key, required this.service});
   final ServiceModel service;
-
-  const ServiceDetailScreen({Key? key, required this.service}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // Collapsible Image App Bar
-          SliverAppBar(
-            expandedHeight: 240,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    service.image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: AppColors.primaryLight,
-                      child: const Icon(Icons.build, size: 64, color: AppColors.primary),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.3),
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.6),
+      appBar: AppBar(title: Text(service.nameAr)),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: AppResponsive.pagePadding(context).add(const EdgeInsets.symmetric(vertical: AppDesignTokens.space5)),
+                child: AppResponsive.content(
+                  context,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _Hero(service: service),
+                      const SizedBox(height: AppDesignTokens.space5),
+                      Row(
+                        children: [
+                          HomeFixStatusChip(label: service.categoryNameAr, color: AppColors.primary),
+                          const Spacer(),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, size: 18, color: AppColors.warningDark),
+                              const SizedBox(width: 4),
+                              Text('${service.rating.toStringAsFixed(1)} · ${service.reviewCount} تقييم', style: Theme.of(context).textTheme.bodySmall),
+                            ],
+                          ),
                         ],
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Content
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Category tag & Rating
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primarySurface,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          service.categoryNameAr,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                            fontFamily: 'Cairo',
-                          ),
-                        ),
+                      const SizedBox(height: AppDesignTokens.space2),
+                      Text(service.nameAr, style: Theme.of(context).textTheme.displaySmall),
+                      const SizedBox(height: AppDesignTokens.space2),
+                      Row(
+                        children: [
+                          const Icon(Icons.schedule_rounded, size: 18, color: AppColors.textMuted),
+                          const SizedBox(width: 6),
+                          Text('المدة المتوقعة: ${service.estimatedDuration}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+                        ],
                       ),
-                      RatingStarsWidget(
-                        rating: service.rating,
-                        reviewCount: service.reviewCount,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Service Title
-                  Text(
-                    service.nameAr,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time_rounded, size: 16, color: AppColors.textMuted),
-                      const SizedBox(width: 6),
-                      Text(
-                        'المدة المقدرة للعمل: ${service.estimatedDuration}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Price card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: AppDesignTokens.space5),
+                      HomeFixCard(
+                        child: Row(
                           children: [
-                            const Text(
-                              'نطاق التسعير المعتمد',
-                              style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontFamily: 'Cairo'),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${service.pricing.minPrice.toInt()} - ${service.pricing.maxPrice.toInt()} ${service.pricing.currency}',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.primaryDark,
-                                fontFamily: 'Cairo',
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('نطاق السعر المعتمد', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+                                  const SizedBox(height: AppDesignTokens.space1),
+                                  Text('${service.pricing.minPrice.toInt()} – ${service.pricing.maxPrice.toInt()} ${service.pricing.currency}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppColors.primaryDark)),
+                                ],
                               ),
                             ),
+                            if (service.pricing.visitFee > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: AppDesignTokens.space3, vertical: AppDesignTokens.space2),
+                                decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd)),
+                                child: Text('زيارة ${service.pricing.visitFee.toInt()} ${service.pricing.currency}', style: Theme.of(context).textTheme.labelMedium),
+                              ),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.scaffoldBackground,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'رسوم الكشف: ${service.pricing.visitFee.toInt()} ${service.pricing.currency}',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'),
-                          ),
-                        ),
+                      ),
+                      const SizedBox(height: AppDesignTokens.space6),
+                      Text('عن الخدمة', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: AppDesignTokens.space2),
+                      Text(service.descriptionAr.isEmpty ? 'تفاصيل الخدمة يحددها مقدم الخدمة وفق نطاق العمل الفعلي.' : service.descriptionAr, style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary)),
+                      if (service.features.isNotEmpty) ...[
+                        const SizedBox(height: AppDesignTokens.space6),
+                        Text('تشمل الخدمة', style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: AppDesignTokens.space2),
+                        ...service.features.map((feature) => Padding(
+                              padding: const EdgeInsets.only(bottom: AppDesignTokens.space2),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, size: 19, color: AppColors.successDark),
+                                  const SizedBox(width: AppDesignTokens.space2),
+                                  Expanded(child: Text(feature, style: Theme.of(context).textTheme.bodyMedium)),
+                                ],
+                              ),
+                            )),
                       ],
-                    ),
+                      const SizedBox(height: AppDesignTokens.space8),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-
-                  // Description
-                  const Text(
-                    'نبذة عن الخدمة والضمان',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    service.descriptionAr,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                      height: 1.6,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Features / What's Included
-                  const Text(
-                    'ما تشمله الخدمة:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildIncludedItem('فحص ومعاينة دقيقة للمشكلة بأجهزة حديثة'),
-                  _buildIncludedItem('تقديم تقرير فني معتمد قبل بدء العمل'),
-                  _buildIncludedItem('ضمان رسمي لمدة 30 يوماً على جودة الخدمة'),
-                  _buildIncludedItem('تنظيف موقع العمل بعد انتهاء الصيانة'),
-
-                  const SizedBox(height: 32),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: const Border(top: BorderSide(color: AppColors.border)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
+            Container(
+              padding: EdgeInsets.fromLTRB(AppDesignTokens.space4, AppDesignTokens.space3, AppDesignTokens.space4, MediaQuery.paddingOf(context).bottom + AppDesignTokens.space3),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, boxShadow: [BoxShadow(color: Colors.black.withOpacity(.06), blurRadius: 18, offset: const Offset(0, -4))]),
+              child: HomeFixButton(
+                label: 'اطلب هذه الخدمة',
+                icon: Icons.arrow_back_rounded,
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateRequestScreen(initialService: service))),
+              ),
             ),
           ],
         ),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateRequestScreen(initialService: service),
-              ),
-            );
-          },
-          child: const Text(
-            'طلب هذه الخدمة الآن',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
-          ),
+      ),
+    );
+  }
+}
+
+class _Hero extends StatelessWidget {
+  const _Hero({required this.service});
+  final ServiceModel service;
+
+  @override
+  Widget build(BuildContext context) {
+    return HomeFixCard(
+      padding: EdgeInsets.zero,
+      child: AspectRatio(
+        aspectRatio: 16 / 8,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusLg),
+          child: service.image.isNotEmpty
+              ? Image.network(service.image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder())
+              : _placeholder(),
         ),
       ),
     );
   }
 
-  Widget _buildIncludedItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle_rounded, size: 18, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, fontFamily: 'Cairo'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _placeholder() => Container(color: AppColors.primarySurface, child: const Center(child: Icon(Icons.home_repair_service_rounded, size: 64, color: AppColors.primary)));
 }
