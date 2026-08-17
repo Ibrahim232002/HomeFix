@@ -33,16 +33,13 @@ import '../models/api_dtos.dart';
 /// Domain/application state. Authentication/session ownership lives exclusively
 /// in AuthSessionProvider.
 class AppStateProvider extends ChangeNotifier {
-  AppStateProvider({required AuthSessionProvider session}) : _session = session {
-    _loadPublicData();
-  }
+  AppStateProvider({required AuthSessionProvider session}) : _session = session;
 
   AuthSessionProvider _session;
 
   void bindSession(AuthSessionProvider session) {
     if (identical(_session, session)) return;
     _session = session;
-    notifyListeners();
   }
 
   final IServiceRepository _serviceRepo = ServiceRepository();
