@@ -42,7 +42,7 @@ class WalletRepository implements IWalletRepository {
       technicianId: dto.technicianId.toString(),
       currentBalance: dto.balance,
       pendingBalance: payouts
-          .where((p) => p.status.toLowerCase() == 'pending')
+          .where((p) => (p.status ?? '').toLowerCase() == 'pending')
           .fold<double>(0.0, (sum, p) => sum + p.amount),
       totalEarnings: dto.balance + totalWithdrawn,
       totalWithdrawn: totalWithdrawn,
@@ -76,10 +76,13 @@ class WalletRepository implements IWalletRepository {
 
   @override
   Future<void> requestWithdrawal(String technicianId, double amount, String iban) async {
+    final intId = int.tryParse(technicianId);
+    if (intId == null) throw ArgumentError('معرف الفني غير صالح');
     if (amount <= 0) throw ArgumentError('مبلغ السحب يجب أن يكون أكبر من صفر');
     if (iban.trim().isEmpty) throw ArgumentError('بيانات السحب مطلوبة');
 
     await createApiPayout(CreatePayoutRequest(
+      technicianId: intId,
       amount: amount,
       paymentMethod: 'Bank Transfer: ${iban.trim()}',
     ));
