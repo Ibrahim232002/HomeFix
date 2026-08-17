@@ -40,6 +40,10 @@ public class UserDevicesController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpDelete]
@@ -55,7 +59,6 @@ public class UserDevicesController : ControllerBase
     private static object Map(UserDevice d) => new
     {
         d.Id,
-        d.DeviceToken,
         d.Platform,
         d.IsActive,
         d.CreatedAt,
