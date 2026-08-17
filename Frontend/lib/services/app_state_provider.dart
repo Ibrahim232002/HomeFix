@@ -133,15 +133,7 @@ class AppStateProvider extends ChangeNotifier {
         }
       }
       _categories = catMap.entries
-          .map((entry) => CategoryModel(
-                id: entry.key,
-                nameAr: entry.value,
-                nameEn: entry.value,
-                iconName: 'Wrench',
-                colorHex: '#0284c7',
-                image: '',
-                descriptionAr: entry.value,
-              ))
+          .map((entry) => CategoryModel(id: entry.key, nameAr: entry.value, nameEn: entry.value, iconName: 'Wrench', colorHex: '#0284c7', image: '', descriptionAr: entry.value))
           .toList();
     } catch (e) {
       _apiError = e.toString();
@@ -153,27 +145,14 @@ class AppStateProvider extends ChangeNotifier {
 
   Future<void> refreshPublicData() => _loadPublicData();
 
-  /// Compatibility wrappers keep older callers compiling, but do not own auth state.
   Future<void> login(String email, String password, UserRole role) async {
     final success = await _session.login(email, password);
     if (success) await refreshAuthenticatedData();
     _notify();
   }
 
-  Future<void> register({
-    required String fullName,
-    required String email,
-    required String phoneNumber,
-    required String password,
-    required UserRole role,
-  }) async {
-    await _session.register(
-      fullName: fullName,
-      email: email,
-      phoneNumber: phoneNumber,
-      password: password,
-      role: role,
-    );
+  Future<void> register({required String fullName, required String email, required String phoneNumber, required String password, required UserRole role}) async {
+    await _session.register(fullName: fullName, email: email, phoneNumber: phoneNumber, password: password, role: role);
     _notify();
   }
 
@@ -193,16 +172,14 @@ class AppStateProvider extends ChangeNotifier {
       _clearAuthenticatedData();
       return;
     }
-
     _isLoading = true;
     _errorMessage = null;
     _notify();
     try {
       _services = await _serviceRepo.getServices();
       _technicians = await _techRepo.getTechnicians();
-      _conversations = await _chatRepo.getConversations(user.id, user.role);
+      _conversations = await _chatRepo.getConversations(user.id);
       _notifications = await _userRepo.getUserNotifications(user.id);
-
       if (isCustomer) {
         _customerRequests = await _requestRepo.getRequestsByCustomer(user.id);
         _savedAddresses = await _userRepo.getUserAddresses(user.id);
@@ -223,21 +200,12 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
 
-  void setCustomerNavIndex(int index) {
-    _customerNavIndex = index;
-    _notify();
-  }
-
-  void setTechnicianNavIndex(int index) {
-    _technicianNavIndex = index;
-    _notify();
-  }
+  void setCustomerNavIndex(int index) { _customerNavIndex = index; _notify(); }
+  void setTechnicianNavIndex(int index) { _technicianNavIndex = index; _notify(); }
 
   Future<void> selectCategory(String categoryId) async {
     _selectedCategoryId = categoryId;
-    _services = categoryId == 'all'
-        ? await _serviceRepo.getServices()
-        : await _serviceRepo.getServicesByCategory(categoryId);
+    _services = categoryId == 'all' ? await _serviceRepo.getServices() : await _serviceRepo.getServicesByCategory(categoryId);
     _notify();
   }
 
@@ -253,63 +221,31 @@ class AppStateProvider extends ChangeNotifier {
     _notify();
   }
 
-  void removePromoCode() {
-    _appliedPromo = null;
-    _notify();
-  }
+  void removePromoCode() { _appliedPromo = null; _notify(); }
 
-  Future<ServiceRequestModel> createServiceRequest({
-    required ServiceModel service,
-    required AddressModel address,
-    required String problemDescription,
-    required String preferredDate,
-    required String preferredTime,
-    List<ServiceRequestFileModel>? files,
-  }) async {
+  Future<ServiceRequestModel> createServiceRequest({required ServiceModel service, required AddressModel address, required String problemDescription, required String preferredDate, required String preferredTime, List<ServiceRequestFileModel>? files}) async {
     if (currentUser == null) throw StateError('User not authenticated');
-
+    if (files?.isNotEmpty == true) {
+      throw UnsupportedError('Service-request file upload is not available in the current backend contract. The API accepts file URLs only and exposes no binary upload endpoint.');
+    }
     final request = ServiceRequestModel(
-      id: '',
-      serviceId: service.id,
-      serviceNameAr: service.nameAr,
-      categoryNameAr: service.categoryNameAr,
-      customerId: currentUser!.id,
-      customerName: currentUser!.fullName,
-      customerPhone: currentUser!.phoneNumber,
-      address: address,
-      problemDescription: problemDescription.trim(),
-      preferredDate: preferredDate,
-      preferredTime: preferredTime,
-      files: files ?? const [],
-      status: ServiceRequestStatus.pending,
-      estimatedPriceMin: 0,
-      estimatedPriceMax: 0,
-      createdAt: '',
-      statusHistory: const [],
+      id: '', serviceId: service.id, serviceNameAr: service.nameAr, categoryNameAr: service.categoryNameAr,
+      customerId: currentUser!.id, customerName: currentUser!.fullName, customerPhone: currentUser!.phoneNumber,
+      address: address, problemDescription: problemDescription.trim(), preferredDate: preferredDate, preferredTime: preferredTime,
+      files: const [], status: ServiceRequestStatus.pending, estimatedPriceMin: 0, estimatedPriceMax: 0, createdAt: '', statusHistory: const [],
     );
-
     final created = await _requestRepo.createRequest(request);
     _customerRequests = [created, ..._customerRequests.where((r) => r.id != created.id)];
     _notify();
     return created;
   }
 
-  Future<void> cancelRequest(String requestId, String reason) async {
-    throw UnsupportedError('Request cancellation is not exposed by the current backend contract.');
-  }
+  Future<void> cancelRequest(String requestId, String reason) async => throw UnsupportedError('Request cancellation is not exposed by the current backend contract.');
 
-  Future<ServiceRequestOfferModel> createOffer(
-    ServiceRequestModel request, {
-    required double proposedPrice,
-    String? technicianNote,
-  }) async {
+  Future<ServiceRequestOfferModel> createOffer(ServiceRequestModel request, {required double proposedPrice, String? technicianNote}) async {
     final requestId = int.tryParse(request.id);
     if (requestId == null) throw ArgumentError('معرف الطلب غير صالح');
-    final offer = await _offerRepo.create(
-      serviceRequestId: requestId,
-      proposedPrice: proposedPrice,
-      technicianNote: technicianNote,
-    );
+    final offer = await _offerRepo.create(serviceRequestId: requestId, proposedPrice: proposedPrice, technicianNote: technicianNote);
     _offers = [offer, ..._offers.where((item) => item.id != offer.id)];
     _notify();
     return offer;
@@ -324,40 +260,16 @@ class AppStateProvider extends ChangeNotifier {
     return result;
   }
 
-  Future<void> acceptOffer(String offerId) async {
-    await _offerRepo.accept(int.parse(offerId));
-    if (currentUser != null) await refreshAuthenticatedData();
-  }
+  Future<void> acceptOffer(String offerId) async { await _offerRepo.accept(int.parse(offerId)); if (currentUser != null) await refreshAuthenticatedData(); }
+  Future<void> rejectOffer(String offerId) async { await _offerRepo.reject(int.parse(offerId)); _notify(); }
+  Future<void> acceptRequest(ServiceRequestModel request) async => throw UnsupportedError('Technicians must create an offer; booking creation is performed by offer acceptance.');
 
-  Future<void> rejectOffer(String offerId) async {
-    await _offerRepo.reject(int.parse(offerId));
-    _notify();
-  }
-
-  /// Legacy method retained only as a compatibility guard. Technician booking
-  /// creation is intentionally not performed here; offer acceptance owns it.
-  Future<void> acceptRequest(ServiceRequestModel request) async {
-    throw UnsupportedError('Technicians must create an offer; booking creation is performed by offer acceptance.');
-  }
-
-  Future<void> updateBookingStatus(
-    String bookingId,
-    BookingStatus status, {
-    double? finalPrice,
-    String? notes,
-  }) async {
-    await _bookingRepo.updateBookingStatus(
-      bookingId,
-      status,
-      finalPrice: finalPrice,
-      notes: notes,
-    );
+  Future<void> updateBookingStatus(String bookingId, BookingStatus status, {double? finalPrice, String? notes}) async {
+    await _bookingRepo.updateBookingStatus(bookingId, status, finalPrice: finalPrice, notes: notes);
     await refreshAuthenticatedData();
   }
 
-  Future<void> requestVerificationCode(String bookingId, String purpose) async {
-    await _bookingRepo.requestVerificationCode(bookingId, purpose);
-  }
+  Future<void> requestVerificationCode(String bookingId, String purpose) => _bookingRepo.requestVerificationCode(bookingId, purpose);
 
   Future<BookingModel> verifyBookingCode(String bookingId, String purpose, String code) async {
     final booking = await _bookingRepo.verifyBookingCode(bookingId, purpose, code);
@@ -376,200 +288,68 @@ class AppStateProvider extends ChangeNotifier {
   Future<MessageModel> sendMessage(String conversationId, String text, {String? attachmentUrl}) async {
     final user = currentUser;
     if (user == null) throw StateError('Not logged in');
-    if (text.trim().isEmpty && (attachmentUrl == null || attachmentUrl.trim().isEmpty)) {
-      throw ArgumentError('Message cannot be empty');
-    }
-    final msg = await _chatRepo.sendMessage(
-      conversationId: conversationId,
-      sender: user,
-      text: text.trim(),
-      attachmentUrl: attachmentUrl,
-    );
-    _conversations = await _chatRepo.getConversations(user.id, user.role);
+    if (text.trim().isEmpty && (attachmentUrl == null || attachmentUrl.trim().isEmpty)) throw ArgumentError('Message cannot be empty');
+    final msg = await _chatRepo.sendMessage(conversationId: conversationId, sender: user, text: text.trim(), attachmentUrl: attachmentUrl);
+    _conversations = await _chatRepo.getConversations(user.id);
     _notify();
     return msg;
   }
 
-  Future<ConversationModel> startConversationWithTechnician({
-    required TechnicianProfileModel technician,
-    String? serviceNameAr,
-    String? requestId,
-  }) async {
+  Future<ConversationModel> startConversationWithTechnician({required TechnicianProfileModel technician, String? serviceNameAr, String? requestId}) async {
     final user = currentUser;
     if (user == null) throw StateError('Not logged in');
-    final conv = await _chatRepo.getOrCreateConversation(
-      customerId: user.id,
-      customerName: user.fullName,
-      customerAvatar: user.avatarUrl,
-      technicianId: technician.userId,
-      technicianName: technician.fullName,
-      technicianAvatar: technician.avatarUrl,
-      serviceNameAr: serviceNameAr,
-      requestId: requestId,
-    );
-    _conversations = await _chatRepo.getConversations(user.id, user.role);
+    final conv = await _chatRepo.getOrCreateConversation(customerId: user.id, customerName: user.fullName, customerAvatar: user.avatarUrl, technicianId: technician.userId, technicianName: technician.fullName, technicianAvatar: technician.avatarUrl, serviceNameAr: serviceNameAr, requestId: requestId);
+    _conversations = await _chatRepo.getConversations(user.id);
     _notify();
     return conv;
   }
 
-  Future<void> addAddress(AddressModel address) async {
-    final added = await _userRepo.addAddress(address);
-    _savedAddresses = [added, ..._savedAddresses.where((item) => item.id != added.id)];
-    _notify();
-  }
+  Future<void> addAddress(AddressModel address) async { final added = await _userRepo.addAddress(address); _savedAddresses = [added, ..._savedAddresses.where((item) => item.id != added.id)]; _notify(); }
 
-  Future<void> requestWithdrawal(double amount, String iban) async {
+  Future<void> requestWithdrawal(double amount, String iban) async { final user = currentUser; if (user == null) throw StateError('Not authenticated'); await _walletRepo.requestWithdrawal(user.id, amount, iban); _wallet = await _walletRepo.getWalletByTechnician(user.id); _notify(); }
+
+  Future<void> markNotificationAsRead(String id) async { await _userRepo.markNotificationAsRead(id); final index = _notifications.indexWhere((n) => n.id == id); if (index != -1) { _notifications[index] = _notifications[index].copyWith(isRead: true); _notify(); } }
+
+  Future<void> markAllNotificationsAsRead() async { final unread = _notifications.where((n) => !n.isRead).toList(); for (final notification in unread) { await _userRepo.markNotificationAsRead(notification.id); } _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList(); _notify(); }
+
+  Future<void> submitReview({required String requestId, required String technicianId, required double rating, String? comment, String? serviceNameAr}) async {
     final user = currentUser;
     if (user == null) throw StateError('Not authenticated');
-    await _walletRepo.requestWithdrawal(user.id, amount, iban);
-    _wallet = await _walletRepo.getWalletByTechnician(user.id);
-    _notify();
-  }
-
-  Future<void> markNotificationAsRead(String id) async {
-    await _userRepo.markNotificationAsRead(id);
-    final index = _notifications.indexWhere((n) => n.id == id);
-    if (index != -1) {
-      _notifications[index] = _notifications[index].copyWith(isRead: true);
-      _notify();
-    }
-  }
-
-  Future<void> markAllNotificationsAsRead() async {
-    final unread = _notifications.where((n) => !n.isRead).toList();
-    for (final notification in unread) {
-      await _userRepo.markNotificationAsRead(notification.id);
-    }
-    _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
-    _notify();
-  }
-
-  Future<void> submitReview({
-    required String requestId,
-    required String technicianId,
-    required double rating,
-    String? comment,
-    String? serviceNameAr,
-  }) async {
-    final user = currentUser;
-    if (user == null) throw StateError('Not authenticated');
-    final reqId = int.tryParse(requestId);
-    final techId = int.tryParse(technicianId);
-    final custId = int.tryParse(user.id);
+    final reqId = int.tryParse(requestId), techId = int.tryParse(technicianId), custId = int.tryParse(user.id);
     if (reqId == null || techId == null || custId == null) throw ArgumentError('بيانات التقييم غير صالحة');
-    await _reviewRepo.createReview(CreateReviewRequest(
-      serviceRequestId: reqId,
-      customerId: custId,
-      technicianId: techId,
-      rating: rating.toInt(),
-      comment: comment?.trim(),
-    ));
+    await _reviewRepo.createReview(CreateReviewRequest(serviceRequestId: reqId, customerId: custId, technicianId: techId, rating: rating.toInt(), comment: comment?.trim()));
     _notify();
   }
 
-  Future<void> uploadDocument({
-    required String titleAr,
-    required String titleEn,
-    required String documentType,
-    String? documentNumber,
-    String? fileUrl,
-  }) async {
+  Future<void> uploadDocument({required String titleAr, required String titleEn, required String documentType, String? documentNumber, String? fileUrl}) async {
     final user = currentUser;
     if (user == null) throw StateError('Not authenticated');
     final techId = int.tryParse(_currentTechProfile?.id ?? user.id);
     if (techId == null) throw ArgumentError('Technician id is invalid');
-    if (fileUrl == null || fileUrl.trim().isEmpty) {
-      throw ArgumentError('Document upload requires a real file URL.');
-    }
-
-    final docDto = await _techRepo.uploadDocument(CreateTechnicianDocumentRequest(
-      technicianId: techId,
-      documentType: documentType,
-      documentUrl: fileUrl.trim(),
-    ));
-
-    _technicianDocuments = [
-      ..._technicianDocuments,
-      TechnicianDocumentModel(
-        id: docDto.id.toString(),
-        technicianId: docDto.technicianId.toString(),
-        titleAr: titleAr,
-        titleEn: titleEn,
-        documentType: docDto.documentType ?? documentType,
-        documentNumber: documentNumber,
-        fileUrl: docDto.documentUrl ?? '',
-        status: DocumentStatus.fromString(docDto.status ?? 'Pending'),
-        submittedAt: docDto.uploadedAt,
-      ),
-    ];
+    if (fileUrl == null || fileUrl.trim().isEmpty) throw ArgumentError('Document upload requires a real file URL.');
+    final docDto = await _techRepo.uploadDocument(CreateTechnicianDocumentRequest(technicianId: techId, documentType: documentType, documentUrl: fileUrl.trim()));
+    _technicianDocuments = [..._technicianDocuments, TechnicianDocumentModel(id: docDto.id.toString(), technicianId: docDto.technicianId.toString(), titleAr: titleAr, titleEn: titleEn, documentType: docDto.documentType ?? documentType, documentNumber: documentNumber, fileUrl: docDto.documentUrl ?? '', status: DocumentStatus.fromString(docDto.status ?? 'Pending'), submittedAt: docDto.uploadedAt)];
     _notify();
   }
 
-  Future<List<PaymentModel>> loadPaymentsForRequest(String requestId) async {
-    final reqId = int.tryParse(requestId);
-    if (reqId == null) return [];
-    final dtoList = await _paymentRepo.getPaymentsByRequestId(reqId);
-    final mapped = dtoList.map(PaymentModel.fromDto).toList();
-    _payments = mapped;
-    _notify();
-    return mapped;
-  }
+  Future<List<PaymentModel>> loadPaymentsForRequest(String requestId) async { final reqId = int.tryParse(requestId); if (reqId == null) return []; final dtoList = await _paymentRepo.getPaymentsByRequestId(reqId); final mapped = dtoList.map(PaymentModel.fromDto).toList(); _payments = mapped; _notify(); return mapped; }
 
   Future<PaymentDto> selectCashOnDelivery(String serviceRequestId) async {
-    final reqId = int.tryParse(serviceRequestId);
-    if (reqId == null) throw ArgumentError('معرف طلب الخدمة غير صالح');
-    _isLoading = true;
-    _errorMessage = null;
-    _notify();
-    try {
-      final dto = await _paymentRepo.setCashPayment(reqId);
-      _activePayment = PaymentModel.fromDto(dto);
-      if (currentUser != null) {
-        _customerRequests = await _requestRepo.getRequestsByCustomer(currentUser!.id);
-      }
-      return dto;
-    } finally {
-      _isLoading = false;
-      _notify();
-    }
+    final reqId = int.tryParse(serviceRequestId); if (reqId == null) throw ArgumentError('معرف طلب الخدمة غير صالح');
+    _isLoading = true; _errorMessage = null; _notify();
+    try { final dto = await _paymentRepo.setCashPayment(reqId); _activePayment = PaymentModel.fromDto(dto); if (currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(currentUser!.id); return dto; }
+    finally { _isLoading = false; _notify(); }
   }
 
-  Future<InitiatePaymentResponse> initiatePayment({
-    required String serviceRequestId,
-    required PaymentMethodType method,
-    String? walletPhoneNumber,
-    String paymentType = 'FullService',
-  }) async {
-    throw UnsupportedError('Online gateway payment is not available to customers in the current backend contract.');
-  }
-
-  Future<VerifyPaymentResponse> verifyPayment(int paymentId) async {
-    throw UnsupportedError('Online gateway payment verification is not available to customers in the current backend contract.');
-  }
+  Future<InitiatePaymentResponse> initiatePayment({required String serviceRequestId, required PaymentMethodType method, String? walletPhoneNumber, String paymentType = 'FullService'}) async => throw UnsupportedError('Online gateway payment is not available to customers in the current backend contract.');
+  Future<VerifyPaymentResponse> verifyPayment(int paymentId) async => throw UnsupportedError('Online gateway payment verification is not available to customers in the current backend contract.');
 
   void _clearAuthenticatedData() {
-    _customerRequests = [];
-    _availableTechRequests = [];
-    _bookings = [];
-    _conversations = [];
-    _notifications = [];
-    _savedAddresses = [];
-    _technicianDocuments = [];
-    _payments = [];
-    _offers = [];
-    _activePayment = null;
-    _wallet = null;
-    _currentTechProfile = null;
-    _errorMessage = null;
+    _customerRequests = []; _availableTechRequests = []; _bookings = []; _conversations = []; _notifications = []; _savedAddresses = []; _technicianDocuments = []; _payments = []; _offers = []; _activePayment = null; _wallet = null; _currentTechProfile = null; _errorMessage = null;
   }
 
-  void _notify() {
-    if (!_disposed) notifyListeners();
-  }
+  void _notify() { if (!_disposed) notifyListeners(); }
 
   @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
-  }
+  void dispose() { _disposed = true; super.dispose(); }
 }
