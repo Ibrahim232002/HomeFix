@@ -7,6 +7,7 @@ abstract class IBookingRepository {
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId);
   Future<List<BookingModel>> getBookingsByCustomer(String customerId);
   Future<BookingModel?> getBookingById(String id);
+  Future<BookingModel?> getBookingByRequest(String requestId);
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus, {double? finalPrice, String? notes});
   Future<BookingModel> createBooking(BookingModel booking);
   Future<void> requestVerificationCode(String bookingId, String purpose);
@@ -20,19 +21,15 @@ class BookingRepository implements IBookingRepository {
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId) async {
     final intId = int.tryParse(technicianId);
     if (intId == null) return [];
-
     final response = await _client.get(ApiConstants.bookingsByTechnician(intId));
     if (response is! List) return [];
-    return response
-        .map((item) => _mapBooking(item as Map<String, dynamic>))
-        .toList();
+    return response.map((item) => _mapBooking(item as Map<String, dynamic>)).toList();
   }
 
   @override
   Future<List<BookingModel>> getBookingsByCustomer(String customerId) async {
     final intId = int.tryParse(customerId);
     if (intId == null) return [];
-
     final requests = await _client.get(ApiConstants.serviceRequestsByCustomer(intId));
     if (requests is! List) return [];
 
@@ -41,17 +38,23 @@ class BookingRepository implements IBookingRepository {
       final requestId = (request as Map<String, dynamic>)['id'];
       final parsedRequestId = requestId is int ? requestId : int.tryParse(requestId?.toString() ?? '');
       if (parsedRequestId == null) continue;
-
-      try {
-        final response = await _client.get(ApiConstants.bookingByRequest(parsedRequestId));
-        if (response is Map<String, dynamic>) {
-          bookings.add(_mapBooking(response));
-        }
-      } on Exception {
-        // A service request without a booking is normal.
-      }
+      final booking = await getBookingByRequest(parsedRequestId.toString());
+      if (booking != null) bookings.add(booking);
     }
     return bookings;
+  }
+
+  @override
+  Future<BookingModel?> getBookingByRequest(String requestId) async {
+    final intId = int.tryParse(requestId);
+    if (intId == null) return null;
+    try {
+      final response = await _client.get(ApiConstants.bookingByRequest(intId));
+      if (response is! Map<String, dynamic>) return null;
+      return _mapBooking(response);
+    } on NotFoundException {
+      return null;
+    }
   }
 
   @override
@@ -86,7 +89,7 @@ class BookingRepository implements IBookingRepository {
   @override
   Future<BookingModel> createBooking(BookingModel booking) async {
     throw UnsupportedError(
-      'Booking creation is not available to the technician/customer client. The current backend creates bookings through the offer-acceptance workflow.',
+      'Booking creation is not available to the client. The current backend creates bookings through offer acceptance.',
     );
   }
 
@@ -115,14 +118,11 @@ class BookingRepository implements IBookingRepository {
       queryParameters: {'purpose': purpose},
       body: code.trim(),
     );
-    if (response is! Map<String, dynamic>) {
-      throw StateError('استجابة تحقق الحجز غير صالحة');
-    }
+    if (response is! Map<String, dynamic>) throw StateError('استجابة تحقق الحجز غير صالحة');
     return _mapBooking(response);
   }
 
   BookingModel _mapBooking(Map<String, dynamic> json) {
-    final status = BookingStatus.fromString(json['status']?.toString() ?? 'Confirmed');
     return BookingModel(
       id: json['id']?.toString() ?? '',
       requestId: json['serviceRequestId']?.toString() ?? '',
@@ -135,7 +135,7 @@ class BookingRepository implements IBookingRepository {
       scheduledDate: json['acceptedAt']?.toString() ?? '',
       scheduledTime: '',
       price: ((json['finalPrice'] ?? json['agreedPrice']) as num?)?.toDouble() ?? 0.0,
-      status: status,
+      status: BookingStatus.fromString(json['status']?.toString() ?? 'Confirmed'),
       createdAt: json['acceptedAt']?.toString() ?? '',
       completedAt: json['completedAt']?.toString(),
       notes: json['technicianNotes']?.toString(),
