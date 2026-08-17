@@ -23,10 +23,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
       await context.read<AppStateProvider>().refreshAuthenticatedData();
@@ -74,7 +77,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 10),
                                     child: HomeFixCard(
-                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatDetailScreen(conversation: conversation))).then((_) => _load()),
+                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatDetailScreen(conversation: conversation))).then((_) {
+                                        if (mounted) _load();
+                                      }),
                                       child: Row(children: [
                                         CircleAvatar(
                                           radius: 26,
