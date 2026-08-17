@@ -5,7 +5,7 @@ import '../models/chat_model.dart';
 import '../models/user_model.dart';
 
 abstract class IChatRepository {
-  Future<List<ConversationModel>> getConversations(String userId);
+  Future<List<ConversationModel>> getConversations(String userId, UserRole role);
   Future<ConversationModel?> getConversationById(String id);
   Future<MessageModel> sendMessage({
     required String conversationId,
@@ -23,9 +23,7 @@ abstract class IChatRepository {
     String? serviceNameAr,
     String? requestId,
   });
-
-  // OpenAPI DTO methods
-  Future<List<ConversationDto>> getApiConversationsByUser(int userId);
+  Future<List<ConversationDto>> getApiConversationsByProfile(int profileId, UserRole role);
   Future<ConversationDto> getApiConversationById(int id);
   Future<ConversationDto> createApiConversation(CreateConversationRequest request);
   Future<List<MessageDto>> getApiMessagesByConversation(int conversationId);
@@ -35,85 +33,91 @@ abstract class IChatRepository {
 class ChatRepository implements IChatRepository {
   final ApiClient _client = ApiClient();
 
-  @override
-  Future<List<ConversationModel>> getConversations(String userId) async {
+  Future<int?> _resolveProfileId(String userId, UserRole role) async {
     final intUserId = int.tryParse(userId);
-    if (intUserId != null) {
-      try {
-        final dtos = await getApiConversationsByUser(intUserId);
-        final List<ConversationModel> result = [];
-        for (final dto in dtos) {
-          List<MessageModel> messages = [];
-          try {
-            final msgDtos = await getApiMessagesByConversation(dto.id);
-            messages = msgDtos
-                .map((m) => MessageModel(
-                      id: m.id.toString(),
-                      conversationId: dto.id.toString(),
-                      senderId: m.senderId.toString(),
-                      senderName: m.senderId == dto.customerId ? 'العميل' : 'الفني',
-                      senderRole: m.senderId == dto.customerId ? UserRole.customer : UserRole.technician,
-                      text: m.messageText ?? '',
-                      createdAt: m.sentAt.isNotEmpty ? m.sentAt : 'الآن',
-                      isRead: m.isRead,
-                    ))
-                .toList();
-          } catch (_) {}
+    if (intUserId == null) return null;
+    final endpoint = role == UserRole.customer
+        ? ApiConstants.customerProfileByUser(intUserId)
+        : ApiConstants.technicianProfileByUser(intUserId);
+    try {
+      final response = await _client.get(endpoint);
+      if (response is Map<String, dynamic>) {
+        final id = response['id'];
+        return id is int ? id : int.tryParse(id?.toString() ?? '');
+      }
+    } catch (_) {}
+    return null;
+  }
 
-          result.add(ConversationModel(
-            id: dto.id.toString(),
-            requestId: dto.serviceRequestId.toString(),
-            serviceNameAr: 'خدمة صيانة منزلية',
-            customerId: dto.customerId.toString(),
-            customerName: '',
-            technicianId: dto.technicianId.toString(),
-            technicianName: '',
-            lastMessage: messages.isNotEmpty ? messages.last.text : 'مرحباً بك',
-            lastMessageTime: dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن',
-            messages: messages,
-          ));
-        }
-        return result;
-      } catch (_) {}
+  @override
+  Future<List<ConversationModel>> getConversations(String userId, UserRole role) async {
+    final profileId = await _resolveProfileId(userId, role);
+    if (profileId == null) return [];
+
+    final dtos = await getApiConversationsByProfile(profileId, role);
+    final result = <ConversationModel>[];
+    for (final dto in dtos) {
+      final msgDtos = await getApiMessagesByConversation(dto.id);
+      final messages = msgDtos
+          .map((m) => MessageModel(
+                id: m.id.toString(),
+                conversationId: dto.id.toString(),
+                senderId: m.senderId.toString(),
+                senderName: m.senderId.toString() == userId ? 'أنت' : 'مشارك آخر',
+                senderRole: m.senderId.toString() == userId
+                    ? role
+                    : (role == UserRole.customer ? UserRole.technician : UserRole.customer),
+                text: m.messageText ?? '',
+                createdAt: m.sentAt,
+                isRead: m.isRead,
+              ))
+          .toList();
+
+      result.add(ConversationModel(
+        id: dto.id.toString(),
+        requestId: dto.serviceRequestId.toString(),
+        serviceNameAr: '',
+        customerId: dto.customerId.toString(),
+        customerName: '',
+        technicianId: dto.technicianId.toString(),
+        technicianName: '',
+        lastMessage: messages.isNotEmpty ? messages.last.text : '',
+        lastMessageTime: messages.isNotEmpty ? messages.last.createdAt : dto.createdAt,
+        messages: messages,
+      ));
     }
-    return [];
+    return result;
   }
 
   @override
   Future<ConversationModel?> getConversationById(String id) async {
     final intId = int.tryParse(id);
-    if (intId != null) {
-      try {
-        final dto = await getApiConversationById(intId);
-        final msgDtos = await getApiMessagesByConversation(dto.id);
-        final messages = msgDtos
-            .map((m) => MessageModel(
-                  id: m.id.toString(),
-                  conversationId: dto.id.toString(),
-                  senderId: m.senderId.toString(),
-                  senderName: m.senderId == dto.customerId ? 'العميل' : 'الفني',
-                  senderRole: m.senderId == dto.customerId ? UserRole.customer : UserRole.technician,
-                  text: m.messageText ?? '',
-                  createdAt: m.sentAt.isNotEmpty ? m.sentAt : 'الآن',
-                  isRead: m.isRead,
-                ))
-            .toList();
-
-        return ConversationModel(
-          id: dto.id.toString(),
-          requestId: dto.serviceRequestId.toString(),
-          serviceNameAr: 'خدمة صيانة منزلية',
-          customerId: dto.customerId.toString(),
-          customerName: '',
-          technicianId: dto.technicianId.toString(),
-          technicianName: '',
-          lastMessage: messages.isNotEmpty ? messages.last.text : 'مرحباً بك',
-          lastMessageTime: dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن',
-          messages: messages,
-        );
-      } catch (_) {}
-    }
-    return null;
+    if (intId == null) return null;
+    final dto = await getApiConversationById(intId);
+    final msgDtos = await getApiMessagesByConversation(dto.id);
+    return ConversationModel(
+      id: dto.id.toString(),
+      requestId: dto.serviceRequestId.toString(),
+      serviceNameAr: '',
+      customerId: dto.customerId.toString(),
+      customerName: '',
+      technicianId: dto.technicianId.toString(),
+      technicianName: '',
+      lastMessage: msgDtos.isNotEmpty ? msgDtos.last.messageText ?? '' : '',
+      lastMessageTime: msgDtos.isNotEmpty ? msgDtos.last.sentAt : dto.createdAt,
+      messages: msgDtos
+          .map((m) => MessageModel(
+                id: m.id.toString(),
+                conversationId: dto.id.toString(),
+                senderId: m.senderId.toString(),
+                senderName: '',
+                senderRole: UserRole.customer,
+                text: m.messageText ?? '',
+                createdAt: m.sentAt,
+                isRead: m.isRead,
+              ))
+          .toList(),
+    );
   }
 
   @override
@@ -123,27 +127,31 @@ class ChatRepository implements IChatRepository {
     required String text,
     String? attachmentUrl,
   }) async {
-    final intConvId = int.tryParse(conversationId);
-    final intSenderId = int.tryParse(sender.id);
-
-    if (intConvId != null && intSenderId != null) {
-      final msgDto = await createApiMessage(CreateMessageRequest(
-        conversationId: intConvId,
-        senderId: intSenderId,
-        messageText: text,
-      ));
-      return MessageModel(
-        id: msgDto.id.toString(),
-        conversationId: conversationId,
-        senderId: sender.id,
-        senderName: sender.fullName,
-        senderRole: sender.role,
-        text: msgDto.messageText ?? text,
-        createdAt: msgDto.sentAt.isNotEmpty ? msgDto.sentAt : 'الآن',
-        isRead: false,
-      );
+    final conversationIdInt = int.tryParse(conversationId);
+    final senderIdInt = int.tryParse(sender.id);
+    if (conversationIdInt == null || senderIdInt == null) {
+      throw ArgumentError('بيانات الرسالة غير صالحة');
     }
-    throw Exception('تعذر إرسال الرسالة');
+    if (text.trim().isEmpty && (attachmentUrl == null || attachmentUrl.trim().isEmpty)) {
+      throw ArgumentError('لا يمكن إرسال رسالة فارغة');
+    }
+
+    final msgDto = await createApiMessage(CreateMessageRequest(
+      conversationId: conversationIdInt,
+      senderId: senderIdInt,
+      messageText: text.trim(),
+      attachmentUrl: attachmentUrl,
+    ));
+    return MessageModel(
+      id: msgDto.id.toString(),
+      conversationId: conversationId,
+      senderId: sender.id,
+      senderName: sender.fullName,
+      senderRole: sender.role,
+      text: msgDto.messageText ?? text.trim(),
+      createdAt: msgDto.sentAt,
+      isRead: msgDto.isRead,
+    );
   }
 
   @override
@@ -157,51 +165,42 @@ class ChatRepository implements IChatRepository {
     String? serviceNameAr,
     String? requestId,
   }) async {
-    final intCustomer = int.tryParse(customerId);
-    final intTech = int.tryParse(technicianId);
-    final intRequest = requestId != null ? int.tryParse(requestId) : 0;
-
-    if (intCustomer == null || intTech == null) {
-      throw Exception('بيانات المحادثة غير مكتملة');
+    final customerUserId = int.tryParse(customerId);
+    final technicianIdInt = int.tryParse(technicianId);
+    final requestIdInt = int.tryParse(requestId ?? '');
+    if (customerUserId == null || technicianIdInt == null || requestIdInt == null || requestIdInt <= 0) {
+      throw ArgumentError('المحادثة تتطلب حجزاً/طلب خدمة صالحاً');
     }
 
     final dto = await createApiConversation(CreateConversationRequest(
-      customerId: intCustomer,
-      technicianId: intTech,
-      serviceRequestId: intRequest ?? 0,
+      customerId: customerUserId,
+      technicianId: technicianIdInt,
+      serviceRequestId: requestIdInt,
     ));
+
     return ConversationModel(
       id: dto.id.toString(),
       requestId: requestId,
-      serviceNameAr: serviceNameAr ?? 'خدمة صيانة',
+      serviceNameAr: serviceNameAr ?? '',
       customerId: customerId,
       customerName: customerName,
       customerAvatar: customerAvatar,
       technicianId: technicianId,
       technicianName: technicianName,
       technicianAvatar: technicianAvatar,
-      lastMessage: 'مرحباً، تم بدء المحادثة.',
-      lastMessageTime: 'الآن',
-      messages: [],
+      lastMessage: '',
+      lastMessageTime: dto.createdAt,
+      messages: const [],
     );
   }
 
-  // --- Direct OpenAPI Implementations ---
   @override
-  Future<List<ConversationDto>> getApiConversationsByUser(int userId) async {
-    try {
-      final response = await _client.get(ApiConstants.conversationsByCustomer(userId));
-      if (response is List && response.isNotEmpty) {
-        return response.map((item) => ConversationDto.fromJson(item as Map<String, dynamic>)).toList();
-      }
-    } catch (_) {}
-    try {
-      final response = await _client.get(ApiConstants.conversationsByTechnician(userId));
-      if (response is List) {
-        return response.map((item) => ConversationDto.fromJson(item as Map<String, dynamic>)).toList();
-      }
-    } catch (_) {}
-    return [];
+  Future<List<ConversationDto>> getApiConversationsByProfile(int profileId, UserRole role) async {
+    final response = role == UserRole.customer
+        ? await _client.get(ApiConstants.conversationsByCustomer(profileId))
+        : await _client.get(ApiConstants.conversationsByTechnician(profileId));
+    if (response is! List) return [];
+    return response.map((item) => ConversationDto.fromJson(item as Map<String, dynamic>)).toList();
   }
 
   @override
@@ -219,10 +218,8 @@ class ChatRepository implements IChatRepository {
   @override
   Future<List<MessageDto>> getApiMessagesByConversation(int conversationId) async {
     final response = await _client.get(ApiConstants.messagesByConversation(conversationId));
-    if (response is List) {
-      return response.map((item) => MessageDto.fromJson(item as Map<String, dynamic>)).toList();
-    }
-    return [];
+    if (response is! List) return [];
+    return response.map((item) => MessageDto.fromJson(item as Map<String, dynamic>)).toList();
   }
 
   @override
