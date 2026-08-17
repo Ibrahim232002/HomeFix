@@ -96,7 +96,6 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
   Widget build(BuildContext context) {
     final state = context.watch<AppStateProvider>();
     final padding = AppResponsive.pagePadding(context);
-    final requests = _filter(state.customerRequests, _tabs.index);
 
     return Scaffold(
       backgroundColor: AppColors.background,
