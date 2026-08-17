@@ -8,10 +8,8 @@ abstract class INotificationRepository {
   Future<List<NotificationModel>> getUserNotifications(String userId);
   Future<void> markAsRead(String notificationId);
 
-  // OpenAPI DTO methods
   Future<NotificationDto> getApiNotificationById(int id);
-  Future<List<NotificationDto>> getApiNotificationsByUser(int userId);
-  Future<NotificationDto> createApiNotification(CreateNotificationRequest request);
+  Future<List<NotificationDto>> getApiNotificationsForCurrentUser();
   Future<void> markApiNotificationAsRead(int id);
 }
 
@@ -20,38 +18,30 @@ class NotificationRepository implements INotificationRepository {
 
   @override
   Future<List<NotificationModel>> getUserNotifications(String userId) async {
-    final intUserId = int.tryParse(userId);
-    if (intUserId != null) {
-      try {
-        final dtos = await getApiNotificationsByUser(intUserId);
-        return dtos
-            .map((d) => NotificationModel(
-                  id: d.id.toString(),
-                  recipientId: d.userId.toString(),
-                  recipientRole: UserRole.customer,
-                  title: d.title ?? 'تنبيه',
-                  message: d.message ?? '',
-                  type: NotificationType.system,
-                  createdAt: d.createdAt.isNotEmpty ? d.createdAt : '',
-                  isRead: d.isRead,
-                ))
-            .toList();
-      } catch (_) {}
-    }
-    return [];
+    final dtos = await getApiNotificationsForCurrentUser();
+    return dtos
+        .map((d) => NotificationModel(
+              id: d.id.toString(),
+              recipientId: d.userId.toString(),
+              recipientRole: UserRole.customer,
+              title: d.title ?? 'تنبيه',
+              message: d.message ?? '',
+              type: NotificationType.system,
+              createdAt: d.createdAt,
+              isRead: d.isRead,
+            ))
+        .toList();
   }
 
   @override
   Future<void> markAsRead(String notificationId) async {
     final intId = int.tryParse(notificationId);
-    if (intId != null) {
-      try {
-        await markApiNotificationAsRead(intId);
-      } catch (_) {}
+    if (intId == null) {
+      throw FormatException('معرف الإشعار غير صالح');
     }
+    await markApiNotificationAsRead(intId);
   }
 
-  // --- Direct OpenAPI Implementations ---
   @override
   Future<NotificationDto> getApiNotificationById(int id) async {
     final response = await _client.get(ApiConstants.notificationById(id));
@@ -59,18 +49,14 @@ class NotificationRepository implements INotificationRepository {
   }
 
   @override
-  Future<List<NotificationDto>> getApiNotificationsByUser(int userId) async {
-    final response = await _client.get(ApiConstants.notificationsByUser(userId));
+  Future<List<NotificationDto>> getApiNotificationsForCurrentUser() async {
+    final response = await _client.get(ApiConstants.notifications);
     if (response is List) {
-      return response.map((item) => NotificationDto.fromJson(item as Map<String, dynamic>)).toList();
+      return response
+          .map((item) => NotificationDto.fromJson(item as Map<String, dynamic>))
+          .toList();
     }
     return [];
-  }
-
-  @override
-  Future<NotificationDto> createApiNotification(CreateNotificationRequest request) async {
-    final response = await _client.post(ApiConstants.notifications, body: request.toJson());
-    return NotificationDto.fromJson(response as Map<String, dynamic>);
   }
 
   @override
