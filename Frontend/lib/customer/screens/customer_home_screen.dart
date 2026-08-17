@@ -166,16 +166,77 @@ class CustomerHomeScreen extends StatelessWidget {
                             child: LayoutBuilder(
                               builder: (context, constraints) {
                                 final compact = constraints.maxWidth < 360;
-                                final image = ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(service.image, width: compact ? double.infinity : 72, height: compact ? 120 : 72, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: compact ? double.infinity : 72, height: compact ? 120 : 72, color: AppColors.primaryLight, child: const Icon(Icons.build, color: AppColors.primary)));
-                                final details = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Row(children: [if (service.categoryNameAr.isNotEmpty) Flexible(child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(6)), child: Text(service.categoryNameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary, fontFamily: 'Cairo')))), const Spacer(), RatingStarsWidget(rating: service.rating, reviewCount: service.reviewCount)]),
-                                  const SizedBox(height: 5),
-                                  Text(service.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo')),
-                                  if (service.descriptionAr.isNotEmpty) ...[const SizedBox(height: 3), Text(service.descriptionAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo', height: 1.3))],
-                                  const SizedBox(height: 6),
-                                  Wrap(alignment: WrapAlignment.spaceBetween, runSpacing: 6, spacing: 8, children: [Text(service.pricing.minPrice > 0 ? 'تبدأ من ${service.pricing.minPrice.toInt()} ${service.pricing.currency}' : 'السعر حسب المعاينة', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Cairo')), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), minimumSize: const Size(0, 30), tapTargetSize: MaterialTapTargetSize.shrinkWrap), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateRequestScreen(initialService: service))), child: const Text('طلب الخدمة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')))]),
-                                ]);
-                                if (compact) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [image, const SizedBox(height: 10), details]);
+                                final image = ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    service.image,
+                                    width: compact ? double.infinity : 72,
+                                    height: compact ? 120 : 72,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: compact ? double.infinity : 72,
+                                      height: compact ? 120 : 72,
+                                      color: AppColors.primaryLight,
+                                      child: const Icon(Icons.build, color: AppColors.primary),
+                                    ),
+                                  ),
+                                );
+                                final details = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        if (service.categoryNameAr.isNotEmpty)
+                                          Flexible(
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(6)),
+                                              child: Text(
+                                                service.categoryNameAr,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary, fontFamily: 'Cairo'),
+                                              ),
+                                            ),
+                                          ),
+                                        const Spacer(),
+                                        RatingStarsWidget(rating: service.rating, reviewCount: service.reviewCount),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(service.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo')),
+                                    if (service.descriptionAr.isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      Text(service.descriptionAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo', height: 1.3)),
+                                    ],
+                                    const SizedBox(height: 6),
+                                    Wrap(
+                                      alignment: WrapAlignment.spaceBetween,
+                                      runSpacing: 6,
+                                      spacing: 8,
+                                      children: [
+                                        Text(
+                                          service.pricing.minPrice > 0 ? 'تبدأ من ${service.pricing.minPrice.toInt()} ${service.pricing.currency}' : 'السعر حسب المعاينة',
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Cairo'),
+                                        ),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            minimumSize: const Size(0, 30),
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CreateRequestScreen(initialService: service))),
+                                          child: const Text('طلب الخدمة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                                if (compact) {
+                                  return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [image, const SizedBox(height: 10), details]);
+                                }
                                 return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [image, const SizedBox(width: 10), Expanded(child: details)]);
                               },
                             ),
