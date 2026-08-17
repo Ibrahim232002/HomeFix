@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using HomeFix.DAL.Data;
 
 #nullable disable
 
 namespace HomeFix.DAL.Migrations;
 
+[DbContext(typeof(HomeFixDbContext))]
 [Migration("20260817050000_RemoveRawRefreshTokenStorage")]
 public partial class RemoveRawRefreshTokenStorage : Migration
 {
