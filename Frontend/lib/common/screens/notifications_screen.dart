@@ -93,7 +93,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     Widget body;
     if (_loading) {
-      body = const ListView(children: [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))]);
+      body = ListView(children: const [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))]);
     } else if (_error != null) {
       body = ListView(children: [
         Padding(
