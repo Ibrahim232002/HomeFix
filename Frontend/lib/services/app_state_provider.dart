@@ -15,6 +15,7 @@ import '../models/promo_code_model.dart';
 import '../models/payment_model.dart';
 
 import '../repositories/service_repository.dart';
+import '../repositories/service_category_repository.dart';
 import '../repositories/service_request_repository.dart';
 import '../repositories/booking_repository.dart';
 import '../repositories/chat_repository.dart';
@@ -29,6 +30,7 @@ import '../models/api_dtos.dart';
 class AppStateProvider extends ChangeNotifier {
   // Repositories
   final IServiceRepository _serviceRepo = ServiceRepository();
+  final IServiceCategoryRepository _serviceCategoryRepo = ServiceCategoryRepository();
   final IServiceRequestRepository _requestRepo = ServiceRequestRepository();
   final IBookingRepository _bookingRepo = BookingRepository();
   final IChatRepository _chatRepo = ChatRepository();
@@ -43,8 +45,10 @@ class AppStateProvider extends ChangeNotifier {
   UserModel? _currentUser;
   bool _isLoading = false;
   bool _isLoadingPublic = false;
+  bool _isLoadingCategoryServices = false;
   String? _errorMessage;
   String? _apiError;
+  String? _categoryError;
 
   // Navigation State
   int _customerNavIndex = 0;
@@ -78,9 +82,9 @@ class AppStateProvider extends ChangeNotifier {
   bool get isCustomer => currentRole == UserRole.customer;
   bool get isTechnician => currentRole == UserRole.technician;
   bool get isLoading => _isLoading;
-  bool get isLoadingPublic => _isLoadingPublic;
+  bool get isLoadingPublic => _isLoadingPublic || _isLoadingCategoryServices;
   String? get errorMessage => _errorMessage;
-  String? get apiError => _apiError;
+  String? get apiError => _categoryError ?? _apiError;
 
   int get customerNavIndex => _customerNavIndex;
   int get technicianNavIndex => _technicianNavIndex;
@@ -113,28 +117,13 @@ class AppStateProvider extends ChangeNotifier {
 
   Future<void> _loadPublicData() async {
     _isLoadingPublic = true;
+    _categoryError = null;
     _apiError = null;
     notifyListeners();
     try {
+      _categories = await _serviceCategoryRepo.getCategories();
       _services = await _serviceRepo.getServices();
       _technicians = await _techRepo.getTechnicians();
-      final Map<String, String> catMap = {};
-      for (final s in _services) {
-        if (s.categoryId.isNotEmpty && !catMap.containsKey(s.categoryId)) {
-          catMap[s.categoryId] = s.categoryNameAr;
-        }
-      }
-      _categories = catMap.entries
-          .map((e) => CategoryModel(
-                id: e.key,
-                nameAr: e.value,
-                nameEn: e.value,
-                iconName: 'Wrench',
-                colorHex: '#0284c7',
-                image: '',
-                descriptionAr: e.value,
-              ))
-          .toList();
     } catch (e) {
       _apiError = e.toString();
     } finally {
@@ -261,14 +250,35 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   // Category & Filter selection
-  void selectCategory(String categoryId) async {
+  Future<void> selectCategory(String categoryId) async {
     _selectedCategoryId = categoryId;
-    if (categoryId == 'all') {
-      _services = await _serviceRepo.getServices();
-    } else {
-      _services = await _serviceRepo.getServicesByCategory(categoryId);
-    }
+    _categoryError = null;
+    _isLoadingCategoryServices = true;
     notifyListeners();
+
+    try {
+      if (categoryId == 'all') {
+        _services = await _serviceRepo.getServices();
+      } else {
+        var categoryName = '';
+        for (final category in _categories) {
+          if (category.id == categoryId) {
+            categoryName = category.nameAr;
+            break;
+          }
+        }
+        _services = await _serviceRepo.getServicesByCategory(
+          categoryId,
+          categoryNameAr: categoryName,
+        );
+      }
+    } catch (e) {
+      _services = [];
+      _categoryError = e.toString();
+    } finally {
+      _isLoadingCategoryServices = false;
+      notifyListeners();
+    }
   }
 
   void setSearchQuery(String query) async {
