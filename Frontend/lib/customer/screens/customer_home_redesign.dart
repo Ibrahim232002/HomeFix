@@ -165,24 +165,71 @@ class CustomerHomeRedesign extends StatelessWidget {
                         final service = state.services[index];
                         return HomeFixCard(
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServiceDetailScreen(service: service))),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                height: AppResponsive.isCompact(context) ? 72 : 76,
-                                decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd)),
-                                child: const Center(child: Icon(Icons.home_repair_service_rounded, size: 36, color: AppColors.primary)),
-                              ),
-                              const SizedBox(height: AppDesignTokens.space2),
-                              Text(service.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
-                              const SizedBox(height: AppDesignTokens.space1),
-                              Text(service.categoryNameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
-                            ],
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final tight = constraints.maxHeight < 150;
+                              final imageMax = tight ? 56.0 : 72.0;
+                              final gap = tight ? AppDesignTokens.space1 : AppDesignTokens.space2;
+                              final content = Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.max,
+                                children: [
+                                  Flexible(
+                                    fit: FlexFit.loose,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(minHeight: 40, maxHeight: imageMax),
+                                      child: Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primarySurface,
+                                          borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd),
+                                        ),
+                                        child: const Center(
+                                          child: Icon(Icons.home_repair_service_rounded, size: 36, color: AppColors.primary),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: gap),
+                                  Flexible(
+                                    fit: FlexFit.loose,
+                                    child: Text(
+                                      service.nameAr,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.titleMedium,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppDesignTokens.space1),
+                                  Flexible(
+                                    fit: FlexFit.loose,
+                                    child: Text(
+                                      service.categoryNameAr,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+                                    ),
+                                  ),
+                                ],
+                              );
+
+                              return tight
+                                  ? FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: AlignmentDirectional.topCenter,
+                                      child: SizedBox(width: constraints.maxWidth, child: content),
+                                    )
+                                  : content;
+                            },
                           ),
                         );
                       }, childCount: state.services.length.clamp(0, 6)),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: AppResponsive.columns(context), crossAxisSpacing: AppDesignTokens.space3, mainAxisSpacing: AppDesignTokens.space3, childAspectRatio: AppResponsive.isCompact(context) ? 0.92 : 0.95),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: AppResponsive.columns(context),
+                        crossAxisSpacing: AppDesignTokens.space3,
+                        mainAxisSpacing: AppDesignTokens.space3,
+                        childAspectRatio: AppResponsive.isCompact(context) ? 0.92 : 0.95,
+                      ),
                     ),
                   ),
               ],
