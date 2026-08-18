@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_responsive.dart';
 import '../../core/widgets/homefix_card.dart';
 import '../../core/widgets/homefix_states.dart';
+import '../../models/chat_model.dart';
 import '../../models/user_model.dart';
 import '../../services/app_state_provider.dart';
 import 'chat_detail_screen.dart';
@@ -18,6 +19,7 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   bool _loading = true;
+  bool _hasLoaded = false;
   String? _error;
   String? _openingConversationId;
 
@@ -30,13 +32,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Future<void> _load() async {
-    if (!mounted || _loading) return;
+    if (!mounted || (_loading && _hasLoaded)) return;
     setState(() { _loading = true; _error = null; });
     try {
       await context.read<AppStateProvider>().refreshAuthenticatedData();
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() { _loading = false; _hasLoaded = true; });
     } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = e.toString().replaceFirst('Exception: ', ''); });
+      if (mounted) setState(() { _loading = false; _hasLoaded = true; _error = e.toString().replaceFirst('Exception: ', ''); });
     }
   }
 
