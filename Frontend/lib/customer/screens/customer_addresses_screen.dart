@@ -24,6 +24,7 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
   final IAddressRepository _repository = AddressRepository();
   final ICityRepository _cityRepository = CityRepository();
   List<AddressDto> _addresses = const [];
+  List<CityDto>? _cities;
   Future<List<CityDto>>? _citiesFuture;
   bool _loading = true;
   String? _error;
@@ -54,11 +55,18 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
   }
 
   Future<List<CityDto>> _loadCities() {
+    final cached = _cities;
+    if (cached != null) return Future.value(cached);
+
     final inFlight = _citiesFuture;
     if (inFlight != null) return inFlight;
+
     final future = _cityRepository.getActiveCities();
-    _citiesFuture = future.whenComplete(() => _citiesFuture = null);
-    return future;
+    _citiesFuture = future.then((cities) {
+      _cities = cities;
+      return cities;
+    }).whenComplete(() => _citiesFuture = null);
+    return _citiesFuture!;
   }
 
   String _message(Object error) => error is ApiException ? error.message : 'تعذر تحميل البيانات. يرجى المحاولة مرة أخرى.';
@@ -96,7 +104,7 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                       return Row(
                         children: [
                           const Expanded(child: Text('تعذر تحميل المدن. حاول مرة أخرى.')),
-                          IconButton(onPressed: () => setDialogState(() {}), icon: const Icon(Icons.refresh_rounded)),
+                          IconButton(onPressed: () => setDialogState(() { _cities = null; }), icon: const Icon(Icons.refresh_rounded)),
                         ],
                       );
                     }
@@ -110,10 +118,10 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                       onChanged: saving
                           ? null
                           : (value) {
-                              final city = cities.where((item) => item.id == value).firstOrNull;
+                              final selected = cities.firstWhere((item) => item.id == value);
                               setDialogState(() {
                                 selectedCityId = value;
-                                selectedGovernorateId = city?.governorateId;
+                                selectedGovernorateId = selected.governorateId;
                               });
                             },
                     );
@@ -285,8 +293,4 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
       floatingActionButton: HomeFixButton(expanded: false, icon: Icons.add_location_alt_outlined, label: 'إضافة عنوان', onPressed: () => _openEditor()),
     );
   }
-}
-
-extension<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }
