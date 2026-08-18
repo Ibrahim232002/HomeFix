@@ -16,12 +16,17 @@ public class ServicePricingRepository
     public Task<ServicePricing?> GetAsync(int serviceId, int cityId) =>
         GetForServiceAsync(serviceId, cityId);
 
-    public Task<ServicePricing?> GetForServiceAsync(int serviceId, int? cityId) =>
-        _context.ServicePricings
-            .Where(p => p.ServiceId == serviceId && p.IsActive &&
-                        (p.CityId == cityId || (cityId.HasValue && p.CityId == null)))
-            .OrderByDescending(p => p.CityId.HasValue)
+    public Task<ServicePricing?> GetForServiceAsync(int serviceId, int? cityId)
+    {
+        if (!cityId.HasValue)
+            return Task.FromResult<ServicePricing?>(null);
+
+        return _context.ServicePricings
+            .Where(p => p.ServiceId == serviceId &&
+                        p.IsActive &&
+                        p.CityId == cityId.Value)
             .FirstOrDefaultAsync();
+    }
 
     public async Task<List<ServicePricing>> GetByServiceIdAsync(int serviceId)
     {
