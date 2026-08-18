@@ -19,6 +19,7 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   bool _loading = true;
   String? _error;
+  String? _openingConversationId;
 
   @override
   void initState() {
@@ -29,13 +30,28 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Future<void> _load() async {
-    if (!mounted) return;
+    if (!mounted || _loading) return;
     setState(() { _loading = true; _error = null; });
     try {
       await context.read<AppStateProvider>().refreshAuthenticatedData();
       if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) setState(() { _loading = false; _error = e.toString().replaceFirst('Exception: ', ''); });
+    }
+  }
+
+  Future<void> _openConversation(ConversationModel conversation) async {
+    if (!mounted || _openingConversationId != null) return;
+    setState(() => _openingConversationId = conversation.id);
+    try {
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => ChatDetailScreen(conversation: conversation)));
+    } finally {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _openingConversationId = null);
+        _load();
+      });
     }
   }
 
@@ -74,12 +90,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                   final otherName = isCustomer ? conversation.technicianName : conversation.customerName;
                                   final otherAvatar = isCustomer ? conversation.technicianAvatar : conversation.customerAvatar;
                                   final unread = isCustomer ? conversation.unreadCountCustomer : conversation.unreadCountTechnician;
+                                  final opening = _openingConversationId == conversation.id;
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 10),
                                     child: HomeFixCard(
-                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatDetailScreen(conversation: conversation))).then((_) {
-                                        if (mounted) _load();
-                                      }),
+                                      onTap: opening ? null : () => _openConversation(conversation),
                                       child: Row(children: [
                                         CircleAvatar(
                                           radius: 26,
@@ -94,7 +109,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                           const SizedBox(height: 4),
                                           Text(conversation.lastMessage.isEmpty ? 'لا توجد رسالة بعد' : conversation.lastMessage, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
                                         ])),
-                                        if (unread > 0)
+                                        if (opening)
+                                          const Padding(padding: EdgeInsetsDirectional.only(start: 10), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                                        else if (unread > 0)
                                           Container(
                                             margin: const EdgeInsetsDirectional.only(start: 10),
                                             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
