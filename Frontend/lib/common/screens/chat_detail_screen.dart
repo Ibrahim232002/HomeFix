@@ -25,13 +25,11 @@ class ChatDetailScreen extends StatefulWidget {
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final IChatRepository _repository = ChatRepository();
-  final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   ConversationModel? _conversation;
   bool _loading = true;
-  bool _sending = false;
-  bool _disposed = false;
   String? _error;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -44,52 +42,71 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void dispose() {
     _disposed = true;
-    _msgController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _loadConversation() async {
     if (!mounted || _disposed) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final conversation = await _repository.getConversationById(widget.conversation.id);
       if (!mounted || _disposed) return;
-      setState(() { _conversation = conversation ?? widget.conversation; _loading = false; });
+      setState(() {
+        _conversation = conversation ?? widget.conversation;
+        _loading = false;
+      });
       _scrollToBottom();
     } catch (e) {
       if (!mounted || _disposed) return;
-      setState(() { _loading = false; _error = e is ApiException ? e.message : 'تعذر تحميل المحادثة. تحقق من الاتصال ثم حاول مرة أخرى.'; });
+      setState(() {
+        _loading = false;
+        _error = e is ApiException ? e.message : 'تعذر تحميل المحادثة. تحقق من الاتصال ثم حاول مرة أخرى.';
+      });
     }
   }
 
-  Future<void> _send() async {
-    if (!mounted || _disposed || _sending) return;
+  Future<void> _sendMessage(String text) async {
+    if (!mounted || _disposed) return;
     final user = context.read<AuthSessionProvider>().user;
-    final conversation = _conversation ?? widget.conversation;
-    final text = _msgController.text.trim();
-    if (user == null || text.isEmpty) return;
+    if (user == null) {
+      throw StateError('انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.');
+    }
 
-    _msgController.clear();
-    setState(() { _sending = true; _error = null; });
+    final conversation = _conversation ?? widget.conversation;
     try {
-      await _repository.sendMessage(conversationId: conversation.id, sender: user, text: text);
+      await _repository.sendMessage(
+        conversationId: conversation.id,
+        sender: user,
+        text: text,
+      );
       if (!mounted || _disposed) return;
       final refreshed = await _repository.getConversationById(conversation.id);
       if (!mounted || _disposed) return;
-      setState(() { _conversation = refreshed ?? conversation; _sending = false; });
+      setState(() {
+        _conversation = refreshed ?? conversation;
+        _error = null;
+      });
       _scrollToBottom();
     } catch (e) {
       if (!mounted || _disposed) return;
-      _msgController.value = TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
-      setState(() { _sending = false; _error = e is ApiException ? e.message : 'تعذر إرسال الرسالة. حاول مرة أخرى.'; });
+      final message = e is ApiException ? e.message : 'تعذر إرسال الرسالة. حاول مرة أخرى.';
+      setState(() => _error = message);
+      rethrow;
     }
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _disposed || !_scrollController.hasClients) return;
-      _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -104,63 +121,201 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: AppDesignTokens.space3,
-        title: Row(children: [
-          CircleAvatar(radius: 18, backgroundColor: AppColors.primarySurface, backgroundImage: otherAvatar?.isNotEmpty == true ? NetworkImage(otherAvatar!) : null, child: otherAvatar?.isNotEmpty == true ? null : const Icon(Icons.person_outline_rounded, size: 20, color: AppColors.primary)),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(otherName.isEmpty ? 'المحادثة' : otherName, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)), if (conversation.serviceNameAr?.isNotEmpty == true) Text(conversation.serviceNameAr!, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary))])),
-        ]),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.primarySurface,
+              backgroundImage: otherAvatar?.isNotEmpty == true ? NetworkImage(otherAvatar!) : null,
+              child: otherAvatar?.isNotEmpty == true
+                  ? null
+                  : const Icon(Icons.person_outline_rounded, size: 20, color: AppColors.primary),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    otherName.isEmpty ? 'المحادثة' : otherName,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  if (conversation.serviceNameAr?.isNotEmpty == true)
+                    Text(
+                      conversation.serviceNameAr!,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       body: SafeArea(
-        child: Column(children: [
-          if (_error != null) MaterialBanner(content: Text(_error!), actions: [TextButton(onPressed: _loadConversation, child: const Text('إعادة المحاولة'))]),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _loadConversation,
-              child: _loading
-                  ? ListView(padding: AppResponsive.pagePadding(context), children: const [HomeFixLoadingList(itemCount: 6)])
-                  : conversation.messages.isEmpty
-                      ? ListView(physics: const AlwaysScrollableScrollPhysics(), children: const [SizedBox(height: 280), HomeFixEmptyState(icon: Icons.chat_bubble_outline_rounded, title: 'لا توجد رسائل بعد', message: 'ابدأ المحادثة بإرسال أول رسالة.')])
-                      : ListView.builder(
-                          controller: _scrollController,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: AppResponsive.pagePadding(context),
-                          itemCount: conversation.messages.length,
-                          itemBuilder: (context, index) {
-                            final msg = conversation.messages[index];
-                            final isMe = msg.senderId == user?.id;
-                            return Align(
-                              alignment: isMe ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
-                              child: Container(
-                                constraints: const BoxConstraints(maxWidth: 560),
-                                margin: const EdgeInsets.only(bottom: 10),
-                                child: HomeFixCard(
-                                  backgroundColor: isMe ? AppColors.primary : AppColors.cardBackground,
-                                  borderColor: isMe ? Colors.transparent : AppColors.border,
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text(msg.text, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: isMe ? Colors.white : AppColors.textPrimary)),
-                                    if (msg.attachmentUrl?.isNotEmpty == true) ...[const SizedBox(height: 6), Text('مرفق: ${msg.attachmentUrl}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: isMe ? Colors.white70 : AppColors.textMuted))],
-                                    const SizedBox(height: 5),
-                                    Text(msg.createdAt, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: isMe ? Colors.white70 : AppColors.textMuted)),
-                                  ]),
-                                ),
+        child: Column(
+          children: [
+            if (_error != null)
+              MaterialBanner(
+                content: Text(_error!),
+                actions: [
+                  TextButton(onPressed: _loadConversation, child: const Text('إعادة المحاولة')),
+                ],
+              ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _loadConversation,
+                child: _loading
+                    ? ListView(
+                        padding: AppResponsive.pagePadding(context),
+                        children: const [HomeFixLoadingList(itemCount: 6)],
+                      )
+                    : conversation.messages.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 280),
+                              HomeFixEmptyState(
+                                icon: Icons.chat_bubble_outline_rounded,
+                                title: 'لا توجد رسائل بعد',
+                                message: 'ابدأ المحادثة بإرسال أول رسالة.',
                               ),
-                            );
-                          },
-                        ),
+                            ],
+                          )
+                        : ListView.builder(
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: AppResponsive.pagePadding(context),
+                            itemCount: conversation.messages.length,
+                            itemBuilder: (context, index) {
+                              final msg = conversation.messages[index];
+                              final isMe = msg.senderId == user?.id;
+                              return Align(
+                                alignment: isMe ? AlignmentDirectional.centerStart : AlignmentDirectional.centerEnd,
+                                child: Container(
+                                  constraints: const BoxConstraints(maxWidth: 560),
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  child: HomeFixCard(
+                                    backgroundColor: isMe ? AppColors.primary : AppColors.cardBackground,
+                                    borderColor: isMe ? Colors.transparent : AppColors.border,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          msg.text,
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                color: isMe ? Colors.white : AppColors.textPrimary,
+                                              ),
+                                        ),
+                                        if (msg.attachmentUrl?.isNotEmpty == true) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'مرفق: ${msg.attachmentUrl}',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                  color: isMe ? Colors.white70 : AppColors.textMuted,
+                                                ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 5),
+                                        Text(
+                                          msg.createdAt,
+                                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                                color: isMe ? Colors.white70 : AppColors.textMuted,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+              ),
             ),
-          ),
-          SafeArea(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
-              child: Row(children: [
-                Expanded(child: HomeFixField(controller: _msgController, enabled: !_sending, hintText: 'اكتب رسالتك...', textInputAction: TextInputAction.send, onChanged: (_) {}, onTap: () {})),
-                const SizedBox(width: 8),
-                HomeFixButton(expanded: false, loading: _sending, label: 'إرسال', icon: Icons.send_rounded, onPressed: _sending ? null : _send),
-              ]),
+            _ChatComposer(enabled: true, onSend: _sendMessage),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatComposer extends StatefulWidget {
+  const _ChatComposer({required this.enabled, required this.onSend});
+
+  final bool enabled;
+  final Future<void> Function(String text) onSend;
+
+  @override
+  State<_ChatComposer> createState() => _ChatComposerState();
+}
+
+class _ChatComposerState extends State<_ChatComposer> {
+  late final TextEditingController _controller;
+  bool _sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    if (!mounted || _sending || !widget.enabled) return;
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    final previousText = text;
+    setState(() => _sending = true);
+    _controller.clear();
+    try {
+      await widget.onSend(previousText);
+    } catch (_) {
+      if (!mounted) return;
+      _controller.value = TextEditingValue(
+        text: previousText,
+        selection: TextSelection.collapsed(offset: previousText.length),
+      );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: HomeFixField(
+                controller: _controller,
+                enabled: widget.enabled && !_sending,
+                hintText: 'اكتب رسالتك...',
+                textInputAction: TextInputAction.send,
+                onFieldSubmitted: _send,
+              ),
             ),
-          ),
-        ]),
+            const SizedBox(width: 8),
+            HomeFixButton(
+              expanded: false,
+              loading: _sending,
+              label: 'إرسال',
+              icon: Icons.send_rounded,
+              onPressed: widget.enabled && !_sending ? _send : null,
+            ),
+          ],
+        ),
       ),
     );
   }
