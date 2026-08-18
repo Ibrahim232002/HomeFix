@@ -5,10 +5,12 @@ on:
     branches:
       - phase-1.5-security-audit
       - backend-clean-architecture
+      - backend-service-categories
   pull_request:
     branches:
       - phase-1.5-security-audit
       - backend-clean-architecture
+      - backend-service-categories
 
 env:
   DOTNET_VERSION: 8.0.x
