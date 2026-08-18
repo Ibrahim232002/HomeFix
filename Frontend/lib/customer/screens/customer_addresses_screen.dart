@@ -11,6 +11,7 @@ import '../../core/widgets/homefix_field.dart';
 import '../../core/widgets/homefix_states.dart';
 import '../../models/api_dtos.dart';
 import '../../repositories/address_repository.dart';
+import '../../repositories/city_repository.dart';
 
 class CustomerAddressesScreen extends StatefulWidget {
   const CustomerAddressesScreen({super.key});
@@ -21,7 +22,9 @@ class CustomerAddressesScreen extends StatefulWidget {
 
 class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
   final IAddressRepository _repository = AddressRepository();
+  final ICityRepository _cityRepository = CityRepository();
   List<AddressDto> _addresses = const [];
+  Future<List<CityDto>>? _citiesFuture;
   bool _loading = true;
   String? _error;
 
@@ -50,7 +53,15 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
     }
   }
 
-  String _message(Object error) => error is ApiException ? error.message : 'تعذر تحميل العناوين. يرجى المحاولة مرة أخرى.';
+  Future<List<CityDto>> _loadCities() {
+    final inFlight = _citiesFuture;
+    if (inFlight != null) return inFlight;
+    final future = _cityRepository.getActiveCities();
+    _citiesFuture = future.whenComplete(() => _citiesFuture = null);
+    return future;
+  }
+
+  String _message(Object error) => error is ApiException ? error.message : 'تعذر تحميل البيانات. يرجى المحاولة مرة أخرى.';
 
   Future<void> _openEditor({AddressDto? address}) async {
     final customerId = _customerId;
@@ -62,6 +73,8 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
     final floor = TextEditingController(text: address?.floorNumber ?? '');
     final apartment = TextEditingController(text: address?.apartmentNumber ?? '');
     final instructions = TextEditingController(text: address?.additionalInstructions ?? '');
+    var selectedCityId = address?.cityId;
+    var selectedGovernorateId = address?.governorateId;
     var isDefault = address?.isDefault ?? _addresses.isEmpty;
     var saving = false;
 
@@ -73,6 +86,40 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
           content: SingleChildScrollView(
             child: Column(
               children: [
+                FutureBuilder<List<CityDto>>(
+                  future: _loadCities(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const LinearProgressIndicator();
+                    }
+                    if (snapshot.hasError) {
+                      return Row(
+                        children: [
+                          const Expanded(child: Text('تعذر تحميل المدن. حاول مرة أخرى.')),
+                          IconButton(onPressed: () => setDialogState(() {}), icon: const Icon(Icons.refresh_rounded)),
+                        ],
+                      );
+                    }
+                    final cities = snapshot.data ?? const <CityDto>[];
+                    return DropdownButtonFormField<int>(
+                      value: cities.any((city) => city.id == selectedCityId) ? selectedCityId : null,
+                      decoration: const InputDecoration(labelText: 'المدينة', prefixIcon: Icon(Icons.location_city_outlined)),
+                      items: cities
+                          .map((city) => DropdownMenuItem<int>(value: city.id, child: Text(city.name ?? 'مدينة ${city.id}')))
+                          .toList(),
+                      onChanged: saving
+                          ? null
+                          : (value) {
+                              final city = cities.where((item) => item.id == value).firstOrNull;
+                              setDialogState(() {
+                                selectedCityId = value;
+                                selectedGovernorateId = city?.governorateId;
+                              });
+                            },
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
                 HomeFixField(controller: label, label: 'اسم العنوان', hintText: 'المنزل، العمل...'),
                 const SizedBox(height: 10),
                 HomeFixField(controller: fullAddress, label: 'العنوان الكامل', maxLines: 2),
@@ -101,6 +148,10 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
               icon: Icons.check_rounded,
               onPressed: saving ? null : () async {
                 if (fullAddress.text.trim().isEmpty) return;
+                if (selectedCityId == null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(const SnackBar(content: Text('اختر المدينة أولاً لضبط التسعير حسب موقعك.')));
+                  return;
+                }
                 setDialogState(() => saving = true);
                 try {
                   if (address == null) {
@@ -113,6 +164,8 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                       apartmentNumber: apartment.text.trim(),
                       additionalInstructions: instructions.text.trim(),
                       isDefault: isDefault,
+                      governorateId: selectedGovernorateId,
+                      cityId: selectedCityId,
                     ));
                     if (mounted) setState(() => _addresses = [created, ..._addresses]);
                   } else {
@@ -124,6 +177,8 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                       apartmentNumber: apartment.text.trim(),
                       additionalInstructions: instructions.text.trim(),
                       isDefault: isDefault,
+                      governorateId: selectedGovernorateId,
+                      cityId: selectedCityId,
                     ));
                     if (mounted) setState(() => _addresses = _addresses.map((item) => item.id == updated.id ? updated : item).toList());
                   }
@@ -210,6 +265,10 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                               const SizedBox(height: 8),
                               Text('مبنى ${address.buildingNumber ?? '-'} • دور ${address.floorNumber ?? '-'} • شقة ${address.apartmentNumber ?? '-'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
                             ],
+                            if (address.cityId == null) ...[
+                              const SizedBox(height: 8),
+                              Text('المدينة غير محددة — عدّل العنوان لإكمال التسعير حسب الموقع.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.warning)),
+                            ],
                             const SizedBox(height: 12),
                             Row(children: [Expanded(child: HomeFixButton(expanded: true, variant: HomeFixButtonVariant.outline, icon: Icons.edit_outlined, label: 'تعديل', onPressed: () => _openEditor(address: address))), const SizedBox(width: 8), IconButton(tooltip: 'حذف', onPressed: () => _delete(address), icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error))]),
                           ],
@@ -226,4 +285,8 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
       floatingActionButton: HomeFixButton(expanded: false, icon: Icons.add_location_alt_outlined, label: 'إضافة عنوان', onPressed: () => _openEditor()),
     );
   }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
