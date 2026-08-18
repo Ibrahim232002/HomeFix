@@ -35,6 +35,7 @@ class CustomerHomeRedesign extends StatelessWidget {
       body: SafeArea(
         child: AppResponsive.content(
           context,
+          padding: EdgeInsets.zero,
           child: RefreshIndicator(
             onRefresh: state.refreshAuthenticatedData,
             child: CustomScrollView(
@@ -167,13 +168,14 @@ class CustomerHomeRedesign extends StatelessWidget {
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServiceDetailScreen(service: service))),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                height: 88,
+                                height: 76,
                                 decoration: BoxDecoration(color: AppColors.primarySurface, borderRadius: BorderRadius.circular(AppDesignTokens.radiusMd)),
                                 child: const Center(child: Icon(Icons.home_repair_service_rounded, size: 36, color: AppColors.primary)),
                               ),
-                              const SizedBox(height: AppDesignTokens.space3),
+                              const SizedBox(height: AppDesignTokens.space2),
                               Text(service.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
                               const SizedBox(height: AppDesignTokens.space1),
                               Text(service.categoryNameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
@@ -181,7 +183,7 @@ class CustomerHomeRedesign extends StatelessWidget {
                           ),
                         );
                       }, childCount: state.services.length.clamp(0, 6)),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: AppResponsive.columns(context), crossAxisSpacing: AppDesignTokens.space3, mainAxisSpacing: AppDesignTokens.space3, childAspectRatio: 0.95),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: AppDesignTokens.space3, mainAxisSpacing: AppDesignTokens.space3, childAspectRatio: 0.95),
                     ),
                   ),
               ],
