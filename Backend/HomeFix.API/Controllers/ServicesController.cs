@@ -52,4 +52,19 @@ public class ServicesController : ControllerBase
 
         return Ok(result);
     }
+
+    [AllowAnonymous]
+    [HttpGet("category/{categoryId:int}")]
+    public async Task<ActionResult<List<ServiceDto>>> GetByCategory(int categoryId)
+    {
+        var services = await _serviceService.GetActiveServicesByCategoryAsync(categoryId);
+
+        return Ok(services.Select(s => new ServiceDto
+        {
+            Id = s.Id,
+            Name = s.Name,
+            Description = s.Description,
+            IsActive = s.IsActive
+        }).ToList());
+    }
 }
