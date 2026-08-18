@@ -11,7 +11,7 @@ abstract class IServiceRepository {
     String categoryNameAr = '',
   });
   Future<List<ServiceModel>> searchServices(String query);
-
+  
   // Direct OpenAPI DTO methods
   Future<List<ServiceDto>> getApiServices();
   Future<ServiceDto> getApiServiceById(int id);
@@ -35,7 +35,7 @@ class ServiceRepository implements IServiceRepository {
         return list;
       }
     } catch (_) {
-      // Return empty list if API fails or empty.
+      // Return empty list if API fails or empty
     }
     return [];
   }
@@ -100,14 +100,29 @@ class ServiceRepository implements IServiceRepository {
 
   @override
   Future<List<ServiceDto>> getApiServices() async {
+    // ignore: avoid_print
+    print('=== HOMEFIX GET /api/Services ===');
     try {
       final response = await _client.get(ApiConstants.services, includeAuth: false);
       if (response is List) {
-        return response
+        final list = response
             .map((item) => ServiceDto.fromJson(item as Map<String, dynamic>))
             .toList();
+        // ignore: avoid_print
+        print('=== API STATUS: SUCCESS ===');
+        // ignore: avoid_print
+        print('=== API SERVICES COUNT: ${list.length} ===');
+        return list;
       }
-    } catch (_) {
+      // ignore: avoid_print
+      print('=== API STATUS: SUCCESS (NOT LIST) ===');
+      // ignore: avoid_print
+      print('=== API SERVICES COUNT: 0 ===');
+    } catch (e) {
+      // ignore: avoid_print
+      print('=== API STATUS: ERROR ($e) ===');
+      // ignore: avoid_print
+      print('=== API SERVICES COUNT: 0 ===');
       rethrow;
     }
     return [];
