@@ -30,62 +30,65 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   ConversationModel? _conversation;
   bool _loading = true;
   bool _sending = false;
+  bool _disposed = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadConversation();
+      if (mounted && !_disposed) _loadConversation();
     });
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _msgController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _loadConversation() async {
-    if (!mounted) return;
+    if (!mounted || _disposed) return;
     setState(() { _loading = true; _error = null; });
     try {
       final conversation = await _repository.getConversationById(widget.conversation.id);
-      if (!mounted) return;
+      if (!mounted || _disposed) return;
       setState(() { _conversation = conversation ?? widget.conversation; _loading = false; });
       _scrollToBottom();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _disposed) return;
       setState(() { _loading = false; _error = e is ApiException ? e.message : 'تعذر تحميل المحادثة. تحقق من الاتصال ثم حاول مرة أخرى.'; });
     }
   }
 
   Future<void> _send() async {
-    if (!mounted || _sending) return;
+    if (!mounted || _disposed || _sending) return;
     final user = context.read<AuthSessionProvider>().user;
     final conversation = _conversation ?? widget.conversation;
     final text = _msgController.text.trim();
     if (user == null || text.isEmpty) return;
 
+    _msgController.clear();
     setState(() { _sending = true; _error = null; });
     try {
       await _repository.sendMessage(conversationId: conversation.id, sender: user, text: text);
-      if (!mounted) return;
-      _msgController.clear();
+      if (!mounted || _disposed) return;
       final refreshed = await _repository.getConversationById(conversation.id);
-      if (!mounted) return;
+      if (!mounted || _disposed) return;
       setState(() { _conversation = refreshed ?? conversation; _sending = false; });
       _scrollToBottom();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _disposed) return;
+      _msgController.value = TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
       setState(() { _sending = false; _error = e is ApiException ? e.message : 'تعذر إرسال الرسالة. حاول مرة أخرى.'; });
     }
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
+      if (!mounted || _disposed || !_scrollController.hasClients) return;
       _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
     });
   }
