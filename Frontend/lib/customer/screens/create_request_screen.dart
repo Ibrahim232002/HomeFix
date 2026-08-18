@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/theme/app_design_tokens.dart';
 import '../../core/theme/app_responsive.dart';
 import '../../core/widgets/homefix_button.dart';
@@ -71,10 +72,18 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => CustomerRequestDetailScreen(requestId: request.id)));
     } catch (error) {
       if (!mounted) return;
-      _showError(error is UnsupportedError ? (error.message ?? 'تعذر إرسال الطلب. حاول مرة أخرى.') : 'تعذر إرسال الطلب. حاول مرة أخرى.');
+      _showError(_formatSubmissionError(error));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  String _formatSubmissionError(Object error) {
+    if (error is ApiException) return error.message;
+    if (error is FormatException) return error.message;
+    if (error is ArgumentError) return error.message?.toString() ?? 'بيانات الطلب غير صالحة.';
+    if (error is StateError) return error.message;
+    return 'تعذر إرسال الطلب. حاول مرة أخرى.';
   }
 
   void _showError(String message) {
