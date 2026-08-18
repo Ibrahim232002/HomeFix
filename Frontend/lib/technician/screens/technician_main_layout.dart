@@ -11,14 +11,6 @@ import 'technician_profile_screen.dart';
 class TechnicianMainLayout extends StatelessWidget {
   const TechnicianMainLayout({super.key});
 
-  static final List<Widget> _screens = [
-    const TechnicianDashboardRedesign(),
-    const TechnicianRequestsScreen(),
-    const TechnicianBookingsScreen(),
-    const TechnicianWalletScreen(),
-    const TechnicianProfileScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppStateProvider>();
@@ -26,7 +18,13 @@ class TechnicianMainLayout extends StatelessWidget {
     return Scaffold(
       body: IndexedStack(
         index: appState.technicianNavIndex,
-        children: _screens,
+        children: const [
+          TechnicianDashboardRedesign(),
+          TechnicianRequestsScreen(),
+          TechnicianBookingsScreen(),
+          TechnicianWalletScreen(),
+          TechnicianProfileScreen(),
+        ],
       ),
       bottomNavigationBar: TechnicianBottomNav(
         currentIndex: appState.technicianNavIndex,
