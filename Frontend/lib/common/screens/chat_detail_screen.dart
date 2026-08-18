@@ -303,7 +303,6 @@ class _ChatComposerState extends State<_ChatComposer> {
                 enabled: widget.enabled && !_sending,
                 hintText: 'اكتب رسالتك...',
                 textInputAction: TextInputAction.send,
-                onFieldSubmitted: _send,
               ),
             ),
             const SizedBox(width: 8),
