@@ -54,6 +54,10 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       _showError('اختر عنوان تقديم الخدمة أولاً.');
       return;
     }
+    if (_address!.cityId == null) {
+      _showError('العنوان المختار لا يحتوي على مدينة. عدّل العنوان واختر المدينة أولاً حتى يمكن تحديد السعر حسب الموقع.');
+      return;
+    }
     if (_problemController.text.trim().isEmpty) {
       _showError('اكتب وصفاً مختصراً للمشكلة ليساعد الفني على فهم الطلب.');
       return;
@@ -150,6 +154,10 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                       onChanged: (value) => setState(() => _address = value),
                     ),
                   ),
+                if (_address != null && _address!.cityId == null) ...[
+                  const SizedBox(height: AppDesignTokens.space2),
+                  Text('هذا العنوان لا يحتوي على مدينة مرتبطة به، لذلك لن يمكن إنشاء طلب بتسعير المدينة حتى يتم تعديله.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.warning)),
+                ],
                 const SizedBox(height: AppDesignTokens.space5),
                 Text('ما المشكلة؟', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: AppDesignTokens.space2),
@@ -199,7 +207,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                   ),
                 ),
                 const SizedBox(height: AppDesignTokens.space5),
-                HomeFixButton(label: 'إرسال طلب الخدمة', icon: Icons.arrow_back_rounded, loading: _submitting, onPressed: _address == null || addresses.isEmpty ? null : () => _submit(state)),
+                HomeFixButton(label: 'إرسال طلب الخدمة', icon: Icons.arrow_back_rounded, loading: _submitting, onPressed: _address == null || _address!.cityId == null || addresses.isEmpty ? null : () => _submit(state)),
               ],
             ),
           ),
