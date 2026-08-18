@@ -30,9 +30,13 @@ class ApiConstants {
   static const String governorates = '/api/Governorates';
   static String governorateById(int id) => '/api/Governorates/$id';
 
-  // Services & Service Pricings
+  // Services & Service Categories
   static const String services = '/api/Services';
   static String serviceById(int id) => '/api/Services/$id';
+  static String servicesByCategory(int categoryId) =>
+      '/api/Services/category/$categoryId';
+  static const String serviceCategories = '/api/ServiceCategories';
+  static String serviceCategoryById(int id) => '/api/ServiceCategories/$id';
   static const String servicePricings = '/api/ServicePricings';
   static String servicePricingsByService(int serviceId) =>
       '/api/ServicePricings/service/$serviceId';
@@ -111,8 +115,7 @@ class ApiConstants {
       '/api/Payments/verify/$paymentId';
   static String inquirePaymentByReference(String reference) =>
       '/api/Payments/inquire/$reference';
-  static String setCashPayment(int serviceRequestId) =>
-      '/api/Payments/cash/$serviceRequestId';
+  static String setCashPayment(int serviceRequestId) => '/api/Payments/cash/$serviceRequestId';
   static const String paymobWebhook = '/api/Payments/webhook/paymob';
 
   // Reviews
