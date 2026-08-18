@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IAddressService, AddressService>();
 
         services.AddScoped<IServiceService, ServiceService>();
+        services.AddScoped<IServiceCategoryService, ServiceCategoryService>();
         services.AddScoped<IServicePricingService, ServicePricingService>();
 
         services.AddScoped<IServiceRequestService, ServiceRequestService>();
