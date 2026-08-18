@@ -1,4 +1,4 @@
-﻿using HomeFix.DAL.Data;
+using HomeFix.DAL.Data;
 using HomeFix.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +25,14 @@ public class ServiceRepository
     {
         return await _context.Services
             .FirstOrDefaultAsync(s => s.Id == id);
+    }
+
+    public async Task<List<Service>> GetActiveByCategoryAsync(int categoryId)
+    {
+        return await _context.Services
+            .Where(s => s.IsActive && s.CategoryId == categoryId)
+            .OrderBy(s => s.Name)
+            .ToListAsync();
     }
 
     public async Task AddAsync(Service service)
