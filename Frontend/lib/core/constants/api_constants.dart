@@ -115,7 +115,8 @@ class ApiConstants {
       '/api/Payments/verify/$paymentId';
   static String inquirePaymentByReference(String reference) =>
       '/api/Payments/inquire/$reference';
-  static String setCashPayment(int serviceRequestId) => '/api/Payments/cash/$serviceRequestId';
+  static String setCashPayment(int serviceRequestId) =>
+      '/api/Payments/cash/$serviceRequestId';
   static const String paymobWebhook = '/api/Payments/webhook/paymob';
 
   // Reviews
