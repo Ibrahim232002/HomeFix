@@ -35,7 +35,6 @@ class CustomerHomeRedesign extends StatelessWidget {
       body: SafeArea(
         child: AppResponsive.content(
           context,
-          padding: EdgeInsets.zero,
           child: RefreshIndicator(
             onRefresh: state.refreshAuthenticatedData,
             child: CustomScrollView(
