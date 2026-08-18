@@ -10,13 +10,6 @@ import 'customer_profile_screen.dart';
 class CustomerMainLayout extends StatelessWidget {
   const CustomerMainLayout({super.key});
 
-  static final List<Widget> _screens = [
-    const CustomerHomeRedesign(),
-    const CustomerRequestsScreen(),
-    const ChatListScreen(),
-    const CustomerProfileScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppStateProvider>();
@@ -24,7 +17,12 @@ class CustomerMainLayout extends StatelessWidget {
     return Scaffold(
       body: IndexedStack(
         index: appState.customerNavIndex,
-        children: _screens,
+        children: const [
+          CustomerHomeRedesign(),
+          CustomerRequestsScreen(),
+          ChatListScreen(),
+          CustomerProfileScreen(),
+        ],
       ),
       bottomNavigationBar: CustomerBottomNav(
         currentIndex: appState.customerNavIndex,
