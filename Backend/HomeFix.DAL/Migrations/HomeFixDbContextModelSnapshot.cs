@@ -87,7 +87,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("CityId", "GovernorateId");
 
-                    b.ToTable("Addresses", (string)null);
+                    b.ToTable("Addresses");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Booking", b =>
@@ -141,7 +141,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "ServiceRequestId" }, "UQ__Bookings__790F6C8A34F866A4")
                         .IsUnique();
 
-                    b.ToTable("Bookings", (string)null);
+                    b.ToTable("Bookings");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.City", b =>
@@ -179,7 +179,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "Id", "GovernorateId" }, "UQ_Cities_Id_Governorate")
                         .IsUnique();
 
-                    b.ToTable("Cities", (string)null);
+                    b.ToTable("Cities");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Conversation", b =>
@@ -214,7 +214,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "ServiceRequestId" }, "UQ__Conversa__790F6C8A898F216E")
                         .IsUnique();
 
-                    b.ToTable("Conversations", (string)null);
+                    b.ToTable("Conversations");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.CustomerProfile", b =>
@@ -243,7 +243,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "UserId" }, "UQ__Customer__1788CC4D4EA9CC72")
                         .IsUnique();
 
-                    b.ToTable("CustomerProfiles", (string)null);
+                    b.ToTable("CustomerProfiles");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.EmailVerificationToken", b =>
@@ -281,7 +281,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "Token" }, "UQ__EmailVer__1EB4F817C701AAD0")
                         .IsUnique();
 
-                    b.ToTable("EmailVerificationTokens", (string)null);
+                    b.ToTable("EmailVerificationTokens");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.ExternalLogin", b =>
@@ -322,7 +322,7 @@ namespace HomeFix.DAL.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_ExternalLogins_Provider_Subject");
 
-                    b.ToTable("ExternalLogins", (string)null);
+                    b.ToTable("ExternalLogins");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Governorate", b =>
@@ -354,7 +354,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "Name" }, "UQ__Governor__737584F6D9D82374")
                         .IsUnique();
 
-                    b.ToTable("Governorates", (string)null);
+                    b.ToTable("Governorates");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Message", b =>
@@ -398,7 +398,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("SenderId");
 
-                    b.ToTable("Messages", (string)null);
+                    b.ToTable("Messages");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Notification", b =>
@@ -442,7 +442,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.PasswordResetToken", b =>
@@ -480,7 +480,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "Token" }, "UQ__Password__1EB4F81771672048")
                         .IsUnique();
 
-                    b.ToTable("PasswordResetTokens", (string)null);
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Payment", b =>
@@ -539,7 +539,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("ServiceRequestId");
 
-                    b.ToTable("Payments", (string)null);
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.PaymentAttempt", b =>
@@ -593,7 +593,7 @@ namespace HomeFix.DAL.Migrations
                         .HasDatabaseName("UX_PaymentAttempts_ProviderTransactionId")
                         .HasFilter("[ProviderTransactionId] IS NOT NULL");
 
-                    b.ToTable("PaymentAttempts", (string)null);
+                    b.ToTable("PaymentAttempts");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Payout", b =>
@@ -639,7 +639,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("TechnicianId");
 
-                    b.ToTable("Payouts", (string)null);
+                    b.ToTable("Payouts");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.PromoCode", b =>
@@ -686,7 +686,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "Code" }, "UQ__PromoCod__A25C5AA7AEEF8AB8")
                         .IsUnique();
 
-                    b.ToTable("PromoCodes", (string)null);
+                    b.ToTable("PromoCodes");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.RefreshToken", b =>
@@ -713,12 +713,8 @@ namespace HomeFix.DAL.Migrations
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<string>("TokenHash")
+                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
@@ -730,15 +726,11 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("TokenHash")
                         .IsUnique()
-                        .HasDatabaseName("UX_RefreshTokens_TokenHash")
-                        .HasFilter("[TokenHash] IS NOT NULL");
+                        .HasDatabaseName("UX_RefreshTokens_TokenHash");
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex(new[] { "Token" }, "UQ__RefreshT__1EB4F817A73115DC")
-                        .IsUnique();
-
-                    b.ToTable("RefreshTokens", (string)null);
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Review", b =>
@@ -780,7 +772,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "ServiceRequestId" }, "UQ__Reviews__790F6C8A5AF653A1")
                         .IsUnique();
 
-                    b.ToTable("Reviews", (string)null);
+                    b.ToTable("Reviews");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.Service", b =>
@@ -790,6 +782,9 @@ namespace HomeFix.DAL.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -820,7 +815,49 @@ namespace HomeFix.DAL.Migrations
                     b.HasKey("Id")
                         .HasName("PK__Services__3214EC07AD91B341");
 
-                    b.ToTable("Services", (string)null);
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("Services");
+                });
+
+            modelBuilder.Entity("HomeFix.DAL.Entities.ServiceCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("IconName")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ServiceCategories");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.ServicePricing", b =>
@@ -929,7 +966,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("ServiceId");
 
-                    b.ToTable("ServiceRequests", (string)null);
+                    b.ToTable("ServiceRequests");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.ServiceRequestFile", b =>
@@ -965,7 +1002,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("ServiceRequestId");
 
-                    b.ToTable("ServiceRequestFiles", (string)null);
+                    b.ToTable("ServiceRequestFiles");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.ServiceRequestOffer", b =>
@@ -1018,7 +1055,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("TechnicianId", "Status");
 
-                    b.ToTable("ServiceRequestOffers", (string)null);
+                    b.ToTable("ServiceRequestOffers");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.ServiceRequestStatusHistory", b =>
@@ -1094,7 +1131,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("SupportTicketId");
 
-                    b.ToTable("SupportMessages", (string)null);
+                    b.ToTable("SupportMessages");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.SupportTicket", b =>
@@ -1150,7 +1187,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("SupportTickets", (string)null);
+                    b.ToTable("SupportTickets");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.TechnicianAvailability", b =>
@@ -1231,7 +1268,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("TechnicianId");
 
-                    b.ToTable("TechnicianDocuments", (string)null);
+                    b.ToTable("TechnicianDocuments");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.TechnicianProfile", b =>
@@ -1285,7 +1322,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "UserId" }, "UQ__Technici__1788CC4DC4C75A2C")
                         .IsUnique();
 
-                    b.ToTable("TechnicianProfiles", (string)null);
+                    b.ToTable("TechnicianProfiles");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.TechnicianServiceArea", b =>
@@ -1305,7 +1342,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("CityId");
 
-                    b.ToTable("TechnicianServiceAreas", (string)null);
+                    b.ToTable("TechnicianServiceAreas");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.TechnicianWallet", b =>
@@ -1333,7 +1370,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "TechnicianId" }, "UQ__Technici__301F812009726F2F")
                         .IsUnique();
 
-                    b.ToTable("TechnicianWallets", (string)null);
+                    b.ToTable("TechnicianWallets");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.User", b =>
@@ -1396,7 +1433,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "Email" }, "UQ__Users__A9D10534097A4A1C")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.UserDevice", b =>
@@ -1441,7 +1478,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("UserId", "IsActive");
 
-                    b.ToTable("UserDevices", (string)null);
+                    b.ToTable("UserDevices");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.UserPromoCode", b =>
@@ -1479,7 +1516,7 @@ namespace HomeFix.DAL.Migrations
                     b.HasIndex(new[] { "ServiceRequestId" }, "UQ_UserPromoCodes_Request")
                         .IsUnique();
 
-                    b.ToTable("UserPromoCodes", (string)null);
+                    b.ToTable("UserPromoCodes");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.VerificationCode", b =>
@@ -1533,7 +1570,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("UserId", "Purpose", "Channel", "CreatedAt");
 
-                    b.ToTable("VerificationCodes", (string)null);
+                    b.ToTable("VerificationCodes");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.WalletTransaction", b =>
@@ -1580,7 +1617,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasIndex("WalletId");
 
-                    b.ToTable("WalletTransactions", (string)null);
+                    b.ToTable("WalletTransactions");
                 });
 
             modelBuilder.Entity("TechnicianService", b =>
@@ -1824,6 +1861,18 @@ namespace HomeFix.DAL.Migrations
                     b.Navigation("ServiceRequest");
 
                     b.Navigation("Technician");
+                });
+
+            modelBuilder.Entity("HomeFix.DAL.Entities.Service", b =>
+                {
+                    b.HasOne("HomeFix.DAL.Entities.ServiceCategory", "Category")
+                        .WithMany("Services")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Services_ServiceCategories_CategoryId");
+
+                    b.Navigation("Category");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.ServicePricing", b =>
@@ -2166,6 +2215,11 @@ namespace HomeFix.DAL.Migrations
                     b.Navigation("ServicePricings");
 
                     b.Navigation("ServiceRequests");
+                });
+
+            modelBuilder.Entity("HomeFix.DAL.Entities.ServiceCategory", b =>
+                {
+                    b.Navigation("Services");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.ServiceRequest", b =>
