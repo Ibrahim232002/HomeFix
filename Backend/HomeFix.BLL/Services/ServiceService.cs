@@ -22,4 +22,9 @@ public class ServiceService : IServiceService
     {
         return await _serviceRepository.GetByIdAsync(id);
     }
+
+    public async Task<List<Service>> GetActiveServicesByCategoryAsync(int categoryId)
+    {
+        return await _serviceRepository.GetActiveByCategoryAsync(categoryId);
+    }
 }
