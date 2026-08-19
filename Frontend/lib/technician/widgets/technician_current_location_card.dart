@@ -179,8 +179,8 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
 
       final updated = await _technicianRepository.updateCurrentLocation(
         technicianId: technicianId,
-        currentGovernorateId: _selectedGovernorateId,
-        currentCityId: _selectedCityId,
+        currentGovernorateId: _profile?.currentGovernorateId,
+        currentCityId: _profile?.currentCityId,
         currentLatitude: position.latitude,
         currentLongitude: position.longitude,
       );
@@ -205,9 +205,11 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
 
   String? _currentLocationLabel() {
     if (_selectedGovernorateId == null || _selectedCityId == null) return null;
-    final governorate = _governorates.where((item) => item.id == _selectedGovernorateId).firstOrNull;
-    final city = _cities.where((item) => item.id == _selectedCityId).firstOrNull;
-    if (governorate == null || city == null) return null;
+    final governorates = _governorates.where((item) => item.id == _selectedGovernorateId);
+    final cities = _cities.where((item) => item.id == _selectedCityId);
+    if (governorates.isEmpty || cities.isEmpty) return null;
+    final governorate = governorates.first;
+    final city = cities.first;
     return '${governorate.name ?? 'المحافظة'} - ${city.name ?? 'المدينة'}';
   }
 
@@ -324,7 +326,9 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
                 ),
               ),
             ),
-            if (currentLocationLabel != null && _profile?.currentGovernorateId == _selectedGovernorateId && _profile?.currentCityId == _selectedCityId) ...[
+            if (currentLocationLabel != null &&
+                _profile?.currentGovernorateId == _selectedGovernorateId &&
+                _profile?.currentCityId == _selectedCityId) ...[
               const SizedBox(height: 10),
               Text(
                 '✓ موقعك محفوظ: $currentLocationLabel',
