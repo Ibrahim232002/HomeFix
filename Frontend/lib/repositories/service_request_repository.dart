@@ -1,3 +1,4 @@
+import '../core/network/api_client.dart';
 import '../core/constants/api_constants.dart';
 import '../models/api_dtos.dart';
 import '../models/service_request_model.dart';
