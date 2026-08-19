@@ -60,6 +60,12 @@ public class TechnicianProfilesController : ControllerBase
     public async Task<ActionResult<TechnicianProfileDto>> Create(
         CreateTechnicianProfileRequest request)
     {
+        var validationError = await _service.ValidateCurrentLocationAsync(
+            request.CurrentGovernorateId,
+            request.CurrentCityId);
+        if (validationError != null)
+            return BadRequest(new { message = validationError });
+
         var technician = new TechnicianProfile
         {
             UserId = request.UserId,
@@ -72,7 +78,9 @@ public class TechnicianProfilesController : ControllerBase
             TotalJobs = 0,
             CreatedAt = DateTime.UtcNow,
             CurrentLatitude = request.CurrentLatitude,
-            CurrentLongitude = request.CurrentLongitude
+            CurrentLongitude = request.CurrentLongitude,
+            CurrentGovernorateId = request.CurrentGovernorateId,
+            CurrentCityId = request.CurrentCityId
         };
 
         await _service.AddAsync(technician);
@@ -94,19 +102,37 @@ public class TechnicianProfilesController : ControllerBase
         if (technician == null)
             return NotFound();
 
+        var validationError = await _service.ValidateCurrentLocationAsync(
+            request.CurrentGovernorateId,
+            request.CurrentCityId);
+        if (validationError != null)
+            return BadRequest(new { message = validationError });
+
         if (!User.IsInRole("Admin"))
         {
-            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || technician.UserId != userId) return Forbid();
-            technician.Bio = request.Bio; technician.ProfileImageUrl = request.ProfileImageUrl;
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || technician.UserId != userId)
+                return Forbid();
+
+            technician.Bio = request.Bio;
+            technician.ProfileImageUrl = request.ProfileImageUrl;
             technician.YearsOfExperience = request.YearsOfExperience;
-            technician.CurrentLatitude = request.CurrentLatitude; technician.CurrentLongitude = request.CurrentLongitude;
+            technician.CurrentLatitude = request.CurrentLatitude;
+            technician.CurrentLongitude = request.CurrentLongitude;
+            technician.CurrentGovernorateId = request.CurrentGovernorateId;
+            technician.CurrentCityId = request.CurrentCityId;
             technician.IsAvailable = request.IsAvailable;
         }
         else
         {
-            technician.Bio = request.Bio; technician.ProfileImageUrl = request.ProfileImageUrl;
-            technician.YearsOfExperience = request.YearsOfExperience; technician.IsVerified = request.IsVerified;
-            technician.IsAvailable = request.IsAvailable; technician.CurrentLatitude = request.CurrentLatitude; technician.CurrentLongitude = request.CurrentLongitude;
+            technician.Bio = request.Bio;
+            technician.ProfileImageUrl = request.ProfileImageUrl;
+            technician.YearsOfExperience = request.YearsOfExperience;
+            technician.IsVerified = request.IsVerified;
+            technician.IsAvailable = request.IsAvailable;
+            technician.CurrentLatitude = request.CurrentLatitude;
+            technician.CurrentLongitude = request.CurrentLongitude;
+            technician.CurrentGovernorateId = request.CurrentGovernorateId;
+            technician.CurrentCityId = request.CurrentCityId;
         }
 
         await _service.UpdateAsync(technician);
@@ -130,7 +156,9 @@ public class TechnicianProfilesController : ControllerBase
             TotalJobs = technician.TotalJobs,
             CreatedAt = technician.CreatedAt,
             CurrentLatitude = technician.CurrentLatitude,
-            CurrentLongitude = technician.CurrentLongitude
+            CurrentLongitude = technician.CurrentLongitude,
+            CurrentGovernorateId = technician.CurrentGovernorateId,
+            CurrentCityId = technician.CurrentCityId
         };
     }
 }
