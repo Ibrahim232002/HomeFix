@@ -28,7 +28,6 @@ import '../repositories/review_repository.dart';
 import '../models/api_dtos.dart';
 
 class AppStateProvider extends ChangeNotifier {
-  // Repositories
   final IServiceRepository _serviceRepo = ServiceRepository();
   final IServiceCategoryRepository _serviceCategoryRepo = ServiceCategoryRepository();
   final IServiceRequestRepository _requestRepo = ServiceRequestRepository();
@@ -41,7 +40,6 @@ class AppStateProvider extends ChangeNotifier {
   final IPaymentRepository _paymentRepo = PaymentRepository();
   final IReviewRepository _reviewRepo = ReviewRepository();
 
-  // Authentication State
   UserModel? _currentUser;
   bool _isLoading = false;
   bool _isLoadingPublic = false;
@@ -50,11 +48,9 @@ class AppStateProvider extends ChangeNotifier {
   String? _apiError;
   String? _categoryError;
 
-  // Navigation State
   int _customerNavIndex = 0;
   int _technicianNavIndex = 0;
 
-  // Domain Cached States
   List<CategoryModel> _categories = [];
   List<ServiceModel> _services = [];
   List<ServiceRequestModel> _customerRequests = [];
@@ -69,13 +65,11 @@ class AppStateProvider extends ChangeNotifier {
   PaymentModel? _activePayment;
   WalletModel? _wallet;
 
-  // Active filters & selections
   String _selectedCategoryId = 'all';
   String _searchQuery = '';
   PromoCodeModel? _appliedPromo;
   TechnicianProfileModel? _currentTechProfile;
 
-  // Getters
   UserModel? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
   UserRole get currentRole => _currentUser?.role ?? UserRole.customer;
@@ -108,8 +102,7 @@ class AppStateProvider extends ChangeNotifier {
   PromoCodeModel? get appliedPromo => _appliedPromo;
   TechnicianProfileModel? get currentTechProfile => _currentTechProfile;
 
-  int get unreadNotificationsCount =>
-      _notifications.where((n) => !n.isRead).length;
+  int get unreadNotificationsCount => _notifications.where((n) => !n.isRead).length;
 
   AppStateProvider() {
     _loadPublicData();
@@ -132,9 +125,7 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> refreshPublicData() async {
-    await _loadPublicData();
-  }
+  Future<void> refreshPublicData() async => _loadPublicData();
 
   Future<void> login(String email, String password, UserRole role) async {
     _isLoading = true;
@@ -210,12 +201,28 @@ class AppStateProvider extends ChangeNotifier {
 
   void logout() {
     _currentUser = null;
+    _errorMessage = null;
+    _apiError = null;
+    _categoryError = null;
     _customerNavIndex = 0;
     _technicianNavIndex = 0;
+    _selectedCategoryId = 'all';
+    _searchQuery = '';
+    _appliedPromo = null;
+    _currentTechProfile = null;
+    _customerRequests = [];
+    _availableTechRequests = [];
+    _bookings = [];
+    _conversations = [];
+    _notifications = [];
+    _savedAddresses = [];
+    _technicianDocuments = [];
+    _payments = [];
+    _activePayment = null;
+    _wallet = null;
     notifyListeners();
   }
 
-  // Navigation Setters
   void setCustomerNavIndex(int index) {
     _customerNavIndex = index;
     notifyListeners();
@@ -226,7 +233,6 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Data Loading
   Future<void> _loadInitialData() async {
     try {
       _services = await _serviceRepo.getServices();
@@ -249,13 +255,11 @@ class AppStateProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  // Category & Filter selection
   Future<void> selectCategory(String categoryId) async {
     _selectedCategoryId = categoryId;
     _categoryError = null;
     _isLoadingCategoryServices = true;
     notifyListeners();
-
     try {
       if (categoryId == 'all') {
         _services = await _serviceRepo.getServices();
@@ -267,10 +271,7 @@ class AppStateProvider extends ChangeNotifier {
             break;
           }
         }
-        _services = await _serviceRepo.getServicesByCategory(
-          categoryId,
-          categoryNameAr: categoryName,
-        );
+        _services = await _serviceRepo.getServicesByCategory(categoryId, categoryNameAr: categoryName);
       }
     } catch (e) {
       _services = [];
@@ -315,7 +316,6 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Request Management
   Future<ServiceRequestModel> createServiceRequest({
     required ServiceModel service,
     required AddressModel address,
@@ -325,7 +325,6 @@ class AppStateProvider extends ChangeNotifier {
     List<ServiceRequestFileModel>? files,
   }) async {
     if (_currentUser == null) throw Exception('User not authenticated');
-
     final requestToCreate = ServiceRequestModel(
       id: 'req-${DateTime.now().millisecondsSinceEpoch}',
       serviceId: service.id,
@@ -351,7 +350,6 @@ class AppStateProvider extends ChangeNotifier {
         ),
       ],
     );
-
     final newReq = await _requestRepo.createRequest(requestToCreate);
     _customerRequests.insert(0, newReq);
     _availableTechRequests.insert(0, newReq);
@@ -368,16 +366,9 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Technician Actions
   Future<void> acceptRequest(ServiceRequestModel request) async {
     if (_currentTechProfile == null) return;
-
-    await _requestRepo.assignTechnician(
-      request.id,
-      _currentTechProfile!.id,
-      _currentTechProfile!.fullName,
-    );
-
+    await _requestRepo.assignTechnician(request.id, _currentTechProfile!.id, _currentTechProfile!.fullName);
     final bookingToCreate = BookingModel(
       id: 'bk-${DateTime.now().millisecondsSinceEpoch}',
       requestId: request.id,
@@ -393,10 +384,8 @@ class AppStateProvider extends ChangeNotifier {
       status: BookingStatus.upcoming,
       createdAt: DateTime.now().toIso8601String(),
     );
-
     final newBooking = await _bookingRepo.createBooking(bookingToCreate);
     _bookings.insert(0, newBooking);
-
     _availableTechRequests.removeWhere((r) => r.id == request.id);
     notifyListeners();
   }
@@ -417,7 +406,6 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Chat Actions
   Future<MessageModel> sendMessage(String conversationId, String text, {String? attachmentUrl}) async {
     if (_currentUser == null) throw Exception('Not logged in');
     final msg = await _chatRepo.sendMessage(
@@ -452,14 +440,12 @@ class AppStateProvider extends ChangeNotifier {
     return conv;
   }
 
-  // Address Actions
   Future<void> addAddress(AddressModel address) async {
     final added = await _userRepo.addAddress(address);
     _savedAddresses.add(added);
     notifyListeners();
   }
 
-  // Wallet Actions
   Future<void> requestWithdrawal(double amount, String iban) async {
     if (_currentUser == null) return;
     await _walletRepo.requestWithdrawal(_currentUser!.id, amount, iban);
@@ -467,7 +453,6 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Notification Actions
   void markNotificationAsRead(String id) {
     _userRepo.markNotificationAsRead(id);
     final index = _notifications.indexWhere((n) => n.id == id);
@@ -487,7 +472,6 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Review Actions
   Future<void> submitReview({
     required String requestId,
     required String technicianId,
@@ -499,7 +483,6 @@ class AppStateProvider extends ChangeNotifier {
     final reqId = int.tryParse(requestId) ?? 0;
     final techId = int.tryParse(technicianId) ?? 0;
     final custId = int.tryParse(_currentUser!.id) ?? 0;
-
     await _reviewRepo.createReview(CreateReviewRequest(
       serviceRequestId: reqId,
       customerId: custId,
@@ -510,7 +493,6 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Document Upload Actions
   Future<void> uploadDocument({
     required String titleAr,
     required String titleEn,
@@ -521,14 +503,12 @@ class AppStateProvider extends ChangeNotifier {
     if (_currentUser == null) return;
     final techId = int.tryParse(_currentTechProfile?.id ?? _currentUser!.id) ?? 0;
     if (techId == 0) return;
-
     try {
       final docDto = await _techRepo.uploadDocument(CreateTechnicianDocumentRequest(
         technicianId: techId,
         documentType: documentType,
         documentUrl: fileUrl ?? 'https://example.com/doc.pdf',
       ));
-
       _technicianDocuments.add(TechnicianDocumentModel(
         id: docDto.id.toString(),
         technicianId: docDto.technicianId.toString(),
@@ -544,7 +524,6 @@ class AppStateProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  // Payment Actions (Egyptian Payment Gateway / Paymob & Cash)
   Future<List<PaymentModel>> loadPaymentsForRequest(String requestId) async {
     final reqId = int.tryParse(requestId) ?? 0;
     if (reqId == 0) return [];
@@ -566,14 +545,10 @@ class AppStateProvider extends ChangeNotifier {
     String paymentType = 'FullService',
   }) async {
     final reqId = int.tryParse(serviceRequestId) ?? 0;
-    if (reqId == 0) {
-      throw Exception('معرف طلب الخدمة غير صالح');
-    }
-
+    if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح');
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
-
     try {
       final response = await _paymentRepo.initiatePayment(
         InitiatePaymentRequest(
@@ -583,13 +558,7 @@ class AppStateProvider extends ChangeNotifier {
           paymentType: paymentType,
         ),
       );
-
-      _activePayment = PaymentModel.fromInitiateResponse(
-        response,
-        serviceRequestId,
-        response.amount,
-      );
-
+      _activePayment = PaymentModel.fromInitiateResponse(response, serviceRequestId, response.amount);
       _isLoading = false;
       notifyListeners();
       return response;
@@ -604,7 +573,6 @@ class AppStateProvider extends ChangeNotifier {
   Future<VerifyPaymentResponse> verifyPayment(int paymentId) async {
     _isLoading = true;
     notifyListeners();
-
     try {
       final verifyResp = await _paymentRepo.verifyPayment(paymentId);
       if (_activePayment != null && _activePayment!.id == paymentId.toString()) {
@@ -614,12 +582,9 @@ class AppStateProvider extends ChangeNotifier {
           paidAt: verifyResp.paidAt,
         );
       }
-
-      // Also reload customer requests if payment was successful to reflect updated status
       if (verifyResp.isSuccess && _currentUser != null) {
         _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
       }
-
       _isLoading = false;
       notifyListeners();
       return verifyResp;
@@ -633,10 +598,8 @@ class AppStateProvider extends ChangeNotifier {
   Future<PaymentDto> selectCashOnDelivery(String serviceRequestId) async {
     final reqId = int.tryParse(serviceRequestId) ?? 0;
     if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح');
-
     _isLoading = true;
     notifyListeners();
-
     try {
       final dto = await _paymentRepo.setCashPayment(reqId);
       _activePayment = PaymentModel.fromDto(dto);
