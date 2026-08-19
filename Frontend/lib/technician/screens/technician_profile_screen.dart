@@ -7,31 +7,10 @@ import '../../core/widgets/rating_stars.dart';
 import '../../models/technician_document_model.dart';
 import '../../services/app_state_provider.dart';
 import '../widgets/technician_service_area_card.dart';
+import '../widgets/technician_current_location_card.dart';
 
 class TechnicianProfileScreen extends StatelessWidget {
   const TechnicianProfileScreen({Key? key}) : super(key: key);
-
-  Future<void> _updateCurrentLocation(BuildContext context) async {
-    final appState = Provider.of<AppStateProvider>(context, listen: false);
-    try {
-      var serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) throw Exception('فعّل خدمة الموقع في الهاتف ثم أعد المحاولة.');
-
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        throw Exception('لم يتم منح صلاحية الموقع. يمكنك متابعة استقبال الطلبات من خلال مناطق الخدمة.');
-      }
-
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
-      await appState.updateTechnicianCurrentLocation(position.latitude, position.longitude);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ موقعك الحالي بنجاح')));
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
-    }
-  }
 
   void _showUploadDocDialog(BuildContext context) {
     final titleController = TextEditingController();
@@ -115,26 +94,7 @@ class TechnicianProfileScreen extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('موقعك الحالي', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
-              const SizedBox(height: 6),
-              Text(
-                tech?.currentLatitude != null && tech?.currentLongitude != null
-                    ? 'آخر موقع محفوظ: ${tech!.currentLatitude!.toStringAsFixed(5)}, ${tech.currentLongitude!.toStringAsFixed(5)}'
-                    : 'لم يتم حفظ موقع حالي. الموقع اختياري حالياً ولا يمنع استقبال الطلبات.',
-                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                onPressed: () => _updateCurrentLocation(context),
-                icon: const Icon(Icons.my_location_rounded),
-                label: const Text('تحديد موقعي الحالي', style: TextStyle(fontFamily: 'Cairo')),
-              ),
-            ]),
-          ),
+          const TechnicianCurrentLocationCard(),
           const SizedBox(height: 16),
           const TechnicianServiceAreaCard(),
           const SizedBox(height: 16),
