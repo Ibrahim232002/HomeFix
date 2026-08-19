@@ -11,18 +11,14 @@ abstract class IServiceRequestRepository {
   Future<ServiceRequestModel> createRequest(ServiceRequestModel request);
   Future<void> updateStatus(String requestId, ServiceRequestStatus newStatus, {String? notes, String? updatedBy});
   Future<void> cancelRequest(String requestId, String reason);
-  Future<void> assignTechnician(String requestId, String technicianId, String technicianName);
 
   Future<ServiceRequestDto> getApiServiceRequestById(int id);
   Future<List<ServiceRequestDto>> getApiServiceRequestsByCustomer(int customerId);
-  Future<List<ServiceRequestDto>> getApiServiceRequestsByStatus(String status);
   Future<ServiceRequestDto> createApiServiceRequest(CreateServiceRequestRequest request);
   Future<void> updateApiServiceRequest(int id, dynamic requestBody);
-
   Future<List<ServiceRequestFileDto>> getFiles(int serviceRequestId);
   Future<ServiceRequestFileDto> addFile(CreateServiceRequestFileRequest request);
   Future<void> deleteFile(int id);
-
   Future<List<ServiceRequestStatusHistoryDto>> getStatusHistory(int serviceRequestId);
   Future<ServiceRequestStatusHistoryDto> addStatusHistory(CreateServiceRequestStatusHistoryRequest request);
 }
@@ -53,15 +49,12 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       if (parsed == null) throw FormatException('وقت الموعد غير صالح: $value');
       return '${parsed.group(1)}:${parsed.group(2)}:${parsed.group(3) ?? '00'}';
     }
-
     var hour = int.parse(match.group(1)!);
     final minute = int.parse(match.group(2)!);
     final period = match.group(3)!;
-
     if (period == 'مساءً' && hour < 12) hour += 12;
     if (period == 'صباحاً' && hour == 12) hour = 0;
     if (period == 'ظهراً' && hour < 12) hour += 12;
-
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}:00';
   }
 
@@ -72,20 +65,21 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerId) async {
     final intId = int.tryParse(customerId);
     if (intId != null) {
-      try {
-        final dtos = await getApiServiceRequestsByCustomer(intId);
-        return dtos.map((d) => _mapDtoToModel(d)).toList();
-      } catch (_) {}
+      final dtos = await getApiServiceRequestsByCustomer(intId);
+      return dtos.map((d) => _mapDtoToModel(d)).toList();
     }
     return [];
   }
 
   @override
   Future<List<ServiceRequestModel>> getAvailableRequestsForTechnicians({String? serviceId, String? governorate}) async {
-    try {
-      final dtos = await getApiServiceRequestsByStatus('Pending');
-      return dtos.map((d) => _mapDtoToModel(d)).toList();
-    } catch (_) {}
+    final response = await _client.get('/api/ServiceRequests/technician-available');
+    if (response is List) {
+      return response
+          .map((item) => ServiceRequestDto.fromJson(item as Map<String, dynamic>))
+          .map((dto) => _mapDtoToModel(dto))
+          .toList();
+    }
     return [];
   }
 
@@ -93,24 +87,18 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   Future<ServiceRequestModel?> getRequestById(String id) async {
     final intId = int.tryParse(id);
     if (intId != null) {
-      try {
-        final dto = await getApiServiceRequestById(intId);
-        return _mapDtoToModel(dto);
-      } catch (_) {}
+      final dto = await getApiServiceRequestById(intId);
+      return _mapDtoToModel(dto);
     }
     return null;
   }
 
   @override
   Future<ServiceRequestModel> createRequest(ServiceRequestModel request) async {
-    final customerId = int.tryParse(request.customerId) ?? 1;
-    final serviceId = int.tryParse(request.serviceId) ?? 1;
-    final addressId = int.tryParse(request.address.id) ?? 1;
-
     final dto = await createApiServiceRequest(CreateServiceRequestRequest(
-      customerId: customerId,
-      serviceId: serviceId,
-      addressId: addressId,
+      customerId: int.tryParse(request.customerId) ?? 1,
+      serviceId: int.tryParse(request.serviceId) ?? 1,
+      addressId: int.tryParse(request.address.id) ?? 1,
       description: request.problemDescription,
       preferredDate: _serializePreferredDate(request.preferredDate),
       preferredTime: _serializePreferredTime(request.preferredTime),
@@ -124,35 +112,21 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   Future<void> updateStatus(String requestId, ServiceRequestStatus newStatus, {String? notes, String? updatedBy}) async {
     final intId = int.tryParse(requestId);
     if (intId != null) {
-      try {
-        await addStatusHistory(CreateServiceRequestStatusHistoryRequest(
-          serviceRequestId: intId,
-          oldStatus: 'Current',
-          newStatus: newStatus.nameStr,
-          changedByUserId: 1,
-        ));
-        await updateApiServiceRequest(intId, {'status': newStatus.nameStr});
-      } catch (_) {}
+      await addStatusHistory(CreateServiceRequestStatusHistoryRequest(
+        serviceRequestId: intId,
+        oldStatus: 'Current',
+        newStatus: newStatus.nameStr,
+        changedByUserId: 1,
+      ));
+      await updateApiServiceRequest(intId, {'status': newStatus.nameStr});
     }
   }
 
   @override
   Future<void> cancelRequest(String requestId, String reason) async {
     final intId = int.tryParse(requestId);
-    if (intId == null || intId <= 0) {
-      throw Exception('معرف طلب الخدمة غير صالح');
-    }
+    if (intId == null || intId <= 0) throw Exception('معرف طلب الخدمة غير صالح');
     await _client.post(ApiConstants.cancelServiceRequest(intId), body: {});
-  }
-
-  @override
-  Future<void> assignTechnician(String requestId, String technicianId, String technicianName) async {
-    final intId = int.tryParse(requestId);
-    if (intId != null) {
-      try {
-        await updateApiServiceRequest(intId, {'status': 'Accepted'});
-      } catch (_) {}
-    }
   }
 
   ServiceRequestModel _mapDtoToModel(ServiceRequestDto dto, {ServiceRequestModel? fallbackModel}) {
@@ -164,18 +138,9 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       customerId: dto.customerId.toString(),
       customerName: fallbackModel?.customerName ?? '',
       customerPhone: fallbackModel?.customerPhone ?? '',
-      address: fallbackModel?.address ??
-          AddressModel(
-            id: dto.addressId.toString(),
-            userId: dto.customerId.toString(),
-            title: '',
-            governorate: '',
-            city: '',
-            street: '',
-            building: '',
-            floor: '',
-            apartment: '',
-          ),
+      address: fallbackModel?.address ?? AddressModel(
+        id: dto.addressId.toString(), userId: dto.customerId.toString(), title: '', governorate: '', city: '', street: '', building: '', floor: '', apartment: '',
+      ),
       problemDescription: dto.description ?? '',
       preferredDate: dto.preferredDate ?? '',
       preferredTime: dto.preferredTime ?? '',
@@ -203,18 +168,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   @override
   Future<List<ServiceRequestDto>> getApiServiceRequestsByCustomer(int customerId) async {
     final response = await _client.get(ApiConstants.serviceRequestsByCustomer(customerId));
-    if (response is List) {
-      return response.map((item) => ServiceRequestDto.fromJson(item as Map<String, dynamic>)).toList();
-    }
-    return [];
-  }
-
-  @override
-  Future<List<ServiceRequestDto>> getApiServiceRequestsByStatus(String status) async {
-    final response = await _client.get(ApiConstants.serviceRequestsByStatus(status));
-    if (response is List) {
-      return response.map((item) => ServiceRequestDto.fromJson(item as Map<String, dynamic>)).toList();
-    }
+    if (response is List) return response.map((item) => ServiceRequestDto.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
@@ -232,9 +186,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   @override
   Future<List<ServiceRequestFileDto>> getFiles(int serviceRequestId) async {
     final response = await _client.get(ApiConstants.serviceRequestFilesByRequest(serviceRequestId));
-    if (response is List) {
-      return response.map((item) => ServiceRequestFileDto.fromJson(item as Map<String, dynamic>)).toList();
-    }
+    if (response is List) return response.map((item) => ServiceRequestFileDto.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
@@ -252,9 +204,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   @override
   Future<List<ServiceRequestStatusHistoryDto>> getStatusHistory(int serviceRequestId) async {
     final response = await _client.get(ApiConstants.serviceRequestStatusHistoryByRequest(serviceRequestId));
-    if (response is List) {
-      return response.map((item) => ServiceRequestStatusHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
-    }
+    if (response is List) return response.map((item) => ServiceRequestStatusHistoryDto.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
