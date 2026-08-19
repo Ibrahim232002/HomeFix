@@ -10,6 +10,7 @@ import '../../models/technician_profile_model.dart';
 import '../../services/app_state_provider.dart';
 import 'service_detail_screen.dart';
 import 'create_request_screen.dart';
+import 'customer_requests_screen.dart';
 import '../../common/screens/notifications_screen.dart';
 import '../../common/screens/chat_detail_screen.dart';
 
@@ -44,6 +45,37 @@ class CustomerHomeScreen extends StatelessWidget {
     } catch (_) {
       return AppColors.primary;
     }
+  }
+
+  bool _isValidRemoteImageUrl(String? value) {
+    final normalized = value?.trim() ?? '';
+    final uri = Uri.tryParse(normalized);
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  Widget _buildTechnicianAvatar(String? imageUrl) {
+    final normalized = imageUrl?.trim() ?? '';
+    if (!_isValidRemoteImageUrl(normalized)) {
+      return const CircleAvatar(
+        radius: 22,
+        child: Icon(Icons.person_rounded, size: 24),
+      );
+    }
+
+    return ClipOval(
+      child: Image.network(
+        normalized,
+        width: 44,
+        height: 44,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const CircleAvatar(
+          radius: 22,
+          child: Icon(Icons.person_rounded, size: 24),
+        ),
+      ),
+    );
   }
 
   @override
@@ -810,10 +842,7 @@ class CustomerHomeScreen extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundImage: NetworkImage(tech.avatarUrl),
-                              ),
+                              _buildTechnicianAvatar(tech.avatarUrl),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
@@ -878,12 +907,16 @@ class CustomerHomeScreen extends StatelessWidget {
                               side: const BorderSide(color: AppColors.primary),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
-                            onPressed: () async {
-                              final conv = await appState.startConversationWithTechnician(technician: tech);
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('للدردشة مع الفني، افتح طلبًا مؤكد الحجز من قائمة طلباتي.'),
+                                ),
+                              );
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => ChatDetailScreen(conversation: conv),
+                                  builder: (_) => const CustomerRequestsScreen(),
                                 ),
                               );
                             },
