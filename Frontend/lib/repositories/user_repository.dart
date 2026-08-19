@@ -48,17 +48,14 @@ class UserRepository implements IUserRepository {
     final authResponse = await _authRepo.login(
       LoginRequest(email: phoneNumber, password: 'password123'),
     );
-    if (authResponse != null) {
-      return UserModel(
-        id: (authResponse.userId ?? 1).toString(),
-        fullName: authResponse.fullName ?? 'المستخدم',
-        phoneNumber: phoneNumber,
-        email: authResponse.email ?? '',
-        role: authResponse.role == 'Technician' ? UserRole.technician : UserRole.customer,
-        createdAt: DateTime.now().toIso8601String(),
-      );
-    }
-    throw Exception('فشل تسجيل الدخول. تحقق من اسم المستخدم أو رقم الهاتف وكلمة المرور');
+    return UserModel(
+      id: (authResponse.userId ?? 1).toString(),
+      fullName: authResponse.fullName ?? 'المستخدم',
+      phoneNumber: phoneNumber,
+      email: authResponse.email ?? '',
+      role: authResponse.role == 'Technician' ? UserRole.technician : UserRole.customer,
+      createdAt: DateTime.now().toIso8601String(),
+    );
   }
 
   @override
@@ -79,6 +76,8 @@ class UserRepository implements IUserRepository {
                   floor: d.floorNumber ?? '',
                   apartment: d.apartmentNumber ?? '',
                   isDefault: d.isDefault,
+                  governorateId: d.governorateId,
+                  cityId: d.cityId,
                 ))
             .toList();
       } catch (_) {}
@@ -90,10 +89,16 @@ class UserRepository implements IUserRepository {
   Future<AddressModel> addAddress(AddressModel address) async {
     final intUserId = int.tryParse(address.userId);
     if (intUserId == null) throw Exception('معرف المستخدم غير صالح');
+    if (address.cityId == null || address.governorateId == null) {
+      throw Exception('يرجى اختيار المحافظة والمدينة');
+    }
+
     final dto = await _addressRepo.createAddress(
       CreateAddressRequest(
         customerId: intUserId,
-        cityId: 1,
+        label: address.title,
+        cityId: address.cityId,
+        governorateId: address.governorateId,
         fullAddress: address.street,
         buildingNumber: address.building,
         floorNumber: address.floor,
