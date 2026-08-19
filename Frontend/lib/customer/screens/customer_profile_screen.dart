@@ -99,16 +99,19 @@ class CustomerProfileScreen extends StatelessWidget {
     String? subtitle,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: (iconColor ?? AppColors.primary).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-        child: Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: (iconColor ?? AppColors.primary).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
+        ),
+        title: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: titleColor ?? AppColors.textPrimary, fontFamily: 'Cairo')),
+        subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')) : null,
+        trailing: const Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
       ),
-      title: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: titleColor ?? AppColors.textPrimary, fontFamily: 'Cairo')),
-      subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')) : null,
-      trailing: const Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
     );
   }
 }
