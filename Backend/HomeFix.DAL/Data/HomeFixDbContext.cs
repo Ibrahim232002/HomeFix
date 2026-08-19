@@ -267,7 +267,6 @@ public partial class HomeFixDbContext : DbContext
             entity.HasIndex(e => e.Token, "UQ__Password__1EB4F81771672048").IsUnique();
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Token).HasMaxLength(500);
 
             entity.HasOne(d => d.User).WithMany(p => p.PasswordResetTokens)
                 .HasForeignKey(d => d.UserId)
@@ -566,6 +565,18 @@ public partial class HomeFixDbContext : DbContext
             entity.Property(e => e.CurrentLongitude).HasColumnType("decimal(10, 7)");
             entity.Property(e => e.ProfileImageUrl).HasMaxLength(500);
 
+            entity.HasOne(d => d.CurrentGovernorate)
+                .WithMany()
+                .HasForeignKey(d => d.CurrentGovernorateId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_TechnicianProfiles_CurrentGovernorate");
+
+            entity.HasOne(d => d.CurrentCity)
+                .WithMany()
+                .HasForeignKey(d => d.CurrentCityId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_TechnicianProfiles_CurrentCity");
+
             entity.HasOne(d => d.User).WithOne(p => p.TechnicianProfile)
                 .HasForeignKey<TechnicianProfile>(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -684,7 +695,6 @@ public partial class HomeFixDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_WalletTransactions_Wallet");
         });
-
 
         modelBuilder.Entity<VerificationCode>(entity =>
         {
@@ -810,9 +820,5 @@ public partial class HomeFixDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_PaymentAttempts_Payment");
         });
-
-        OnModelCreatingPartial(modelBuilder);
     }
-
-    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }
