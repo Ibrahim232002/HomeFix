@@ -28,8 +28,7 @@ class _TechnicianServiceAreaCardState extends State<TechnicianServiceAreaCard> {
   Future<void> _loadGovernorates() async {
     try {
       final appState = Provider.of<AppStateProvider>(context, listen: false);
-      final client = appState;
-      final response = await client.loadGovernoratesForTechnician();
+      final response = await appState.loadGovernoratesForTechnician();
       if (!mounted) return;
       setState(() {
         _governorates = response;
@@ -111,10 +110,13 @@ class _TechnicianServiceAreaCardState extends State<TechnicianServiceAreaCard> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: areas.map((area) => Chip(
-              label: FutureBuilder<String>(future: Provider.of<AppStateProvider>(context, listen: false).getCityName(area.cityId), builder: (_, snapshot) => Text(snapshot.data ?? 'مدينة ${area.cityId}', style: const TextStyle(fontFamily: 'Cairo'))),
-              deleteIcon: const Icon(Icons.close, size: 16),
-              onDeleted: () => Provider.of<AppStateProvider>(context, listen: false).removeTechnicianServiceArea(area.cityId),
+            children: areas.map((area) => FutureBuilder<String>(
+              future: appState.getCityName(area.cityId),
+              builder: (_, snapshot) => Chip(
+                label: Text(snapshot.data ?? 'مدينة ${area.cityId}', style: const TextStyle(fontFamily: 'Cairo')),
+                deleteIcon: const Icon(Icons.close, size: 16),
+                onDeleted: () => appState.removeTechnicianServiceArea(area.cityId),
+              ),
             )).toList(),
           ),
       ]),
