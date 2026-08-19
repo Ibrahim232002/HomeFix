@@ -205,6 +205,7 @@ public partial class HomeFixDbContext : DbContext
             entity.HasIndex(e => e.Token, "UQ__EmailVer__1EB4F817C701AAD0").IsUnique();
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.Token).HasMaxLength(500);
 
             entity.HasOne(d => d.User).WithMany(p => p.EmailVerificationTokens)
                 .HasForeignKey(d => d.UserId)
@@ -266,6 +267,7 @@ public partial class HomeFixDbContext : DbContext
             entity.HasIndex(e => e.Token, "UQ__Password__1EB4F81771672048").IsUnique();
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.Token).HasMaxLength(500);
 
             entity.HasOne(d => d.User).WithMany(p => p.PasswordResetTokens)
                 .HasForeignKey(d => d.UserId)
@@ -329,7 +331,10 @@ public partial class HomeFixDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__RefreshT__3214EC0735665D94");
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.IsRevoked).HasComputedColumnSql("(CONVERT([bit],case when [RevokedAt] IS NULL then (0) else (1) end)", true);
+            entity.Property(e => e.IsRevoked)
+                .HasComputedColumnSql(
+                    "(CONVERT([bit],case when [RevokedAt] IS NULL then (0) else (1) end))",
+                    true);
             entity.Property(e => e.TokenHash)
                 .IsRequired()
                 .HasMaxLength(128);
