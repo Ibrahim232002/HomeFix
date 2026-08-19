@@ -4,15 +4,13 @@ import '../../core/constants/app_colors.dart';
 import '../../services/app_state_provider.dart';
 import '../../repositories/auth_repository.dart';
 import 'customer_addresses_screen.dart';
+import 'customer_support_screen.dart';
 import '../../common/screens/notifications_screen.dart';
 
 class CustomerProfileScreen extends StatelessWidget {
   const CustomerProfileScreen({Key? key}) : super(key: key);
 
   Future<void> _logout(BuildContext context, AppStateProvider appState) async {
-    // AuthRepository always clears local tokens even when the server token is
-    // already revoked/expired. The server failure is intentionally swallowed
-    // there so logout remains safe and idempotent for the user.
     await AuthRepository().logout();
     appState.logout();
   }
@@ -69,7 +67,7 @@ class CustomerProfileScreen extends StatelessWidget {
                   const Divider(height: 1, indent: 56),
                   _buildMenuItem(context, icon: Icons.language_rounded, title: 'لغة التطبيق', subtitle: 'العربية (الافتراضية)', onTap: () {}),
                   const Divider(height: 1, indent: 56),
-                  _buildMenuItem(context, icon: Icons.headset_mic_outlined, title: 'مركز المساعدة وخدمة العملاء', subtitle: 'تواصل معنا على مدار الساعة', onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فريق الدعم الفني في خدمتك دائماً')))),
+                  _buildMenuItem(context, icon: Icons.headset_mic_outlined, title: 'مركز المساعدة وخدمة العملاء', subtitle: 'فتح ومتابعة طلبات الدعم', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerSupportScreen()))),
                 ],
               ),
             ),
