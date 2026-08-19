@@ -29,6 +29,14 @@ public partial class TechnicianProfile
 
     public decimal? CurrentLongitude { get; set; }
 
+    public int? CurrentGovernorateId { get; set; }
+
+    public int? CurrentCityId { get; set; }
+
+    public virtual Governorate? CurrentGovernorate { get; set; }
+
+    public virtual City? CurrentCity { get; set; }
+
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
 
     public virtual ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
