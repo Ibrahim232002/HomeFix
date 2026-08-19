@@ -27,6 +27,9 @@ import '../repositories/payment_repository.dart';
 import '../repositories/review_repository.dart';
 import '../repositories/service_request_offer_repository.dart';
 import '../models/api_dtos.dart';
+import '../models/technician_service_area_model.dart';
+import '../core/constants/api_constants.dart';
+import '../core/network/api_client.dart';
 
 class AppStateProvider extends ChangeNotifier {
   final IServiceRepository _serviceRepo = ServiceRepository();
@@ -70,7 +73,7 @@ class AppStateProvider extends ChangeNotifier {
   String _searchQuery = '';
   PromoCodeModel? _appliedPromo;
   TechnicianProfileModel? _currentTechProfile;
-  List<TechnicianServiceAreaDto> _serviceAreas = [];
+  List<TechnicianServiceAreaModel> _serviceAreas = [];
   List<GovernorateDto> _governorates = [];
 
   UserModel? get currentUser => _currentUser;
@@ -103,7 +106,7 @@ class AppStateProvider extends ChangeNotifier {
   TechnicianProfileModel? get currentTechProfile => _currentTechProfile;
   List<ServiceRequestOfferModel> get customerOffers => _customerOffers;
   List<ServiceRequestOfferModel> get technicianOffers => _technicianOffers;
-  List<TechnicianServiceAreaDto> get serviceAreas => _serviceAreas;
+  List<TechnicianServiceAreaModel> get serviceAreas => _serviceAreas;
   int get unreadNotificationsCount => _notifications.where((n) => !n.isRead).length;
 
   AppStateProvider() { _loadPublicData(); }
@@ -151,22 +154,20 @@ class AppStateProvider extends ChangeNotifier {
 
   Future<List<GovernorateDto>> loadGovernoratesForTechnician() async {
     if (_governorates.isNotEmpty) return _governorates;
-    final client = ApiClient();
-    final response = await client.get(ApiConstants.governorates);
+    final response = await ApiClient().get(ApiConstants.governorates);
     if (response is List) _governorates = response.map((e) => GovernorateDto.fromJson(e as Map<String, dynamic>)).toList();
     return _governorates;
   }
 
   Future<List<CityDto>> loadCitiesForTechnician(int governorateId) async {
-    final client = ApiClient();
-    final response = await client.get(ApiConstants.citiesByGovernorate(governorateId));
+    final response = await ApiClient().get(ApiConstants.citiesByGovernorate(governorateId));
     if (response is List) return response.map((e) => CityDto.fromJson(e as Map<String, dynamic>)).toList();
     return [];
   }
 
   Future<String> getCityName(int cityId) async {
-    final client = ApiClient();
-    try { final response = await client.get(ApiConstants.cityById(cityId)); return CityDto.fromJson(response as Map<String, dynamic>).name ?? 'مدينة $cityId'; } catch (_) { return 'مدينة $cityId'; }
+    try { final response = await ApiClient().get(ApiConstants.cityById(cityId)); return CityDto.fromJson(response as Map<String, dynamic>).name ?? 'مدينة $cityId'; }
+    catch (_) { return 'مدينة $cityId'; }
   }
 
   Future<void> selectCategory(String categoryId) async { _selectedCategoryId = categoryId; _categoryError = null; _isLoadingCategoryServices = true; notifyListeners(); try { if (categoryId == 'all') _services = await _serviceRepo.getServices(); else { final categoryName = _categories.firstWhere((c) => c.id == categoryId, orElse: () => _categories.first).nameAr; _services = await _serviceRepo.getServicesByCategory(categoryId, categoryNameAr: categoryName); } } catch (e) { _services = []; _categoryError = e.toString(); } finally { _isLoadingCategoryServices = false; notifyListeners(); } }
@@ -175,16 +176,13 @@ class AppStateProvider extends ChangeNotifier {
   void removePromoCode() { _appliedPromo = null; notifyListeners(); }
 
   Future<ServiceRequestModel> createServiceRequest({required ServiceModel service, required AddressModel address, required String problemDescription, required String preferredDate, required String preferredTime, List<ServiceRequestFileModel>? files}) async { if (_currentUser == null) throw Exception('User not authenticated'); final requestToCreate = ServiceRequestModel(id: 'req-${DateTime.now().millisecondsSinceEpoch}', serviceId: service.id, serviceNameAr: service.nameAr, categoryNameAr: service.categoryNameAr, customerId: _currentUser!.id, customerName: _currentUser!.fullName, customerPhone: _currentUser!.phoneNumber, address: address, problemDescription: problemDescription, preferredDate: preferredDate, preferredTime: preferredTime, files: files ?? [], status: ServiceRequestStatus.pending, estimatedPriceMin: service.pricing.minPrice, estimatedPriceMax: service.pricing.maxPrice, createdAt: 'الآن', statusHistory: [ServiceRequestStatusHistoryModel(status: ServiceRequestStatus.pending, timestamp: 'الآن', updatedBy: _currentUser!.fullName)]); final newReq = await _requestRepo.createRequest(requestToCreate); _customerRequests.insert(0, newReq); notifyListeners(); return newReq; }
-
   Future<void> cancelRequest(String requestId, String reason) async { await _requestRepo.cancelRequest(requestId, reason); if (_currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); if (isTechnician) _availableTechRequests = await _requestRepo.getAvailableRequestsForTechnicians(); notifyListeners(); }
-
   Future<void> submitTechnicianOffer({required ServiceRequestModel request, required double proposedPrice, String? technicianNote}) async { final requestId = int.tryParse(request.id); if (requestId == null || requestId <= 0) throw Exception('معرف الطلب غير صالح'); final offer = await _offerRepo.createOffer(serviceRequestId: requestId, proposedPrice: proposedPrice, technicianNote: technicianNote); _technicianOffers.insert(0, offer); _availableTechRequests.removeWhere((r) => r.id == request.id); notifyListeners(); }
   Future<void> loadOffersForCustomerRequest(String requestId) async { final id = int.tryParse(requestId); if (id == null || id <= 0) { _customerOffers = []; notifyListeners(); return; } _customerOffers = await _offerRepo.getOffersForRequest(id); notifyListeners(); }
   Future<void> acceptCustomerOffer(String offerId, String requestId) async { final id = int.tryParse(offerId); if (id == null || id <= 0) throw Exception('معرف العرض غير صالح'); await _offerRepo.acceptOffer(id); if (_currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); _customerOffers = await _offerRepo.getOffersForRequest(int.tryParse(requestId) ?? 0); notifyListeners(); }
   Future<void> rejectCustomerOffer(String offerId, String requestId) async { final id = int.tryParse(offerId); if (id == null || id <= 0) throw Exception('معرف العرض غير صالح'); await _offerRepo.rejectOffer(id); _customerOffers = await _offerRepo.getOffersForRequest(int.tryParse(requestId) ?? 0); notifyListeners(); }
-
   Future<void> loadServiceAreas() async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId > 0) { _serviceAreas = await _techRepo.getServiceAreas(techId); notifyListeners(); } }
-  Future<void> addTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.addServiceArea(CreateTechnicianServiceAreaRequest(technicianId: techId, cityId: cityId)); await loadServiceAreas(); }
+  Future<void> addTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.addServiceArea(techId, cityId); await loadServiceAreas(); }
   Future<void> removeTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.deleteServiceArea(techId, cityId); await loadServiceAreas(); }
   Future<void> updateTechnicianCurrentLocation(double latitude, double longitude) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); final dto = await _techRepo.updateApiTechnicianProfile(techId, UpdateTechnicianProfileRequest(currentLatitude: latitude, currentLongitude: longitude)); _currentTechProfile = _currentTechProfile?.copyWith(currentLatitude: dto.currentLatitude, currentLongitude: dto.currentLongitude); notifyListeners(); }
   Future<void> updateBookingStatus(String bookingId, BookingStatus status) async { await _bookingRepo.updateBookingStatus(bookingId, status); if (_currentUser != null) _bookings = await _bookingRepo.getBookingsByTechnician(_currentUser!.id); notifyListeners(); }
