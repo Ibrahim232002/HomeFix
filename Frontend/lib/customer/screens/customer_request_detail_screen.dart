@@ -118,7 +118,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
             ]),
           ),
           const SizedBox(height: 16),
-          if (request.status == ServiceRequestStatus.pending || request.status == ServiceRequestStatus.accepted)
+          if (request.status != ServiceRequestStatus.cancelled)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
@@ -150,7 +150,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
                         const SizedBox(height: 7),
                         Text('حالة العرض: ${offer.status}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
                         if (offer.expiresAt != null && offer.expiresAt!.isNotEmpty) Text('ينتهي: ${offer.expiresAt}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
-                        if (pending && request.status == ServiceRequestStatus.pending) ...[
+                        if (pending && request.status.toString().toLowerCase().contains('pending')) ...[
                           const SizedBox(height: 10),
                           Row(children: [
                             Expanded(child: OutlinedButton(onPressed: acting ? null : () => _rejectOffer(offer.id), child: const Text('رفض', style: TextStyle(fontFamily: 'Cairo')))),
