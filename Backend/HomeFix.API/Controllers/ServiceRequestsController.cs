@@ -115,6 +115,24 @@ public class ServiceRequestsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = serviceRequest.Id }, MapToDto(serviceRequest));
     }
 
+    [HttpPost("{id:int}/cancel")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> Cancel(int id)
+    {
+        var serviceRequest = await _service.GetByIdAsync(id);
+        if (serviceRequest == null) return NotFound();
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var profile = await _customerProfiles.GetByUserIdAsync(userId);
+        if (profile == null || serviceRequest.CustomerId != profile.Id) return Forbid();
+        if (serviceRequest.Status != "Open")
+            return BadRequest(new { message = "Only an open request can be cancelled." });
+
+        serviceRequest.Status = "Cancelled";
+        serviceRequest.UpdatedAt = DateTime.UtcNow;
+        await _service.UpdateAsync(serviceRequest);
+        return Ok(MapToDto(serviceRequest));
+    }
+
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Customer")]
     public async Task<IActionResult> Update(int id, UpdateServiceRequestRequest request)
