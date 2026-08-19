@@ -1,7 +1,7 @@
 class AddressModel {
   final String id;
   final String userId;
-  final String title; // e.g. "المنزل", "المكتب"
+  final String title;
   final String governorate;
   final String city;
   final String street;
@@ -10,6 +10,8 @@ class AddressModel {
   final String apartment;
   final bool isDefault;
   final String? landmark;
+  final int? governorateId;
+  final int? cityId;
 
   AddressModel({
     required this.id,
@@ -23,6 +25,8 @@ class AddressModel {
     required this.apartment,
     this.isDefault = false,
     this.landmark,
+    this.governorateId,
+    this.cityId,
   });
 
   String get fullAddressDescription =>
@@ -40,6 +44,8 @@ class AddressModel {
     String? apartment,
     bool? isDefault,
     String? landmark,
+    int? governorateId,
+    int? cityId,
   }) {
     return AddressModel(
       id: id ?? this.id,
@@ -53,38 +59,40 @@ class AddressModel {
       apartment: apartment ?? this.apartment,
       isDefault: isDefault ?? this.isDefault,
       landmark: landmark ?? this.landmark,
+      governorateId: governorateId ?? this.governorateId,
+      cityId: cityId ?? this.cityId,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'userId': userId,
-      'title': title,
-      'governorate': governorate,
-      'city': city,
-      'street': street,
-      'building': building,
-      'floor': floor,
-      'apartment': apartment,
-      'isDefault': isDefault,
-      'landmark': landmark,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'userId': userId,
+        'title': title,
+        'governorate': governorate,
+        'city': city,
+        'street': street,
+        'building': building,
+        'floor': floor,
+        'apartment': apartment,
+        'isDefault': isDefault,
+        'landmark': landmark,
+        'governorateId': governorateId,
+        'cityId': cityId,
+      };
 
-  factory AddressModel.fromJson(Map<String, dynamic> json) {
-    return AddressModel(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      title: json['title'] ?? '',
-      governorate: json['governorate'] ?? '',
-      city: json['city'] ?? '',
-      street: json['street'] ?? '',
-      building: json['building'] ?? '',
-      floor: json['floor'] ?? '',
-      apartment: json['apartment'] ?? '',
-      isDefault: json['isDefault'] ?? false,
-      landmark: json['landmark'],
-    );
-  }
+  factory AddressModel.fromJson(Map<String, dynamic> json) => AddressModel(
+        id: json['id'] ?? '',
+        userId: json['userId'] ?? '',
+        title: json['title'] ?? '',
+        governorate: json['governorate'] ?? '',
+        city: json['city'] ?? '',
+        street: json['street'] ?? '',
+        building: json['building'] ?? '',
+        floor: json['floor'] ?? '',
+        apartment: json['apartment'] ?? '',
+        isDefault: json['isDefault'] ?? false,
+        landmark: json['landmark'],
+        governorateId: (json['governorateId'] as num?)?.toInt(),
+        cityId: (json['cityId'] as num?)?.toInt(),
+      );
 }
