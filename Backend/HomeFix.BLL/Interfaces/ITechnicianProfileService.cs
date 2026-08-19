@@ -9,4 +9,5 @@ public interface ITechnicianProfileService
     Task<List<TechnicianProfile>> GetActiveTechniciansAsync();
     Task AddAsync(TechnicianProfile technician);
     Task UpdateAsync(TechnicianProfile technician);
+    Task<string?> ValidateCurrentLocationAsync(int? governorateId, int? cityId);
 }
