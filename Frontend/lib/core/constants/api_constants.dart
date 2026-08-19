@@ -81,6 +81,8 @@ class ApiConstants {
   // Service Requests, Files, Status History
   static const String serviceRequests = '/api/ServiceRequests';
   static String serviceRequestById(int id) => '/api/ServiceRequests/$id';
+  static String cancelServiceRequest(int id) =>
+      '/api/ServiceRequests/$id/cancel';
   static String serviceRequestsByCustomer(int customerId) =>
       '/api/ServiceRequests/customer/$customerId';
   static String serviceRequestsByStatus(String status) =>
@@ -122,10 +124,8 @@ class ApiConstants {
   // Reviews
   static const String reviews = '/api/Reviews';
   static String reviewById(int id) => '/api/Reviews/$id';
-  static String reviewByRequest(int serviceRequestId) =>
-      '/api/Reviews/request/$serviceRequestId';
-  static String reviewsByTechnician(int technicianId) =>
-      '/api/Reviews/technician/$technicianId';
+  static String reviewByRequest(int serviceRequestId) => '/api/Reviews/request/$serviceRequestId';
+  static String reviewsByTechnician(int technicianId) => '/api/Reviews/technician/$technicianId';
 
   // Promo Codes & User Promo Codes
   static const String promoCodes = '/api/PromoCodes';
@@ -137,8 +137,7 @@ class ApiConstants {
   static String userPromoCodeById(int id) => '/api/UserPromoCodes/$id';
   static String userPromoCodesByRequest(int serviceRequestId) =>
       '/api/UserPromoCodes/request/$serviceRequestId';
-  static String userPromoCodesByUser(int userId) =>
-      '/api/UserPromoCodes/user/$userId';
+  static String userPromoCodesByUser(int userId) => '/api/UserPromoCodes/user/$userId';
 
   // Technician Wallets, Transactions, Payouts
   static const String technicianWallets = '/api/TechnicianWallets';
@@ -174,16 +173,13 @@ class ApiConstants {
   // Notifications
   static const String notifications = '/api/Notifications';
   static String notificationById(int id) => '/api/Notifications/$id';
-  static String notificationsByUser(int userId) =>
-      '/api/Notifications/user/$userId';
+  static String notificationsByUser(int userId) => '/api/Notifications/user/$userId';
 
   // Support Tickets & Support Messages
   static const String supportTickets = '/api/SupportTickets';
   static String supportTicketById(int id) => '/api/SupportTickets/$id';
-  static String supportTicketsByUser(int userId) =>
-      '/api/SupportTickets/user/$userId';
-  static String supportTicketsByStatus(String status) =>
-      '/api/SupportTickets/status/$status';
+  static String supportTicketsByUser(int userId) => '/api/SupportTickets/user/$userId';
+  static String supportTicketsByStatus(String status) => '/api/SupportTickets/status/$status';
 
   static const String supportMessages = '/api/SupportMessages';
   static String supportMessagesByTicket(int supportTicketId) =>
