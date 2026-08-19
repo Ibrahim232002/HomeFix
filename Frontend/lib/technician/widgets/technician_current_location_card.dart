@@ -56,8 +56,10 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
       }
 
       if (_selectedGovernorateId != null && _selectedCityId != null) {
-        final governorate = _governorates.where((g) => g.id == _selectedGovernorateId).firstOrNull;
-        final city = _cities.where((c) => c.id == _selectedCityId).firstOrNull;
+        final matchingGovernorates = _governorates.where((g) => g.id == _selectedGovernorateId);
+        final matchingCities = _cities.where((c) => c.id == _selectedCityId);
+        final governorate = matchingGovernorates.isEmpty ? null : matchingGovernorates.first;
+        final city = matchingCities.isEmpty ? null : matchingCities.first;
         _savedLocationLabel = '${governorate?.name ?? 'المحافظة'} - ${city?.name ?? 'المدينة'}';
       }
 
@@ -93,8 +95,10 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
 
   Future<void> _saveSelectedCity() async {
     if (_technicianId == null || _selectedGovernorateId == null || _selectedCityId == null) return;
-    final governorate = _governorates.where((g) => g.id == _selectedGovernorateId).firstOrNull;
-    final city = _cities.where((c) => c.id == _selectedCityId).firstOrNull;
+    final matchingGovernorates = _governorates.where((g) => g.id == _selectedGovernorateId);
+    final matchingCities = _cities.where((c) => c.id == _selectedCityId);
+    final governorate = matchingGovernorates.isEmpty ? null : matchingGovernorates.first;
+    final city = matchingCities.isEmpty ? null : matchingCities.first;
     if (governorate == null || city == null) return;
 
     setState(() => _saving = true);
