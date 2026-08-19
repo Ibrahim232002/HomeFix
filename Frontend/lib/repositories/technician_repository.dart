@@ -2,6 +2,7 @@ import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../models/api_dtos.dart';
 import '../models/technician_profile_model.dart';
+import '../models/technician_service_area_model.dart';
 
 abstract class ITechnicianRepository {
   Future<List<TechnicianProfileModel>> getTechnicians();
@@ -9,7 +10,6 @@ abstract class ITechnicianRepository {
   Future<List<TechnicianProfileModel>> getTechniciansByService(String serviceId);
   Future<void> updateAvailability(String technicianId, bool isAvailable);
   Future<void> toggleOnlineStatus(String technicianId);
-
   Future<TechnicianProfileDto> getApiTechnicianProfileById(int id);
   Future<TechnicianProfileDto> getApiTechnicianProfileByUserId(int userId);
   Future<List<TechnicianProfileDto>> getApiActiveTechnicians();
@@ -21,8 +21,8 @@ abstract class ITechnicianRepository {
   Future<List<TechnicianDocumentDto>> getDocuments(int technicianId);
   Future<TechnicianDocumentDto> uploadDocument(CreateTechnicianDocumentRequest request);
   Future<TechnicianDocumentDto> updateDocument(int id, UpdateTechnicianDocumentRequest request);
-  Future<List<TechnicianServiceAreaDto>> getServiceAreas(int technicianId);
-  Future<TechnicianServiceAreaDto> addServiceArea(CreateTechnicianServiceAreaRequest request);
+  Future<List<TechnicianServiceAreaModel>> getServiceAreas(int technicianId);
+  Future<TechnicianServiceAreaModel> addServiceArea(int technicianId, int cityId);
   Future<void> deleteServiceArea(int technicianId, int cityId);
 }
 
@@ -30,47 +30,24 @@ class TechnicianRepository implements ITechnicianRepository {
   final ApiClient _client = ApiClient();
 
   TechnicianProfileModel _mapProfile(TechnicianProfileDto dto) => TechnicianProfileModel(
-        id: dto.id.toString(),
-        userId: dto.userId.toString(),
-        fullName: 'فني #${dto.id}',
-        phoneNumber: '',
-        bio: dto.bio ?? '',
-        avatarUrl: dto.profileImageUrl ?? '',
-        rating: dto.averageRating,
-        reviewCount: dto.totalJobs,
-        completedJobsCount: dto.totalJobs,
-        experienceYears: dto.yearsOfExperience ?? 0,
-        verified: dto.isVerified,
-        isAvailable: dto.isAvailable,
-        specialties: const [],
-        primaryCategory: '',
-        governorates: const [],
-        cities: const [],
-        workingDays: const [],
-        workingHours: WorkingHoursModel(start: '08:00', end: '20:00'),
-        currentLatitude: dto.currentLatitude,
-        currentLongitude: dto.currentLongitude,
+        id: dto.id.toString(), userId: dto.userId.toString(), fullName: 'فني #${dto.id}', phoneNumber: '', bio: dto.bio ?? '',
+        avatarUrl: dto.profileImageUrl ?? '', rating: dto.averageRating, reviewCount: dto.totalJobs, completedJobsCount: dto.totalJobs,
+        experienceYears: dto.yearsOfExperience ?? 0, verified: dto.isVerified, isAvailable: dto.isAvailable,
+        specialties: const [], primaryCategory: '', governorates: const [], cities: const [], workingDays: const [],
+        workingHours: WorkingHoursModel(start: '08:00', end: '20:00'), currentLatitude: dto.currentLatitude, currentLongitude: dto.currentLongitude,
       );
 
   @override
   Future<List<TechnicianProfileModel>> getTechnicians() async {
-    try {
-      final active = await getApiActiveTechnicians();
-      return active.map(_mapProfile).toList();
-    } catch (_) {
-      return [];
-    }
+    final active = await getApiActiveTechnicians();
+    return active.map(_mapProfile).toList();
   }
 
   @override
   Future<TechnicianProfileModel?> getTechnicianById(String id) async {
     final intId = int.tryParse(id);
-    if (intId != null) {
-      try {
-        return _mapProfile(await getApiTechnicianProfileById(intId));
-      } catch (_) {}
-    }
-    return null;
+    if (intId == null) return null;
+    return _mapProfile(await getApiTechnicianProfileById(intId));
   }
 
   @override
@@ -81,10 +58,9 @@ class TechnicianRepository implements ITechnicianRepository {
 
   @override
   Future<void> updateAvailability(String technicianId, bool isAvailable) async {
-    final intId = int.tryParse(technicianId);
-    if (intId != null) {
-      await updateApiTechnicianProfile(intId, UpdateTechnicianProfileRequest(isAvailable: isAvailable));
-    }
+    final id = int.tryParse(technicianId);
+    if (id == null) throw Exception('معرف الفني غير صالح');
+    await updateApiTechnicianProfile(id, UpdateTechnicianProfileRequest(isAvailable: isAvailable));
   }
 
   @override
@@ -163,16 +139,16 @@ class TechnicianRepository implements ITechnicianRepository {
   }
 
   @override
-  Future<List<TechnicianServiceAreaDto>> getServiceAreas(int technicianId) async {
+  Future<List<TechnicianServiceAreaModel>> getServiceAreas(int technicianId) async {
     final response = await _client.get(ApiConstants.technicianServiceAreasByTechnician(technicianId));
-    if (response is List) return response.map((item) => TechnicianServiceAreaDto.fromJson(item as Map<String, dynamic>)).toList();
+    if (response is List) return response.map((item) => TechnicianServiceAreaModel.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
   @override
-  Future<TechnicianServiceAreaDto> addServiceArea(CreateTechnicianServiceAreaRequest request) async {
-    final response = await _client.post(ApiConstants.technicianServiceAreas, body: request.toJson());
-    return TechnicianServiceAreaDto.fromJson(response as Map<String, dynamic>);
+  Future<TechnicianServiceAreaModel> addServiceArea(int technicianId, int cityId) async {
+    final response = await _client.post(ApiConstants.technicianServiceAreas, body: {'technicianId': technicianId, 'cityId': cityId});
+    return TechnicianServiceAreaModel.fromJson(response as Map<String, dynamic>);
   }
 
   @override
