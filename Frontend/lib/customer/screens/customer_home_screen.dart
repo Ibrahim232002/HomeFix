@@ -247,7 +247,7 @@ class CustomerHomeScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: Text(appState.selectedCategoryId == 'all' ? 'الخدمات الأكثر طلباً' : 'خدمات القسم المحدد (${appState.services.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo')))),
             if (appState.isLoadingPublic)
-              const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(32), child: Center(child: Column(children: [CircularProgressIndicator(color: AppColors.primary), SizedBox(height: 12), Text('جاري جلب البيانات من الخادم...', style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontFamily: 'Cairo'))])))
+              const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(32), child: Center(child: Column(children: [CircularProgressIndicator(color: AppColors.primary), SizedBox(height: 12), Text('جاري جلب البيانات من الخادم...', style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontFamily: 'Cairo'))]))))
             else if (appState.apiError != null)
               SliverToBoxAdapter(
                 child: Container(
