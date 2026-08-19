@@ -1,0 +1,50 @@
+name: Temporary EF Drift Fix
+
+on:
+  push:
+    branches:
+      - frontend-technician-location-persistence
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ github.event.head_commit.message != 'fix: restore EF source model mappings' && github.event.head_commit.message != 'chore: remove temporary EF drift fixer' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore EF model mappings
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('Backend/HomeFix.DAL/Data/HomeFixDbContext.cs')
+          s = p.read_text()
+          replacements = [
+              (
+                  '            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");\n\n            entity.HasOne(d => d.User).WithMany(p => p.EmailVerificationTokens)',
+                  '            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");\n            entity.Property(e => e.Token).HasMaxLength(500);\n\n            entity.HasOne(d => d.User).WithMany(p => p.EmailVerificationTokens)'
+              ),
+              (
+                  '            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");\n\n            entity.HasOne(d => d.User).WithMany(p => p.PasswordResetTokens)',
+                  '            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");\n            entity.Property(e => e.Token).HasMaxLength(500);\n\n            entity.HasOne(d => d.User).WithMany(p => p.PasswordResetTokens)'
+              ),
+              (
+                  '            entity.Property(e => e.IsRevoked).HasComputedColumnSql("(CONVERT([bit],case when [RevokedAt] IS NULL then (0) else (1) end)", true);',
+                  '            entity.Property(e => e.IsRevoked)\n                .HasComputedColumnSql(\n                    "(CONVERT([bit],case when [RevokedAt] IS NULL then (0) else (1) end))",\n                    true);'
+              ),
+          ]
+          for old, new in replacements:
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one occurrence, found {count}')
+              s = s.replace(old, new)
+          p.write_text(s)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Backend/HomeFix.DAL/Data/HomeFixDbContext.cs
+          git diff --cached --check
+          git commit -m "fix: restore EF source model mappings"
+          git push
