@@ -15,6 +15,13 @@ abstract class ITechnicianRepository {
   Future<List<TechnicianProfileDto>> getApiActiveTechnicians();
   Future<TechnicianProfileDto> createApiTechnicianProfile(CreateTechnicianProfileRequest request);
   Future<TechnicianProfileDto> updateApiTechnicianProfile(int id, UpdateTechnicianProfileRequest request);
+  Future<TechnicianProfileModel> updateCurrentLocation({
+    required int technicianId,
+    int? currentGovernorateId,
+    int? currentCityId,
+    double? currentLatitude,
+    double? currentLongitude,
+  });
   Future<List<TechnicianAvailabilityDto>> getAvailabilities(int technicianId);
   Future<TechnicianAvailabilityDto> createAvailability(CreateTechnicianAvailabilityRequest request);
   Future<TechnicianAvailabilityDto> updateAvailabilitySlot(int id, UpdateTechnicianAvailabilityRequest request);
@@ -37,6 +44,31 @@ class TechnicianRepository implements ITechnicianRepository {
         workingHours: WorkingHoursModel(start: '08:00', end: '20:00'), currentLatitude: dto.currentLatitude, currentLongitude: dto.currentLongitude,
       );
 
+  TechnicianProfileModel _mapProfileResponse(Map<String, dynamic> json) => TechnicianProfileModel(
+        id: json['id']?.toString() ?? '',
+        userId: json['userId']?.toString() ?? '',
+        fullName: 'فني #${json['id'] ?? ''}',
+        phoneNumber: '',
+        bio: json['bio']?.toString() ?? '',
+        avatarUrl: json['profileImageUrl']?.toString() ?? '',
+        rating: (json['averageRating'] as num?)?.toDouble() ?? 0.0,
+        reviewCount: (json['totalJobs'] as num?)?.toInt() ?? 0,
+        completedJobsCount: (json['totalJobs'] as num?)?.toInt() ?? 0,
+        experienceYears: (json['yearsOfExperience'] as num?)?.toInt() ?? 0,
+        verified: json['isVerified'] ?? false,
+        isAvailable: json['isAvailable'] ?? true,
+        specialties: const [],
+        primaryCategory: '',
+        governorates: const [],
+        cities: const [],
+        workingDays: const [],
+        workingHours: WorkingHoursModel(start: '08:00', end: '20:00'),
+        currentLatitude: (json['currentLatitude'] as num?)?.toDouble(),
+        currentLongitude: (json['currentLongitude'] as num?)?.toDouble(),
+        currentGovernorateId: json['currentGovernorateId'] is int ? json['currentGovernorateId'] : int.tryParse(json['currentGovernorateId']?.toString() ?? ''),
+        currentCityId: json['currentCityId'] is int ? json['currentCityId'] : int.tryParse(json['currentCityId']?.toString() ?? ''),
+      );
+
   @override
   Future<List<TechnicianProfileModel>> getTechnicians() async {
     final active = await getApiActiveTechnicians();
@@ -47,7 +79,8 @@ class TechnicianRepository implements ITechnicianRepository {
   Future<TechnicianProfileModel?> getTechnicianById(String id) async {
     final intId = int.tryParse(id);
     if (intId == null) return null;
-    return _mapProfile(await getApiTechnicianProfileById(intId));
+    final response = await _client.get(ApiConstants.technicianProfileById(intId));
+    return _mapProfileResponse(response as Map<String, dynamic>);
   }
 
   @override
@@ -98,6 +131,27 @@ class TechnicianRepository implements ITechnicianRepository {
   Future<TechnicianProfileDto> updateApiTechnicianProfile(int id, UpdateTechnicianProfileRequest request) async {
     final response = await _client.put(ApiConstants.technicianProfileById(id), body: request.toJson());
     return TechnicianProfileDto.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<TechnicianProfileModel> updateCurrentLocation({
+    required int technicianId,
+    int? currentGovernorateId,
+    int? currentCityId,
+    double? currentLatitude,
+    double? currentLongitude,
+  }) async {
+    final body = <String, dynamic>{
+      'currentGovernorateId': currentGovernorateId,
+      'currentCityId': currentCityId,
+      'currentLatitude': currentLatitude,
+      'currentLongitude': currentLongitude,
+    };
+    final response = await _client.put(
+      ApiConstants.technicianProfileById(technicianId),
+      body: body,
+    );
+    return _mapProfileResponse(response as Map<String, dynamic>);
   }
 
   @override
