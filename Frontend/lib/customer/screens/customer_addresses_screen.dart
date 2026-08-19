@@ -27,12 +27,11 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
   Future<void> _loadGovernorates() async {
     try {
       final values = await _locationRepo.getGovernorates();
-      if (mounted) {
-        setState(() {
-          _governorates = values.where((item) => item.isActive).toList();
-          _loadingGovernorates = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _governorates = values.where((item) => item.isActive).toList();
+        _loadingGovernorates = false;
+      });
     } catch (_) {
       if (mounted) setState(() => _loadingGovernorates = false);
     }
@@ -40,185 +39,14 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
 
   Future<void> _showAddAddressDialog(BuildContext context) async {
     final appState = Provider.of<AppStateProvider>(context, listen: false);
-    final titleController = TextEditingController();
-    final streetController = TextEditingController();
-    final buildingController = TextEditingController();
-    final floorController = TextEditingController();
-    final apartmentController = TextEditingController();
-
-    GovernorateDto? selectedGovernorate;
-    CityDto? selectedCity;
-    List<CityDto> cities = [];
-    bool loadingCities = false;
-    String? locationError;
-
     await showDialog<void>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            Future<void> loadCities(int governorateId) async {
-              setDialogState(() {
-                loadingCities = true;
-                selectedCity = null;
-                locationError = null;
-              });
-              try {
-                final result = await _locationRepo.getCitiesByGovernorate(governorateId);
-                setDialogState(() {
-                  cities = result.where((item) => item.isActive).toList();
-                  loadingCities = false;
-                });
-              } catch (e) {
-                setDialogState(() {
-                  cities = [];
-                  loadingCities = false;
-                  locationError = 'تعذر تحميل المدن المرتبطة بالمحافظة';
-                });
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('إضافة عنوان جديد', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: titleController,
-                      decoration: const InputDecoration(labelText: 'اسم العنوان (مثل: المنزل، العمل)'),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_loadingGovernorates)
-                      const Align(alignment: Alignment.centerRight, child: Padding(padding: EdgeInsets.symmetric(vertical: 12), child: CircularProgressIndicator()))
-                    else
-                      DropdownButtonFormField<GovernorateDto>(
-                        value: selectedGovernorate,
-                        decoration: const InputDecoration(labelText: 'المحافظة'),
-                        items: _governorates
-                            .map((item) => DropdownMenuItem<GovernorateDto>(
-                                  value: item,
-                                  child: Text(item.name ?? 'محافظة #${item.id}'),
-                                ))
-                            .toList(),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          selectedGovernorate = value;
-                          cities = [];
-                          selectedCity = null;
-                          setDialogState(() {});
-                          loadCities(value.id);
-                        },
-                      ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<CityDto>(
-                      value: selectedCity,
-                      decoration: InputDecoration(
-                        labelText: 'المدينة',
-                        helperText: selectedGovernorate == null ? 'اختر المحافظة أولاً' : null,
-                        errorText: locationError,
-                      ),
-                      items: cities
-                          .map((item) => DropdownMenuItem<CityDto>(
-                                value: item,
-                                child: Text(item.name ?? 'مدينة #${item.id}'),
-                              ))
-                          .toList(),
-                      onChanged: selectedGovernorate == null || loadingCities
-                          ? null
-                          : (value) => setDialogState(() => selectedCity = value),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: streetController,
-                      decoration: const InputDecoration(labelText: 'اسم الشارع'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: buildingController,
-                      decoration: const InputDecoration(labelText: 'رقم/تفاصيل المبنى'),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: floorController,
-                            decoration: const InputDecoration(labelText: 'الطابق'),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: apartmentController,
-                            decoration: const InputDecoration(labelText: 'الشقة'),
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                  onPressed: () async {
-                    if (selectedGovernorate == null || selectedCity == null) {
-                      setDialogState(() => locationError = 'يرجى اختيار المحافظة والمدينة');
-                      return;
-                    }
-                    if (streetController.text.trim().isEmpty) {
-                      setDialogState(() => locationError = 'يرجى إدخال اسم الشارع');
-                      return;
-                    }
-
-                    final newAddr = AddressModel(
-                      id: 'addr-${DateTime.now().millisecondsSinceEpoch}',
-                      userId: appState.currentUser?.id ?? '',
-                      title: titleController.text.trim().isEmpty ? 'عنوان جديد' : titleController.text.trim(),
-                      governorate: selectedGovernorate!.name ?? '',
-                      city: selectedCity!.name ?? '',
-                      street: streetController.text.trim(),
-                      building: buildingController.text.trim(),
-                      floor: floorController.text.trim(),
-                      apartment: apartmentController.text.trim(),
-                      isDefault: appState.savedAddresses.isEmpty,
-                      governorateId: selectedGovernorate!.id,
-                      cityId: selectedCity!.id,
-                    );
-
-                    try {
-                      await appState.addAddress(newAddr);
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('تمت إضافة العنوان بنجاح')),
-                      );
-                    } catch (e) {
-                      setDialogState(() => locationError = e.toString().replaceFirst('Exception: ', ''));
-                    }
-                  },
-                  child: const Text('حفظ العنوان', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
-                ),
-              ],
-            );
-          },
-        ),
+      builder: (ctx) => _AddressEditorDialog(
+        locationRepo: _locationRepo,
+        governorates: _governorates,
+        appState: appState,
       ),
     );
-
-    titleController.dispose();
-    streetController.dispose();
-    buildingController.dispose();
-    floorController.dispose();
-    apartmentController.dispose();
   }
 
   @override
@@ -300,6 +128,247 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
         onPressed: () => _showAddAddressDialog(context),
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('إضافة عنوان جديد', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: Colors.white)),
+      ),
+    );
+  }
+}
+
+class _AddressEditorDialog extends StatefulWidget {
+  final IGovernorateCityRepository locationRepo;
+  final List<GovernorateDto> governorates;
+  final AppStateProvider appState;
+
+  const _AddressEditorDialog({
+    required this.locationRepo,
+    required this.governorates,
+    required this.appState,
+  });
+
+  @override
+  State<_AddressEditorDialog> createState() => _AddressEditorDialogState();
+}
+
+class _AddressEditorDialogState extends State<_AddressEditorDialog> {
+  final _labelController = TextEditingController();
+  final _fullAddressController = TextEditingController();
+  final _buildingController = TextEditingController();
+  final _floorController = TextEditingController();
+  final _apartmentController = TextEditingController();
+  final _instructionsController = TextEditingController();
+
+  GovernorateDto? _selectedGovernorate;
+  CityDto? _selectedCity;
+  List<CityDto> _cities = [];
+  bool _loadingCities = false;
+  bool _saving = false;
+  String? _locationError;
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    _fullAddressController.dispose();
+    _buildingController.dispose();
+    _floorController.dispose();
+    _apartmentController.dispose();
+    _instructionsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCities(int governorateId) async {
+    if (!mounted) return;
+    setState(() {
+      _loadingCities = true;
+      _selectedCity = null;
+      _cities = [];
+      _locationError = null;
+    });
+
+    try {
+      final result = await widget.locationRepo.getCitiesByGovernorate(governorateId);
+      if (!mounted) return;
+      setState(() {
+        _cities = result.where((item) => item.isActive).toList();
+        _loadingCities = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _cities = [];
+        _loadingCities = false;
+        _locationError = 'تعذر تحميل المدن المرتبطة بالمحافظة';
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    if (_selectedGovernorate == null || _selectedCity == null) {
+      setState(() => _locationError = 'يرجى اختيار المحافظة والمدينة');
+      return;
+    }
+    if (_fullAddressController.text.trim().isEmpty) {
+      setState(() => _locationError = 'يرجى إدخال العنوان بالتفصيل');
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    final newAddr = AddressModel(
+      id: 'addr-${DateTime.now().millisecondsSinceEpoch}',
+      userId: widget.appState.currentUser?.id ?? '',
+      title: _labelController.text.trim().isEmpty ? 'عنوان جديد' : _labelController.text.trim(),
+      governorate: _selectedGovernorate!.name ?? '',
+      city: _selectedCity!.name ?? '',
+      street: _fullAddressController.text.trim(),
+      building: _buildingController.text.trim(),
+      floor: _floorController.text.trim(),
+      apartment: _apartmentController.text.trim(),
+      isDefault: widget.appState.savedAddresses.isEmpty,
+      governorateId: _selectedGovernorate!.id,
+      cityId: _selectedCity!.id,
+    );
+
+    try {
+      await widget.appState.addAddress(newAddr);
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تمت إضافة العنوان بنجاح')),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _locationError = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('إضافة عنوان جديد', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _labelController,
+                decoration: const InputDecoration(labelText: 'اسم العنوان (مثل: المنزل، العمل)'),
+                enabled: !_saving,
+              ),
+              const SizedBox(height: 8),
+              if (widget.governorates.isEmpty)
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text('لا توجد محافظات متاحة حالياً', style: TextStyle(fontFamily: 'Cairo')),
+                  ),
+                )
+              else
+                DropdownButtonFormField<GovernorateDto>(
+                  value: _selectedGovernorate,
+                  decoration: const InputDecoration(labelText: 'المحافظة'),
+                  items: widget.governorates
+                      .map((item) => DropdownMenuItem<GovernorateDto>(
+                            value: item,
+                            child: Text(item.name ?? 'محافظة #${item.id}'),
+                          ))
+                      .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() => _selectedGovernorate = value);
+                          _loadCities(value.id);
+                        },
+                ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<CityDto>(
+                value: _selectedCity,
+                decoration: InputDecoration(
+                  labelText: 'المدينة',
+                  helperText: _selectedGovernorate == null ? 'اختر المحافظة أولاً' : null,
+                  errorText: _locationError,
+                ),
+                items: _cities
+                    .map((item) => DropdownMenuItem<CityDto>(
+                          value: item,
+                          child: Text(item.name ?? 'مدينة #${item.id}'),
+                        ))
+                    .toList(),
+                onChanged: _saving || _selectedGovernorate == null || _loadingCities
+                    ? null
+                    : (value) => setState(() => _selectedCity = value),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _fullAddressController,
+                decoration: const InputDecoration(labelText: 'العنوان بالتفصيل'),
+                maxLines: 2,
+                enabled: !_saving,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _buildingController,
+                decoration: const InputDecoration(labelText: 'رقم/تفاصيل المبنى'),
+                enabled: !_saving,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _floorController,
+                      decoration: const InputDecoration(labelText: 'الطابق'),
+                      keyboardType: TextInputType.number,
+                      enabled: !_saving,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _apartmentController,
+                      decoration: const InputDecoration(labelText: 'الشقة'),
+                      keyboardType: TextInputType.number,
+                      enabled: !_saving,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _instructionsController,
+                decoration: const InputDecoration(labelText: 'تعليمات إضافية'),
+                maxLines: 2,
+                enabled: !_saving,
+              ),
+              if (_loadingCities) ...[
+                const SizedBox(height: 12),
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : () => Navigator.pop(context),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('حفظ العنوان', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
