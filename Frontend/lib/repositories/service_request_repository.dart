@@ -138,7 +138,11 @@ class ServiceRequestRepository implements IServiceRequestRepository {
 
   @override
   Future<void> cancelRequest(String requestId, String reason) async {
-    await updateStatus(requestId, ServiceRequestStatus.cancelled, notes: reason);
+    final intId = int.tryParse(requestId);
+    if (intId == null || intId <= 0) {
+      throw Exception('معرف طلب الخدمة غير صالح');
+    }
+    await _client.post(ApiConstants.cancelServiceRequest(intId), body: {});
   }
 
   @override
