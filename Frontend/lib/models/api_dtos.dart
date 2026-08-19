@@ -20,7 +20,7 @@ class RegisterRequest {
   final String email;
   final String phoneNumber;
   final String password;
-  final String role;
+  final String role; // "Customer" or "Technician"
 
   RegisterRequest({
     required this.fullName,
@@ -467,45 +467,6 @@ class UpdateTechnicianProfileRequest {
         if (isAvailable != null) 'isAvailable': isAvailable,
         if (currentLatitude != null) 'currentLatitude': currentLatitude,
         if (currentLongitude != null) 'currentLongitude': currentLongitude,
-      };
-}
-
-class TechnicianServiceAreaDto {
-  final int technicianId;
-  final int cityId;
-  final String createdAt;
-
-  TechnicianServiceAreaDto({
-    required this.technicianId,
-    required this.cityId,
-    required this.createdAt,
-  });
-
-  factory TechnicianServiceAreaDto.fromJson(Map<String, dynamic> json) => TechnicianServiceAreaDto(
-        technicianId: json['technicianId'] is int ? json['technicianId'] : int.tryParse(json['technicianId']?.toString() ?? '0') ?? 0,
-        cityId: json['cityId'] is int ? json['cityId'] : int.tryParse(json['cityId']?.toString() ?? '0') ?? 0,
-        createdAt: json['createdAt'] ?? '',
-      );
-
-  Map<String, dynamic> toJson() => {
-        'technicianId': technicianId,
-        'cityId': cityId,
-        'createdAt': createdAt,
-      };
-}
-
-class CreateTechnicianServiceAreaRequest {
-  final int technicianId;
-  final int cityId;
-
-  CreateTechnicianServiceAreaRequest({
-    required this.technicianId,
-    required this.cityId,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'technicianId': technicianId,
-        'cityId': cityId,
       };
 }
 
