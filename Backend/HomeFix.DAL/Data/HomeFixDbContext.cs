@@ -205,7 +205,6 @@ public partial class HomeFixDbContext : DbContext
             entity.HasIndex(e => e.Token, "UQ__EmailVer__1EB4F817C701AAD0").IsUnique();
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Token).HasMaxLength(500);
 
             entity.HasOne(d => d.User).WithMany(p => p.EmailVerificationTokens)
                 .HasForeignKey(d => d.UserId)
@@ -330,7 +329,7 @@ public partial class HomeFixDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__RefreshT__3214EC0735665D94");
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.IsRevoked).HasComputedColumnSql("(CONVERT([bit],case when [RevokedAt] IS NULL then (0) else (1) end))", true);
+            entity.Property(e => e.IsRevoked).HasComputedColumnSql("(CONVERT([bit],case when [RevokedAt] IS NULL then (0) else (1) end)", true);
             entity.Property(e => e.TokenHash)
                 .IsRequired()
                 .HasMaxLength(128);
@@ -758,7 +757,7 @@ public partial class HomeFixDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
 
             entity.HasOne(e => e.User)
-                .WithMany(u => u.UserDevices)
+                .WithMany(p => p.UserDevices)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_UserDevices_User");
@@ -820,5 +819,9 @@ public partial class HomeFixDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_PaymentAttempts_Payment");
         });
+
+        OnModelCreatingPartial(modelBuilder);
     }
+
+    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }
