@@ -54,52 +54,84 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
     }
   }
 
-  void _showCancelDialog(BuildContext context, ServiceRequestModel request) {
+  Future<void> _showCancelDialog(BuildContext context, ServiceRequestModel request) async {
     final reasonController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('إلغاء طلب الخدمة', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('هل أنت متأكد من رغبتك في إلغاء الطلب #${request.id}؟'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'سبب الإلغاء (اختياري)',
-                  hintText: 'مثال: تم حل المشكلة، تغيير الموعد...',
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          bool cancelling = false;
+          String? errorMessage;
+
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: StatefulBuilder(
+              builder: (ctx, setDialogState) => AlertDialog(
+                title: const Text('إلغاء طلب الخدمة', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('هل أنت متأكد من رغبتك في إلغاء الطلب #${request.id}؟'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: reasonController,
+                      enabled: !cancelling,
+                      decoration: InputDecoration(
+                        labelText: 'سبب الإلغاء (اختياري)',
+                        hintText: 'مثال: تم حل المشكلة، تغيير الموعد...',
+                        errorText: errorMessage,
+                      ),
+                    ),
+                  ],
                 ),
+                actions: [
+                  TextButton(
+                    onPressed: cancelling ? null : () => Navigator.pop(ctx),
+                    child: const Text('تراجع', style: TextStyle(fontFamily: 'Cairo')),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                    onPressed: cancelling
+                        ? null
+                        : () async {
+                            setDialogState(() {
+                              cancelling = true;
+                              errorMessage = null;
+                            });
+                            try {
+                              await Provider.of<AppStateProvider>(context, listen: false).cancelRequest(
+                                request.id,
+                                reasonController.text.trim().isNotEmpty
+                                    ? reasonController.text.trim()
+                                    : 'إلغاء بواسطة العميل',
+                              );
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('تم إلغاء الطلب بنجاح')),
+                              );
+                            } catch (e) {
+                              if (!ctx.mounted) return;
+                              setDialogState(() {
+                                cancelling = false;
+                                errorMessage = e.toString().replaceFirst('Exception: ', '');
+                              });
+                            }
+                          },
+                    child: cancelling
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('تأكيد الإلغاء', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
+                  ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('تراجع', style: TextStyle(fontFamily: 'Cairo')),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-              onPressed: () {
-                Provider.of<AppStateProvider>(context, listen: false).cancelRequest(
-                  request.id,
-                  reasonController.text.isNotEmpty ? reasonController.text : 'إلغاء بواسطة العميل',
-                );
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم إلغاء الطلب بنجاح')),
-                );
-              },
-              child: const Text('تأكيد الإلغاء', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
-    );
+          );
+        },
+      );
+    } finally {
+      reasonController.dispose();
+    }
   }
 
   @override
@@ -176,7 +208,6 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header: ID and Status Badge
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -206,8 +237,6 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // Service Name & Category
                       Text(
                         req.serviceNameAr,
                         style: const TextStyle(
@@ -230,8 +259,6 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Date & Address Info Row
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
@@ -260,8 +287,6 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                           ],
                         ),
                       ),
-
-                      // Technician Info (if assigned)
                       if (req.technicianName != null) ...[
                         const SizedBox(height: 12),
                         Row(
@@ -286,33 +311,32 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                                 ],
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.chat_outlined, color: AppColors.primary, size: 20),
-                              onPressed: () async {
-                                final tech = appState.technicians.firstWhere(
-                                  (t) => t.userId == req.technicianId,
-                                  orElse: () => appState.technicians.first,
-                                );
-                                final conv = await appState.startConversationWithTechnician(
-                                  technician: tech,
-                                  serviceNameAr: req.serviceNameAr,
-                                  requestId: req.id,
-                                );
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatDetailScreen(conversation: conv),
-                                  ),
-                                );
-                              },
-                            ),
+                            if (req.status != ServiceRequestStatus.cancelled)
+                              IconButton(
+                                icon: const Icon(Icons.chat_outlined, color: AppColors.primary, size: 20),
+                                onPressed: () async {
+                                  final tech = appState.technicians.firstWhere(
+                                    (t) => t.userId == req.technicianId,
+                                    orElse: () => appState.technicians.first,
+                                  );
+                                  final conv = await appState.startConversationWithTechnician(
+                                    technician: tech,
+                                    serviceNameAr: req.serviceNameAr,
+                                    requestId: req.id,
+                                  );
+                                  if (!context.mounted) return;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatDetailScreen(conversation: conv),
+                                    ),
+                                  );
+                                },
+                              ),
                           ],
                         ),
                       ],
-
                       const Divider(height: 24),
-
-                      // Price and Action Buttons
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
