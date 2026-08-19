@@ -1,5 +1,4 @@
 import '../core/constants/api_constants.dart';
-import '../core/network/api_client.dart';
 import '../models/api_dtos.dart';
 import '../models/service_request_model.dart';
 import '../models/address_model.dart';
@@ -13,7 +12,6 @@ abstract class IServiceRequestRepository {
   Future<void> cancelRequest(String requestId, String reason);
   Future<void> assignTechnician(String requestId, String technicianId, String technicianName);
 
-  // Direct OpenAPI DTO methods
   Future<ServiceRequestDto> getApiServiceRequestById(int id);
   Future<List<ServiceRequestDto>> getApiServiceRequestsByCustomer(int customerId);
   Future<List<ServiceRequestDto>> getApiServiceRequestsByStatus(String status);
@@ -30,6 +28,44 @@ abstract class IServiceRequestRepository {
 
 class ServiceRequestRepository implements IServiceRequestRepository {
   final ApiClient _client = ApiClient();
+
+  String _serializePreferredDate(String value) {
+    switch (value.trim()) {
+      case 'اليوم':
+        return _formatDate(DateTime.now());
+      case 'غداً':
+        return _formatDate(DateTime.now().add(const Duration(days: 1)));
+      case 'بعد غد':
+        return _formatDate(DateTime.now().add(const Duration(days: 2)));
+      default:
+        final parsed = DateTime.tryParse(value.trim());
+        if (parsed == null) throw FormatException('تاريخ الموعد غير صالح: $value');
+        return _formatDate(parsed);
+    }
+  }
+
+  String _serializePreferredTime(String value) {
+    final normalized = value.trim();
+    final match = RegExp(r'^(\d{1,2}):(\d{2})\s*(صباحاً|مساءً|ظهراً)$').firstMatch(normalized);
+    if (match == null) {
+      final parsed = RegExp(r'^(\d{2}):(\d{2})(?::(\d{2}))?$').firstMatch(normalized);
+      if (parsed == null) throw FormatException('وقت الموعد غير صالح: $value');
+      return '${parsed.group(1)}:${parsed.group(2)}:${parsed.group(3) ?? '00'}';
+    }
+
+    var hour = int.parse(match.group(1)!);
+    final minute = int.parse(match.group(2)!);
+    final period = match.group(3)!;
+
+    if (period == 'مساءً' && hour < 12) hour += 12;
+    if (period == 'صباحاً' && hour == 12) hour = 0;
+    if (period == 'ظهراً' && hour < 12) hour += 12;
+
+    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}:00';
+  }
+
+  String _formatDate(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
   @override
   Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerId) async {
@@ -75,8 +111,8 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       serviceId: serviceId,
       addressId: addressId,
       description: request.problemDescription,
-      preferredDate: request.preferredDate,
-      preferredTime: request.preferredTime,
+      preferredDate: _serializePreferredDate(request.preferredDate),
+      preferredTime: _serializePreferredTime(request.preferredTime),
       status: 'Pending',
       visitFee: request.estimatedPriceMin,
     ));
@@ -153,7 +189,6 @@ class ServiceRequestRepository implements IServiceRequestRepository {
     );
   }
 
-  // --- Direct OpenAPI Implementations ---
   @override
   Future<ServiceRequestDto> getApiServiceRequestById(int id) async {
     final response = await _client.get(ApiConstants.serviceRequestById(id));
