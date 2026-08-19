@@ -14,4 +14,6 @@ public class CreateTechnicianProfileRequest
 
     public decimal? CurrentLatitude { get; set; }
     public decimal? CurrentLongitude { get; set; }
+    public int? CurrentGovernorateId { get; set; }
+    public int? CurrentCityId { get; set; }
 }
