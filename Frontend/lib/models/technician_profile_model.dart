@@ -35,6 +35,8 @@ class TechnicianProfileModel {
   final String phoneNumber;
   final double? currentLatitude;
   final double? currentLongitude;
+  final int? currentGovernorateId;
+  final int? currentCityId;
 
   TechnicianProfileModel({
     required this.userId,
@@ -58,6 +60,8 @@ class TechnicianProfileModel {
     required this.phoneNumber,
     this.currentLatitude,
     this.currentLongitude,
+    this.currentGovernorateId,
+    this.currentCityId,
   });
 
   TechnicianProfileModel copyWith({
@@ -82,6 +86,8 @@ class TechnicianProfileModel {
     String? phoneNumber,
     double? currentLatitude,
     double? currentLongitude,
+    int? currentGovernorateId,
+    int? currentCityId,
   }) {
     return TechnicianProfileModel(
       userId: userId ?? this.userId,
@@ -105,6 +111,8 @@ class TechnicianProfileModel {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       currentLatitude: currentLatitude ?? this.currentLatitude,
       currentLongitude: currentLongitude ?? this.currentLongitude,
+      currentGovernorateId: currentGovernorateId ?? this.currentGovernorateId,
+      currentCityId: currentCityId ?? this.currentCityId,
     );
   }
 
@@ -130,6 +138,8 @@ class TechnicianProfileModel {
         'phoneNumber': phoneNumber,
         'currentLatitude': currentLatitude,
         'currentLongitude': currentLongitude,
+        'currentGovernorateId': currentGovernorateId,
+        'currentCityId': currentCityId,
       };
 
   factory TechnicianProfileModel.fromJson(Map<String, dynamic> json) =>
@@ -155,5 +165,7 @@ class TechnicianProfileModel {
         phoneNumber: json['phoneNumber'] ?? '',
         currentLatitude: (json['currentLatitude'] as num?)?.toDouble(),
         currentLongitude: (json['currentLongitude'] as num?)?.toDouble(),
+        currentGovernorateId: json['currentGovernorateId'] is int ? json['currentGovernorateId'] : int.tryParse(json['currentGovernorateId']?.toString() ?? ''),
+        currentCityId: json['currentCityId'] is int ? json['currentCityId'] : int.tryParse(json['currentCityId']?.toString() ?? ''),
       );
 }
