@@ -16,17 +16,20 @@ class TechnicianCurrentLocationCard extends StatefulWidget {
 
 class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocationCard> {
   final TechnicianRepository _technicianRepository = TechnicianRepository();
+
   int? _technicianId;
   int? _selectedGovernorateId;
   int? _selectedCityId;
-  String? _savedLocationLabel;
   List<GovernorateDto> _governorates = [];
   List<CityDto> _cities = [];
   TechnicianProfileModel? _profile;
+
   bool _loading = true;
   bool _loadingCities = false;
   bool _saving = false;
   bool _locating = false;
+  String? _errorMessage;
+  String? _successMessage;
 
   @override
   void initState() {
@@ -36,50 +39,63 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
 
   Future<void> _loadLocationData() async {
     final appState = Provider.of<AppStateProvider>(context, listen: false);
-    _technicianId = int.tryParse(appState.currentTechProfile?.id ?? '0');
-    try {
-      if (_technicianId == null || _technicianId! <= 0) {
-        throw Exception('تعذر تحديد ملف الفني');
-      }
+    final technicianId = int.tryParse(appState.currentTechProfile?.id ?? '0');
 
-      final profile = await _technicianRepository.getTechnicianById(_technicianId!.toString());
+    if (technicianId == null || technicianId <= 0) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorMessage = 'تعذر تحديد ملف الفني.';
+      });
+      return;
+    }
+
+    try {
+      final profile = await _technicianRepository.getTechnicianById(technicianId.toString());
+      if (!mounted) return;
+
       final governorates = await appState.loadGovernoratesForTechnician();
       if (!mounted) return;
 
+      _technicianId = technicianId;
       _profile = profile;
       _governorates = governorates;
       _selectedGovernorateId = profile?.currentGovernorateId;
-      _selectedCityId = profile?.currentCityId;
+      _selectedCityId = null;
+      _cities = [];
 
       if (_selectedGovernorateId != null) {
-        _cities = await appState.loadCitiesForTechnician(_selectedGovernorateId!);
+        final cities = await appState.loadCitiesForTechnician(_selectedGovernorateId!);
+        if (!mounted) return;
+        _cities = cities;
+        if (cities.any((city) => city.id == profile?.currentCityId)) {
+          _selectedCityId = profile?.currentCityId;
+        }
       }
 
-      if (_selectedGovernorateId != null && _selectedCityId != null) {
-        final matchingGovernorates = _governorates.where((g) => g.id == _selectedGovernorateId);
-        final matchingCities = _cities.where((c) => c.id == _selectedCityId);
-        final governorate = matchingGovernorates.isEmpty ? null : matchingGovernorates.first;
-        final city = matchingCities.isEmpty ? null : matchingCities.first;
-        _savedLocationLabel = '${governorate?.name ?? 'المحافظة'} - ${city?.name ?? 'المدينة'}';
-      }
-
-      if (mounted) setState(() => _loading = false);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorMessage = null;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorMessage = _friendlyError(e);
+      });
     }
   }
 
   Future<void> _loadCities(int governorateId) async {
     setState(() {
-      _loadingCities = true;
-      _cities = [];
       _selectedCityId = null;
+      _cities = [];
+      _loadingCities = true;
+      _successMessage = null;
+      _errorMessage = null;
     });
+
     try {
       final cities = await Provider.of<AppStateProvider>(context, listen: false)
           .loadCitiesForTechnician(governorateId);
@@ -88,50 +104,61 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
         _cities = cities;
         _loadingCities = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _loadingCities = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingCities = false;
+        _errorMessage = _friendlyError(e);
+      });
     }
   }
 
-  Future<void> _saveSelectedCity() async {
-    if (_technicianId == null || _selectedGovernorateId == null || _selectedCityId == null) return;
-    final matchingGovernorates = _governorates.where((g) => g.id == _selectedGovernorateId);
-    final matchingCities = _cities.where((c) => c.id == _selectedCityId);
-    final governorate = matchingGovernorates.isEmpty ? null : matchingGovernorates.first;
-    final city = matchingCities.isEmpty ? null : matchingCities.first;
-    if (governorate == null || city == null) return;
+  Future<void> _saveSelectedLocation() async {
+    final technicianId = _technicianId;
+    final governorateId = _selectedGovernorateId;
+    final cityId = _selectedCityId;
+    if (technicianId == null || governorateId == null || cityId == null) return;
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
     try {
       final updated = await _technicianRepository.updateCurrentLocation(
-        technicianId: _technicianId!,
-        currentGovernorateId: _selectedGovernorateId,
-        currentCityId: _selectedCityId,
+        technicianId: technicianId,
+        currentGovernorateId: governorateId,
+        currentCityId: cityId,
         currentLatitude: _profile?.currentLatitude,
         currentLongitude: _profile?.currentLongitude,
       );
       if (!mounted) return;
+
       setState(() {
         _profile = updated;
-        _savedLocationLabel = '${governorate.name ?? 'المحافظة'} - ${city.name ?? 'المدينة'}';
+        _saving = false;
+        _successMessage = 'تم حفظ موقعك الحالي';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حفظ موقعك الحالي')),
-      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _errorMessage = _friendlyError(e);
+      });
     }
   }
 
   Future<void> _useGps() async {
-    if (_technicianId == null) return;
-    setState(() => _locating = true);
+    final technicianId = _technicianId;
+    if (technicianId == null) return;
+
+    setState(() {
+      _locating = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
         throw Exception('فعّل خدمة الموقع في الهاتف ثم أعد المحاولة.');
@@ -141,7 +168,8 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         throw Exception('لم يتم منح صلاحية الموقع. يمكنك اختيار المحافظة والمدينة يدوياً.');
       }
 
@@ -150,124 +178,220 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
       );
 
       final updated = await _technicianRepository.updateCurrentLocation(
-        technicianId: _technicianId!,
+        technicianId: technicianId,
         currentGovernorateId: _selectedGovernorateId,
         currentCityId: _selectedCityId,
         currentLatitude: position.latitude,
         currentLongitude: position.longitude,
       );
-
       if (!mounted) return;
-      setState(() => _profile = updated);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حفظ إحداثيات موقعك الحالي بنجاح')),
-      );
+
+      setState(() {
+        _profile = updated;
+        _locating = false;
+        _successMessage = 'تم تحديث موقعك الجغرافي';
+      });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
-    } finally {
-      if (mounted) setState(() => _locating = false);
+      setState(() {
+        _locating = false;
+        _errorMessage = _friendlyError(e);
+      });
     }
+  }
+
+  String _friendlyError(Object error) =>
+      error.toString().replaceFirst('Exception: ', '').trim();
+
+  String? _currentLocationLabel() {
+    if (_selectedGovernorateId == null || _selectedCityId == null) return null;
+    final governorate = _governorates.where((item) => item.id == _selectedGovernorateId).firstOrNull;
+    final city = _cities.where((item) => item.id == _selectedCityId).firstOrNull;
+    if (governorate == null || city == null) return null;
+    return '${governorate.name ?? 'المحافظة'} - ${city.name ?? 'المدينة'}';
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentLocationLabel = _currentLocationLabel();
+    final hasGps = _profile?.currentLatitude != null && _profile?.currentLongitude != null;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 15, 16, 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'موقع الفني',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
+            'موقع الفني الحالي',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           const Text(
-            'اختر المحافظة والمدينة التي تمثل موقعك الأساسي الحالي. هذا منفصل عن مناطق الخدمة التي تقبل فيها الطلبات.',
+            'حدد المحافظة والمدينة التي تتواجد فيها حاليًا.',
             style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Cairo'),
           ),
           const SizedBox(height: 12),
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_errorMessage != null && _governorates.isEmpty)
+            _InlineState(
+              message: _errorMessage!,
+              actionLabel: 'إعادة المحاولة',
+              onPressed: _loadLocationData,
+            )
           else ...[
+            const Text('المحافظة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
+            const SizedBox(height: 5),
             DropdownButtonFormField<int>(
               value: _selectedGovernorateId,
-              decoration: const InputDecoration(labelText: 'المحافظة'),
+              decoration: const InputDecoration(hintText: 'اختر المحافظة'),
               items: _governorates
-                  .map((g) => DropdownMenuItem<int>(value: g.id, child: Text(g.name ?? 'محافظة')))
+                  .map((governorate) => DropdownMenuItem<int>(
+                        value: governorate.id,
+                        child: Text(governorate.name ?? 'محافظة'),
+                      ))
                   .toList(),
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() => _selectedGovernorateId = value);
-                _loadCities(value);
-              },
+              onChanged: _saving || _locating
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() => _selectedGovernorateId = value);
+                      _loadCities(value);
+                    },
             ),
             const SizedBox(height: 10),
+            const Text('المدينة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
+            const SizedBox(height: 5),
             DropdownButtonFormField<int>(
               value: _selectedCityId,
               decoration: InputDecoration(
-                labelText: 'المدينة',
+                hintText: 'اختر المدينة',
                 suffixIcon: _loadingCities
                     ? const Padding(
                         padding: EdgeInsets.all(12),
-                        child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       )
                     : null,
               ),
               items: _cities
-                  .map((c) => DropdownMenuItem<int>(value: c.id, child: Text(c.name ?? 'مدينة')))
+                  .map((city) => DropdownMenuItem<int>(
+                        value: city.id,
+                        child: Text(city.name ?? 'مدينة'),
+                      ))
                   .toList(),
-              onChanged: _loadingCities ? null : (value) => setState(() => _selectedCityId = value),
+              onChanged: _selectedGovernorateId == null || _loadingCities || _saving || _locating
+                  ? null
+                  : (value) => setState(() {
+                        _selectedCityId = value;
+                        _successMessage = null;
+                        _errorMessage = null;
+                      }),
             ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _saving || _selectedGovernorateId == null || _selectedCityId == null
-                        ? null
-                        : _saveSelectedCity,
-                    icon: const Icon(Icons.save_outlined),
-                    label: const Text('حفظ الموقع', style: TextStyle(fontFamily: 'Cairo')),
-                  ),
+            SizedBox(
+              height: 44,
+              child: ElevatedButton.icon(
+                onPressed: _saving || _locating || _selectedGovernorateId == null || _selectedCityId == null
+                    ? null
+                    : _saveSelectedLocation,
+                icon: _saving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_outlined, size: 19),
+                label: const Text('حفظ الموقع', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: _locating || _saving ? null : _useGps,
+                icon: const Icon(Icons.my_location_rounded, size: 19),
+                label: Text(
+                  _locating ? 'جاري تحديد الموقع...' : 'تحديد موقعي الحالي',
+                  style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _locating ? null : _useGps,
-                    icon: const Icon(Icons.my_location_rounded),
-                    label: Text(
-                      _locating ? 'جاري التحديد...' : 'تحديد موقعي الحالي',
-                      style: const TextStyle(fontFamily: 'Cairo'),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ],
-          if (_savedLocationLabel != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              'الموقع الأساسي المحفوظ: $_savedLocationLabel',
-              style: const TextStyle(fontSize: 11, color: AppColors.technicianPrimary, fontWeight: FontWeight.w700, fontFamily: 'Cairo'),
-            ),
-          ],
-          if (_profile?.currentLatitude != null && _profile?.currentLongitude != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              'GPS: ${_profile!.currentLatitude!.toStringAsFixed(5)}, ${_profile!.currentLongitude!.toStringAsFixed(5)}',
-              style: const TextStyle(fontSize: 10, color: AppColors.textMuted, fontFamily: 'Cairo'),
-            ),
+            if (currentLocationLabel != null && _profile?.currentGovernorateId == _selectedGovernorateId && _profile?.currentCityId == _selectedCityId) ...[
+              const SizedBox(height: 10),
+              Text(
+                '✓ موقعك محفوظ: $currentLocationLabel',
+                style: const TextStyle(fontSize: 11, color: AppColors.technicianPrimary, fontWeight: FontWeight.w700, fontFamily: 'Cairo'),
+              ),
+            ],
+            if (hasGps) ...[
+              const SizedBox(height: 6),
+              Text(
+                'الموقع الجغرافي: ${_profile!.currentLatitude!.toStringAsFixed(5)}, ${_profile!.currentLongitude!.toStringAsFixed(5)}',
+                style: const TextStyle(fontSize: 10, color: AppColors.textMuted, fontFamily: 'Cairo'),
+              ),
+            ],
+            if (_successMessage != null) ...[
+              const SizedBox(height: 8),
+              _MessageBanner(message: _successMessage!, isError: false),
+            ],
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 8),
+              _MessageBanner(message: _errorMessage!, isError: true),
+            ],
           ],
         ],
       ),
     );
   }
+}
+
+class _InlineState extends StatelessWidget {
+  final String message;
+  final String actionLabel;
+  final VoidCallback onPressed;
+
+  const _InlineState({required this.message, required this.actionLabel, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          _MessageBanner(message: message, isError: true),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onPressed, child: Text(actionLabel, style: const TextStyle(fontFamily: 'Cairo'))),
+        ],
+      );
+}
+
+class _MessageBanner extends StatelessWidget {
+  final String message;
+  final bool isError;
+
+  const _MessageBanner({required this.message, required this.isError});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isError ? AppColors.errorLight : AppColors.technicianLight,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Text(
+          message,
+          style: TextStyle(
+            fontSize: 11,
+            color: isError ? AppColors.error : AppColors.technicianPrimary,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Cairo',
+          ),
+        ),
+      );
 }
