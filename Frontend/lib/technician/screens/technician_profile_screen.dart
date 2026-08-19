@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:geolocator/geolocator.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../core/widgets/rating_stars.dart';
@@ -128,13 +127,18 @@ class TechnicianProfileScreen extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 16),
-          Container(
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-            child: ListTile(
-              onTap: () => appState.logout(),
-              leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.errorLight, borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.logout_rounded, color: AppColors.error, size: 20)),
-              title: const Text('تسجيل الخروج', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.error, fontFamily: 'Cairo')),
-              trailing: const Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: Container(
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+              child: ListTile(
+                onTap: () => appState.logout(),
+                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.errorLight, borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.logout_rounded, color: AppColors.error, size: 20)),
+                title: const Text('تسجيل الخروج', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.error, fontFamily: 'Cairo')),
+                trailing: const Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
+              ),
             ),
           ),
           const SizedBox(height: 24),
