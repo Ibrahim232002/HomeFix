@@ -33,6 +33,8 @@ class TechnicianProfileModel {
   final List<String> workingDays;
   final WorkingHoursModel workingHours;
   final String phoneNumber;
+  final double? currentLatitude;
+  final double? currentLongitude;
 
   TechnicianProfileModel({
     required this.userId,
@@ -54,6 +56,8 @@ class TechnicianProfileModel {
     required this.workingDays,
     required this.workingHours,
     required this.phoneNumber,
+    this.currentLatitude,
+    this.currentLongitude,
   });
 
   TechnicianProfileModel copyWith({
@@ -76,6 +80,8 @@ class TechnicianProfileModel {
     List<String>? workingDays,
     WorkingHoursModel? workingHours,
     String? phoneNumber,
+    double? currentLatitude,
+    double? currentLongitude,
   }) {
     return TechnicianProfileModel(
       userId: userId ?? this.userId,
@@ -97,6 +103,8 @@ class TechnicianProfileModel {
       workingDays: workingDays ?? this.workingDays,
       workingHours: workingHours ?? this.workingHours,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      currentLatitude: currentLatitude ?? this.currentLatitude,
+      currentLongitude: currentLongitude ?? this.currentLongitude,
     );
   }
 
@@ -120,6 +128,8 @@ class TechnicianProfileModel {
         'workingDays': workingDays,
         'workingHours': workingHours.toJson(),
         'phoneNumber': phoneNumber,
+        'currentLatitude': currentLatitude,
+        'currentLongitude': currentLongitude,
       };
 
   factory TechnicianProfileModel.fromJson(Map<String, dynamic> json) =>
@@ -143,5 +153,7 @@ class TechnicianProfileModel {
         workingDays: (json['workingDays'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
         workingHours: WorkingHoursModel.fromJson(json['workingHours'] ?? {}),
         phoneNumber: json['phoneNumber'] ?? '',
+        currentLatitude: (json['currentLatitude'] as num?)?.toDouble(),
+        currentLongitude: (json['currentLongitude'] as num?)?.toDouble(),
       );
 }
