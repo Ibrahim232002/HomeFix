@@ -7,6 +7,7 @@ import '../../models/technician_document_model.dart';
 import '../../services/app_state_provider.dart';
 import '../widgets/technician_service_area_card.dart';
 import '../widgets/technician_current_location_card.dart';
+import '../widgets/technician_specialization_card.dart';
 
 class TechnicianProfileScreen extends StatelessWidget {
   const TechnicianProfileScreen({Key? key}) : super(key: key);
@@ -92,6 +93,8 @@ class TechnicianProfileScreen extends StatelessWidget {
               ]),
             ]),
           ),
+          const SizedBox(height: 16),
+          const TechnicianSpecializationCard(),
           const SizedBox(height: 16),
           const TechnicianCurrentLocationCard(),
           const SizedBox(height: 16),
