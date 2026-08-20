@@ -3,6 +3,7 @@
 public class CreateTechnicianProfileRequest
 {
     public int UserId { get; set; }
+    public int CategoryId { get; set; }
 
     public string? Bio { get; set; }
     public string? ProfileImageUrl { get; set; }
