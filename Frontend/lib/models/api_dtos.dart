@@ -276,7 +276,7 @@ class GovernorateDto {
   GovernorateDto({
     required this.id,
     this.name,
-    required this.isActive,
+    this.isActive,
     required this.createdAt,
   });
 
@@ -496,12 +496,14 @@ class ServiceDto {
   final int id;
   final String? name;
   final String? description;
+  final int categoryId;
   final bool isActive;
 
   ServiceDto({
     required this.id,
     this.name,
     this.description,
+    required this.categoryId,
     required this.isActive,
   });
 
@@ -509,6 +511,7 @@ class ServiceDto {
         id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
         name: json['name'],
         description: json['description'],
+        categoryId: json['categoryId'] is int ? json['categoryId'] : int.tryParse(json['categoryId']?.toString() ?? '0') ?? 0,
         isActive: json['isActive'] ?? true,
       );
 
@@ -516,6 +519,7 @@ class ServiceDto {
         'id': id,
         'name': name,
         'description': description,
+        'categoryId': categoryId,
         'isActive': isActive,
       };
 }
