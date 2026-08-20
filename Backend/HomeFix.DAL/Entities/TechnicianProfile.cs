@@ -9,7 +9,7 @@ public partial class TechnicianProfile
 
     public int UserId { get; set; }
 
-    public int CategoryId { get; set; }
+    public int? CategoryId { get; set; }
 
     public string? Bio { get; set; }
 
@@ -35,7 +35,7 @@ public partial class TechnicianProfile
 
     public int? CurrentCityId { get; set; }
 
-    public virtual ServiceCategory Category { get; set; } = null!;
+    public virtual ServiceCategory? Category { get; set; }
 
     public virtual Governorate? CurrentGovernorate { get; set; }
 
