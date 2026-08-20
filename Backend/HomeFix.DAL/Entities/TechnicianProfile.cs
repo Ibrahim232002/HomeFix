@@ -9,6 +9,8 @@ public partial class TechnicianProfile
 
     public int UserId { get; set; }
 
+    public int CategoryId { get; set; }
+
     public string? Bio { get; set; }
 
     public string? ProfileImageUrl { get; set; }
@@ -32,6 +34,8 @@ public partial class TechnicianProfile
     public int? CurrentGovernorateId { get; set; }
 
     public int? CurrentCityId { get; set; }
+
+    public virtual ServiceCategory Category { get; set; } = null!;
 
     public virtual Governorate? CurrentGovernorate { get; set; }
 
