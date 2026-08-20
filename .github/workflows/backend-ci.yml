@@ -7,12 +7,14 @@ on:
       - backend-clean-architecture
       - backend-service-categories
       - feature/technician-services
+      - tmp/ef-regenerate-technician
   pull_request:
     branches:
       - phase-1.5-security-audit
       - backend-clean-architecture
       - backend-service-categories
       - feature/technician-services
+      - tmp/ef-regenerate-technician
 
 env:
   DOTNET_VERSION: 8.0.x
@@ -46,7 +48,7 @@ jobs:
         run: dotnet test Backend/HomeFix.Tests/HomeFix.Tests.csproj --configuration Release --no-build --verbosity normal
 
       - name: Regenerate EF migration and snapshot
-        if: github.ref == 'refs/heads/feature/technician-services'
+        if: github.ref == 'refs/heads/feature/technician-services' || github.ref == 'refs/heads/tmp/ef-regenerate-technician'
         run: |
           dotnet tool install --global dotnet-ef --version 8.0.28
           export PATH="$PATH:$HOME/.dotnet/tools"
@@ -55,8 +57,17 @@ jobs:
           dotnet ef migrations has-pending-model-changes --project Backend/HomeFix.DAL/HomeFix.DAL.csproj --startup-project Backend/HomeFix.API/HomeFix.API.csproj
           dotnet ef migrations list --project Backend/HomeFix.DAL/HomeFix.DAL.csproj --startup-project Backend/HomeFix.API/HomeFix.API.csproj
 
+      - name: Commit regenerated EF artifacts on temporary branch
+        if: github.ref == 'refs/heads/tmp/ef-regenerate-technician'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Backend/HomeFix.DAL/Migrations
+          git commit -m "Regenerate EF migration snapshot for technician category"
+          git push origin HEAD:tmp/ef-regenerate-technician
+
       - name: Upload regenerated EF artifacts
-        if: github.ref == 'refs/heads/feature/technician-services'
+        if: github.ref == 'refs/heads/feature/technician-services' || github.ref == 'refs/heads/tmp/ef-regenerate-technician'
         uses: actions/upload-artifact@v4
         with:
           name: regenerated-technician-category-ef
