@@ -1,49 +1,91 @@
 import 'address_model.dart';
 
 enum BookingStatus {
+  // Legacy name retained for existing UI code. It maps to the backend's Confirmed state.
   upcoming,
+  technicianOnTheWay,
+  arrived,
   inProgress,
+  awaitingCompletion,
   completed,
-  cancelled;
+  cancelled,
+  unknown;
 
   String get displayNameAr {
     switch (this) {
       case BookingStatus.upcoming:
-        return 'قادمة ومجدولة';
+        return 'قادمة ومؤكدة';
+      case BookingStatus.technicianOnTheWay:
+        return 'الفني في الطريق';
+      case BookingStatus.arrived:
+        return 'وصل الفني';
       case BookingStatus.inProgress:
         return 'جاري العمل';
+      case BookingStatus.awaitingCompletion:
+        return 'بانتظار تأكيد العميل';
       case BookingStatus.completed:
         return 'مكتملة';
       case BookingStatus.cancelled:
         return 'ملغاة';
+      case BookingStatus.unknown:
+        return 'حالة غير معروفة';
     }
   }
 
-  static BookingStatus fromString(String val) {
-    switch (val.toLowerCase()) {
+  /// Exact backend Booking.Status value represented by this enum member.
+  String get nameStr {
+    switch (this) {
+      case BookingStatus.upcoming:
+        return 'Confirmed';
+      case BookingStatus.technicianOnTheWay:
+        return 'TechnicianOnTheWay';
+      case BookingStatus.arrived:
+        return 'Arrived';
+      case BookingStatus.inProgress:
+        return 'InProgress';
+      case BookingStatus.awaitingCompletion:
+        return 'AwaitingCompletion';
+      case BookingStatus.completed:
+        return 'Completed';
+      case BookingStatus.cancelled:
+        return 'Cancelled';
+      case BookingStatus.unknown:
+        return 'Unknown';
+    }
+  }
+
+  static BookingStatus fromString(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'confirmed':
+        return BookingStatus.upcoming;
+      case 'technicianontheway':
+        return BookingStatus.technicianOnTheWay;
+      case 'arrived':
+        return BookingStatus.arrived;
       case 'inprogress':
         return BookingStatus.inProgress;
+      case 'awaitingcompletion':
+        return BookingStatus.awaitingCompletion;
       case 'completed':
         return BookingStatus.completed;
       case 'cancelled':
         return BookingStatus.cancelled;
       default:
-        return BookingStatus.upcoming;
+        // Unknown backend values must remain explicitly unknown rather than being
+        // silently converted into a valid booking state.
+        return BookingStatus.unknown;
     }
   }
 
-  String get nameStr {
-    switch (this) {
-      case BookingStatus.upcoming:
-        return 'Upcoming';
-      case BookingStatus.inProgress:
-        return 'InProgress';
-      case BookingStatus.completed:
-        return 'Completed';
-      case BookingStatus.cancelled:
-        return 'Cancelled';
-    }
-  }
+  bool get isPreExecution =>
+      this == BookingStatus.upcoming ||
+      this == BookingStatus.technicianOnTheWay ||
+      this == BookingStatus.arrived;
+
+  bool get isActive =>
+      this != BookingStatus.completed &&
+      this != BookingStatus.cancelled &&
+      this != BookingStatus.unknown;
 }
 
 class BookingModel {
@@ -136,20 +178,20 @@ class BookingModel {
       };
 
   factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
-        id: json['id'] ?? '',
-        requestId: json['requestId'] ?? '',
-        serviceNameAr: json['serviceNameAr'] ?? '',
-        customerName: json['customerName'] ?? '',
-        customerPhone: json['customerPhone'] ?? '',
-        technicianId: json['technicianId'] ?? '',
-        technicianName: json['technicianName'] ?? '',
-        address: AddressModel.fromJson(json['address'] ?? {}),
-        scheduledDate: json['scheduledDate'] ?? '',
-        scheduledTime: json['scheduledTime'] ?? '',
+        id: json['id']?.toString() ?? '',
+        requestId: json['requestId']?.toString() ?? '',
+        serviceNameAr: json['serviceNameAr']?.toString() ?? '',
+        customerName: json['customerName']?.toString() ?? '',
+        customerPhone: json['customerPhone']?.toString() ?? '',
+        technicianId: json['technicianId']?.toString() ?? '',
+        technicianName: json['technicianName']?.toString() ?? '',
+        address: AddressModel.fromJson(json['address'] as Map<String, dynamic>? ?? {}),
+        scheduledDate: json['scheduledDate']?.toString() ?? '',
+        scheduledTime: json['scheduledTime']?.toString() ?? '',
         price: (json['price'] as num?)?.toDouble() ?? 0.0,
-        status: BookingStatus.fromString(json['status'] ?? 'Upcoming'),
-        createdAt: json['createdAt'] ?? '',
-        completedAt: json['completedAt'],
-        notes: json['notes'],
+        status: BookingStatus.fromString(json['status']?.toString() ?? 'Unknown'),
+        createdAt: json['createdAt']?.toString() ?? '',
+        completedAt: json['completedAt']?.toString(),
+        notes: json['notes']?.toString(),
       );
 }
