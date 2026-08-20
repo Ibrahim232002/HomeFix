@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../models/api_dtos.dart';
@@ -7,6 +9,7 @@ import '../models/technician_service_area_model.dart';
 abstract class ITechnicianRepository {
   Future<List<TechnicianProfileModel>> getTechnicians();
   Future<TechnicianProfileModel?> getTechnicianById(String id);
+  Future<TechnicianProfileModel?> getTechnicianByUserId(String userId);
   Future<List<TechnicianProfileModel>> getTechniciansByService(String serviceId);
   Future<void> updateAvailability(String technicianId, bool isAvailable);
   Future<void> toggleOnlineStatus(String technicianId);
@@ -84,6 +87,14 @@ class TechnicianRepository implements ITechnicianRepository {
   }
 
   @override
+  Future<TechnicianProfileModel?> getTechnicianByUserId(String userId) async {
+    final intUserId = int.tryParse(userId);
+    if (intUserId == null) return null;
+    final response = await _client.get(ApiConstants.technicianProfileByUser(intUserId));
+    return _mapProfileResponse(response as Map<String, dynamic>);
+  }
+
+  @override
   Future<List<TechnicianProfileModel>> getTechniciansByService(String serviceId) async {
     final list = await getTechnicians();
     return list.where((t) => t.specialties.contains(serviceId) || t.primaryCategory == serviceId).toList();
@@ -147,11 +158,24 @@ class TechnicianRepository implements ITechnicianRepository {
       'currentLatitude': currentLatitude,
       'currentLongitude': currentLongitude,
     };
-    final response = await _client.put(
-      ApiConstants.technicianProfileById(technicianId),
-      body: body,
-    );
-    return _mapProfileResponse(response as Map<String, dynamic>);
+    debugPrint('[TECH_CURRENT_LOCATION] PUT payload:');
+    debugPrint('currentGovernorateId: $currentGovernorateId');
+    debugPrint('currentCityId: $currentCityId');
+    debugPrint('currentLatitude: $currentLatitude');
+    debugPrint('currentLongitude: $currentLongitude');
+
+    try {
+      final response = await _client.put(
+        ApiConstants.technicianProfileById(technicianId),
+        body: body,
+      );
+      final responseMap = response as Map<String, dynamic>;
+      debugPrint('[TECH_CURRENT_LOCATION] backend response: $responseMap');
+      return _mapProfileResponse(responseMap);
+    } catch (e) {
+      debugPrint('[TECH_CURRENT_LOCATION] backend exception: $e');
+      rethrow;
+    }
   }
 
   @override
