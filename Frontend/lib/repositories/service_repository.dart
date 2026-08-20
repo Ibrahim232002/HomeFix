@@ -12,7 +12,6 @@ abstract class IServiceRepository {
   });
   Future<List<ServiceModel>> searchServices(String query);
 
-  // Direct OpenAPI DTO methods
   Future<List<ServiceDto>> getApiServices();
   Future<ServiceDto> getApiServiceById(int id);
   Future<ServicePricingDto?> getServicePricing({int? serviceId, int? cityId});
@@ -161,15 +160,19 @@ class ServiceRepository implements IServiceRepository {
     return [];
   }
 
+  ServicePricingDto? _globalPricing(List<ServicePricingDto> pricings) {
+    for (final pricing in pricings) {
+      if (pricing.isActive && pricing.cityId == null) return pricing;
+    }
+    return null;
+  }
+
   ServiceModel _mapService(
     ServiceDto dto,
     List<ServicePricingDto> pricings, {
     String categoryNameAr = '',
   }) {
-    final visitFee = pricings.isNotEmpty ? pricings.first.visitFee : 0.0;
-    final minPrice = pricings.isNotEmpty && pricings.first.minimumPrice != null
-        ? pricings.first.minimumPrice!
-        : visitFee;
+    final globalPricing = _globalPricing(pricings);
 
     return ServiceModel(
       id: dto.id.toString(),
@@ -180,11 +183,11 @@ class ServiceRepository implements IServiceRepository {
       descriptionAr: dto.description ?? '',
       descriptionEn: dto.description ?? '',
       pricing: ServicePricingModel(
-        minPrice: minPrice,
-        maxPrice: minPrice,
-        visitFee: visitFee,
+        minPrice: globalPricing?.minimumPrice,
+        maxPrice: globalPricing?.maximumPrice,
+        visitFee: globalPricing?.visitFee,
         currency: 'ج.م',
-        unit: pricings.isNotEmpty ? 'لكل زيارة' : '',
+        unit: globalPricing != null ? 'لكل زيارة' : '',
       ),
       rating: 0.0,
       reviewCount: 0,
