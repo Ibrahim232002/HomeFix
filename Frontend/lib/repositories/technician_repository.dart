@@ -18,6 +18,11 @@ abstract class ITechnicianRepository {
   Future<List<TechnicianProfileDto>> getApiActiveTechnicians();
   Future<TechnicianProfileDto> createApiTechnicianProfile(CreateTechnicianProfileRequest request);
   Future<TechnicianProfileDto> updateApiTechnicianProfile(int id, UpdateTechnicianProfileRequest request);
+  Future<TechnicianProfileModel> updateTechnicianSpecialization(
+    int technicianId, {
+    required int categoryId,
+    required List<int> serviceIds,
+  });
   Future<TechnicianProfileModel> updateCurrentLocation({
     required int technicianId,
     int? currentGovernorateId,
@@ -45,32 +50,43 @@ class TechnicianRepository implements ITechnicianRepository {
         experienceYears: dto.yearsOfExperience ?? 0, verified: dto.isVerified, isAvailable: dto.isAvailable,
         specialties: const [], primaryCategory: '', governorates: const [], cities: const [], workingDays: const [],
         workingHours: WorkingHoursModel(start: '08:00', end: '20:00'), currentLatitude: dto.currentLatitude, currentLongitude: dto.currentLongitude,
+        categoryId: dto.categoryId, categoryName: dto.categoryName, serviceIds: dto.serviceIds,
       );
 
-  TechnicianProfileModel _mapProfileResponse(Map<String, dynamic> json) => TechnicianProfileModel(
-        id: json['id']?.toString() ?? '',
-        userId: json['userId']?.toString() ?? '',
-        fullName: 'فني #${json['id'] ?? ''}',
-        phoneNumber: '',
-        bio: json['bio']?.toString() ?? '',
-        avatarUrl: json['profileImageUrl']?.toString() ?? '',
-        rating: (json['averageRating'] as num?)?.toDouble() ?? 0.0,
-        reviewCount: (json['totalJobs'] as num?)?.toInt() ?? 0,
-        completedJobsCount: (json['totalJobs'] as num?)?.toInt() ?? 0,
-        experienceYears: (json['yearsOfExperience'] as num?)?.toInt() ?? 0,
-        verified: json['isVerified'] ?? false,
-        isAvailable: json['isAvailable'] ?? true,
-        specialties: const [],
-        primaryCategory: '',
-        governorates: const [],
-        cities: const [],
-        workingDays: const [],
-        workingHours: WorkingHoursModel(start: '08:00', end: '20:00'),
-        currentLatitude: (json['currentLatitude'] as num?)?.toDouble(),
-        currentLongitude: (json['currentLongitude'] as num?)?.toDouble(),
-        currentGovernorateId: json['currentGovernorateId'] is int ? json['currentGovernorateId'] : int.tryParse(json['currentGovernorateId']?.toString() ?? ''),
-        currentCityId: json['currentCityId'] is int ? json['currentCityId'] : int.tryParse(json['currentCityId']?.toString() ?? ''),
-      );
+  TechnicianProfileModel _mapProfileResponse(Map<String, dynamic> json) {
+    final serviceIds = (json['serviceIds'] as List<dynamic>? ?? [])
+        .map((value) => value is int ? value : int.tryParse(value.toString()))
+        .whereType<int>()
+        .toList();
+
+    return TechnicianProfileModel(
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      fullName: 'فني #${json['id'] ?? ''}',
+      phoneNumber: '',
+      bio: json['bio']?.toString() ?? '',
+      avatarUrl: json['profileImageUrl']?.toString() ?? '',
+      rating: (json['averageRating'] as num?)?.toDouble() ?? 0.0,
+      reviewCount: (json['totalJobs'] as num?)?.toInt() ?? 0,
+      completedJobsCount: (json['totalJobs'] as num?)?.toInt() ?? 0,
+      experienceYears: (json['yearsOfExperience'] as num?)?.toInt() ?? 0,
+      verified: json['isVerified'] ?? false,
+      isAvailable: json['isAvailable'] ?? true,
+      specialties: const [],
+      primaryCategory: '',
+      governorates: const [],
+      cities: const [],
+      workingDays: const [],
+      workingHours: WorkingHoursModel(start: '08:00', end: '20:00'),
+      currentLatitude: (json['currentLatitude'] as num?)?.toDouble(),
+      currentLongitude: (json['currentLongitude'] as num?)?.toDouble(),
+      currentGovernorateId: json['currentGovernorateId'] is int ? json['currentGovernorateId'] : int.tryParse(json['currentGovernorateId']?.toString() ?? ''),
+      currentCityId: json['currentCityId'] is int ? json['currentCityId'] : int.tryParse(json['currentCityId']?.toString() ?? ''),
+      categoryId: json['categoryId'] is int ? json['categoryId'] : int.tryParse(json['categoryId']?.toString() ?? ''),
+      categoryName: json['categoryName']?.toString(),
+      serviceIds: serviceIds,
+    );
+  }
 
   @override
   Future<List<TechnicianProfileModel>> getTechnicians() async {
@@ -142,6 +158,22 @@ class TechnicianRepository implements ITechnicianRepository {
   Future<TechnicianProfileDto> updateApiTechnicianProfile(int id, UpdateTechnicianProfileRequest request) async {
     final response = await _client.put(ApiConstants.technicianProfileById(id), body: request.toJson());
     return TechnicianProfileDto.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<TechnicianProfileModel> updateTechnicianSpecialization(
+    int technicianId, {
+    required int categoryId,
+    required List<int> serviceIds,
+  }) async {
+    final dto = await updateApiTechnicianProfile(
+      technicianId,
+      UpdateTechnicianProfileRequest(
+        categoryId: categoryId,
+        serviceIds: List<int>.from(serviceIds)..sort(),
+      ),
+    );
+    return _mapProfile(dto);
   }
 
   @override
