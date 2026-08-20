@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 
+T? firstOrNull<T>(Iterable<T> values) => values.isEmpty ? null : values.first;
+
 class TechnicianLocationOption {
   final int id;
   final String label;
