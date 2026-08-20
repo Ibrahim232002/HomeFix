@@ -20,4 +20,6 @@ public partial class ServiceCategory
     public DateTime CreatedAt { get; set; }
 
     public virtual ICollection<Service> Services { get; set; } = new List<Service>();
+
+    public virtual ICollection<TechnicianProfile> Technicians { get; set; } = new List<TechnicianProfile>();
 }
