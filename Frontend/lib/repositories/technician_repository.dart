@@ -113,8 +113,11 @@ class TechnicianRepository implements ITechnicianRepository {
 
   @override
   Future<List<TechnicianProfileModel>> getTechniciansByService(String serviceId) async {
+    final parsedServiceId = int.tryParse(serviceId);
+    if (parsedServiceId == null) return [];
+
     final list = await getTechnicians();
-    return list.where((t) => t.specialties.contains(serviceId) || t.primaryCategory == serviceId).toList();
+    return list.where((t) => t.serviceIds.contains(parsedServiceId)).toList();
   }
 
   @override
