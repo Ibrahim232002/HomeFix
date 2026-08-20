@@ -137,28 +137,17 @@ class AppStateProvider extends ChangeNotifier {
           _savedAddresses = await _userRepo.getUserAddresses(_currentUser!.id);
         } else {
           _availableTechRequests = await _requestRepo.getAvailableRequestsForTechnicians();
-
           final userId = _currentUser!.id;
           final profile = await _techRepo.getTechnicianByUserId(userId);
-          if (profile == null || profile.id.isEmpty) {
-            throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
-          }
-
+          if (profile == null || profile.id.isEmpty) throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
           debugPrint('[TECH_PROFILE_RESOLUTION]');
           debugPrint('userId: $userId');
           debugPrint('technicianProfileId: ${profile.id}');
           debugPrint('profile.userId: ${profile.userId}');
-
-          if (profile.userId != userId) {
-            throw Exception('عدم تطابق هوية ملف الفني مع حساب المستخدم.');
-          }
-
+          if (profile.userId != userId) throw Exception('عدم تطابق هوية ملف الفني مع حساب المستخدم.');
           _currentTechProfile = profile;
           final technicianProfileId = int.tryParse(profile.id);
-          if (technicianProfileId == null || technicianProfileId <= 0) {
-            throw Exception('معرف ملف الفني غير صالح.');
-          }
-
+          if (technicianProfileId == null || technicianProfileId <= 0) throw Exception('معرف ملف الفني غير صالح.');
           _bookings = await _bookingRepo.getBookingsByTechnician(profile.id);
           _wallet = await _walletRepo.getWalletByTechnician(profile.id);
           _serviceAreas = await _techRepo.getServiceAreas(technicianProfileId);
@@ -194,7 +183,7 @@ class AppStateProvider extends ChangeNotifier {
   Future<void> updateBookingStatus(String bookingId, BookingStatus status) async { await _bookingRepo.updateBookingStatus(bookingId, status); if (_currentTechProfile != null) _bookings = await _bookingRepo.getBookingsByTechnician(_currentTechProfile!.id); notifyListeners(); }
   Future<void> toggleTechnicianAvailability() async { if (_currentTechProfile == null) return; final newStatus = !_currentTechProfile!.isAvailable; await _techRepo.updateAvailability(_currentTechProfile!.id, newStatus); _currentTechProfile = _currentTechProfile!.copyWith(isAvailable: newStatus); notifyListeners(); }
   Future<MessageModel> sendMessage(String conversationId, String text, {String? attachmentUrl}) async { if (_currentUser == null) throw Exception('Not logged in'); final msg = await _chatRepo.sendMessage(conversationId: conversationId, sender: _currentUser!, text: text, attachmentUrl: attachmentUrl); _conversations = await _chatRepo.getConversations(_currentUser!.id); notifyListeners(); return msg; }
-  Future<ConversationModel> startConversationWithTechnician({required ServiceRequestModel request, String? serviceNameAr, String? requestId}) async { if (_currentUser == null) throw Exception('Not logged in'); final conv = await _chatRepo.getOrCreateConversation(customerId: _currentUser!.id, customerName: _currentUser!.fullName, customerAvatar: _currentUser!.avatarUrl, technicianId: request.technicianId, technicianName: request.technicianName, technicianAvatar: request.technicianAvatar, serviceNameAr: serviceNameAr, requestId: requestId); _conversations = await _chatRepo.getConversations(_currentUser!.id); notifyListeners(); return conv; }
+  Future<ConversationModel> startConversationWithTechnician({required TechnicianProfileModel technician, String? serviceNameAr, String? requestId}) async { if (_currentUser == null) throw Exception('Not logged in'); final conv = await _chatRepo.getOrCreateConversation(customerId: _currentUser!.id, customerName: _currentUser!.fullName, customerAvatar: _currentUser!.avatarUrl, technicianId: technician.userId, technicianName: technician.fullName, technicianAvatar: technician.avatarUrl, serviceNameAr: serviceNameAr, requestId: requestId); _conversations = await _chatRepo.getConversations(_currentUser!.id); notifyListeners(); return conv; }
   Future<void> addAddress(AddressModel address) async { final added = await _userRepo.addAddress(address); _savedAddresses.add(added); notifyListeners(); }
   Future<void> requestWithdrawal(double amount, String iban) async { if (_currentTechProfile == null) throw Exception('تعذر تحديد ملف الفني'); await _walletRepo.requestWithdrawal(_currentTechProfile!.id, amount, iban); _wallet = await _walletRepo.getWalletByTechnician(_currentTechProfile!.id); notifyListeners(); }
   void markNotificationAsRead(String id) { _userRepo.markNotificationAsRead(id); final index = _notifications.indexWhere((n) => n.id == id); if (index != -1) { _notifications[index] = _notifications[index].copyWith(isRead: true); notifyListeners(); } }
