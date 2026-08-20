@@ -24,26 +24,9 @@ public partial class AddTechnicianProfileCategory : Migration
                 INNER JOIN Services s ON s.Id = ts.ServiceId
                 GROUP BY ts.TechnicianId
                 HAVING COUNT(DISTINCT s.CategoryId) = 1
-            ) category ON category.TechnicianId = tp.Id;
-
-            IF EXISTS (
-                SELECT 1
-                FROM TechnicianProfiles
-                WHERE CategoryId IS NULL
-            )
-            BEGIN
-                THROW 50002, 'TechnicianProfile.CategoryId cannot be initialized safely. One or more existing technicians have no services or services spanning multiple service categories. Resolve the data conflict before applying AddTechnicianProfileCategory.', 1;
-            END;
+            ) category ON category.TechnicianId = tp.Id
+            WHERE tp.CategoryId IS NULL;
             """);
-
-        migrationBuilder.AlterColumn<int>(
-            name: "CategoryId",
-            table: "TechnicianProfiles",
-            type: "int",
-            nullable: false,
-            oldClrType: typeof(int),
-            oldType: "int",
-            oldNullable: true);
 
         migrationBuilder.CreateIndex(
             name: "IX_TechnicianProfiles_CategoryId",
