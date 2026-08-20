@@ -43,42 +43,49 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
 
   Future<void> _loadLocationData() async {
     final appState = Provider.of<AppStateProvider>(context, listen: false);
+    final profile = appState.currentTechProfile;
     final userId = appState.currentUser?.id;
-    final parsedUserId = int.tryParse(userId ?? '');
 
-    if (parsedUserId == null || parsedUserId <= 0) {
+    if (profile == null || profile.id.isEmpty || userId == null || userId.isEmpty) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _errorMessage = 'تعذر تحديد حساب الفني.';
+        _errorMessage = 'تعذر تحديد ملف الفني المرتبط بالحساب.';
       });
       return;
     }
 
-    try {
-      // IMPORTANT: Auth user ID is not the TechnicianProfile primary key.
-      // Resolve the technician profile through /TechnicianProfiles/user/{userId}.
-      final profile = await _repository.getTechnicianByUserId(parsedUserId.toString());
+    if (profile.userId != userId) {
+      debugPrint('[TECH_PROFILE_RESOLUTION] Current Location profile mismatch');
+      debugPrint('userId: $userId');
+      debugPrint('technicianProfileId: ${profile.id}');
+      debugPrint('profile.userId: ${profile.userId}');
       if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorMessage = 'عدم تطابق هوية ملف الفني مع حساب المستخدم.';
+      });
+      return;
+    }
 
+    final technicianId = int.tryParse(profile.id);
+    if (technicianId == null || technicianId <= 0) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorMessage = 'معرف ملف الفني غير صالح.';
+      });
+      return;
+    }
+
+    debugPrint('[TECH_PROFILE_RESOLUTION] Current Location using central profile');
+    debugPrint('userId: $userId');
+    debugPrint('technicianProfileId: ${profile.id}');
+    debugPrint('profile.userId: ${profile.userId}');
+
+    try {
       final governorates = await appState.loadGovernoratesForTechnician();
       if (!mounted) return;
-
-      if (profile == null || int.tryParse(profile.id) == null) {
-        setState(() {
-          _loading = false;
-          _errorMessage = 'تعذر العثور على ملف الفني المرتبط بالحساب.';
-        });
-        return;
-      }
-
-      final technicianId = int.parse(profile.id);
-      debugPrint('[TECH_CURRENT_LOCATION] profile resolved by userId:');
-      debugPrint('userId: $parsedUserId');
-      debugPrint('technicianId: $technicianId');
-      debugPrint('profile.userId: ${profile.userId}');
-      debugPrint('currentGovernorateId: ${profile.currentGovernorateId}');
-      debugPrint('currentCityId: ${profile.currentCityId}');
 
       _profile = profile;
       _technicianId = technicianId;
@@ -490,12 +497,7 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
               const SizedBox(height: 10),
               Text(
                 '✓ موقعك محفوظ: ${_governorateLabel()} - ${_cityLabel()}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.technicianPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Cairo',
-                ),
+                style: const TextStyle(fontSize: 11, color: AppColors.technicianPrimary, fontWeight: FontWeight.w700, fontFamily: 'Cairo'),
               ),
             ],
             if (hasGps) ...[
