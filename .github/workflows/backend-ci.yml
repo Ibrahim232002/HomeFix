@@ -6,11 +6,13 @@ on:
       - phase-1.5-security-audit
       - backend-clean-architecture
       - backend-service-categories
+      - feature/technician-services
   pull_request:
     branches:
       - phase-1.5-security-audit
       - backend-clean-architecture
       - backend-service-categories
+      - feature/technician-services
 
 env:
   DOTNET_VERSION: 8.0.x
@@ -42,3 +44,22 @@ jobs:
 
       - name: Run tests
         run: dotnet test Backend/HomeFix.Tests/HomeFix.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Regenerate EF migration and snapshot
+        if: github.ref == 'refs/heads/feature/technician-services'
+        run: |
+          dotnet tool install --global dotnet-ef --version 8.0.28
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef migrations remove --project Backend/HomeFix.DAL/HomeFix.DAL.csproj --startup-project Backend/HomeFix.API/HomeFix.API.csproj --force
+          dotnet ef migrations add AddTechnicianProfileCategory --project Backend/HomeFix.DAL/HomeFix.DAL.csproj --startup-project Backend/HomeFix.API/HomeFix.API.csproj --output-dir Migrations
+          dotnet ef migrations has-pending-model-changes --project Backend/HomeFix.DAL/HomeFix.DAL.csproj --startup-project Backend/HomeFix.API/HomeFix.API.csproj
+          dotnet ef migrations list --project Backend/HomeFix.DAL/HomeFix.DAL.csproj --startup-project Backend/HomeFix.API/HomeFix.API.csproj
+
+      - name: Upload regenerated EF artifacts
+        if: github.ref == 'refs/heads/feature/technician-services'
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-technician-category-ef
+          path: |
+            Backend/HomeFix.DAL/Migrations/*AddTechnicianProfileCategory*
+            Backend/HomeFix.DAL/Migrations/HomeFixDbContextModelSnapshot.cs
