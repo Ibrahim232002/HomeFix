@@ -14,8 +14,7 @@ public class TechnicianProfilesController : ControllerBase
 {
     private readonly ITechnicianProfileService _service;
 
-    public TechnicianProfilesController(
-        ITechnicianProfileService service)
+    public TechnicianProfilesController(ITechnicianProfileService service)
     {
         _service = service;
     }
@@ -25,10 +24,7 @@ public class TechnicianProfilesController : ControllerBase
     public async Task<ActionResult<TechnicianProfileDto>> GetById(int id)
     {
         var technician = await _service.GetByIdAsync(id);
-
-        if (technician == null)
-            return NotFound();
-
+        if (technician == null) return NotFound();
         return Ok(MapToDto(technician));
     }
 
@@ -37,10 +33,7 @@ public class TechnicianProfilesController : ControllerBase
     public async Task<ActionResult<TechnicianProfileDto>> GetByUserId(int userId)
     {
         var technician = await _service.GetByUserIdAsync(userId);
-
-        if (technician == null)
-            return NotFound();
-
+        if (technician == null) return NotFound();
         return Ok(MapToDto(technician));
     }
 
@@ -54,8 +47,7 @@ public class TechnicianProfilesController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<TechnicianProfileDto>> Create(
-        CreateTechnicianProfileRequest request)
+    public async Task<ActionResult<TechnicianProfileDto>> Create(CreateTechnicianProfileRequest request)
     {
         var validationError = await _service.ValidateCurrentLocationAsync(
             request.CurrentGovernorateId,
@@ -90,10 +82,7 @@ public class TechnicianProfilesController : ControllerBase
 
         await _service.AddAsync(technician);
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = technician.Id },
-            MapToDto(technician));
+        return CreatedAtAction(nameof(GetById), new { id = technician.Id }, MapToDto(technician));
     }
 
     [HttpPut("{id:int}")]
@@ -103,9 +92,7 @@ public class TechnicianProfilesController : ControllerBase
         UpdateTechnicianProfileRequest request)
     {
         var technician = await _service.GetByIdAsync(id);
-
-        if (technician == null)
-            return NotFound();
+        if (technician == null) return NotFound();
 
         if (!User.IsInRole("Admin"))
         {
@@ -113,37 +100,46 @@ public class TechnicianProfilesController : ControllerBase
                 return Forbid();
         }
 
-        var validationError = await _service.ValidateCurrentLocationAsync(
-            request.CurrentGovernorateId,
-            request.CurrentCityId);
-        if (validationError != null)
-            return BadRequest(new { message = validationError });
+        var locationWasRequested = request.CurrentGovernorateId.HasValue || request.CurrentCityId.HasValue;
+        if (locationWasRequested)
+        {
+            var locationError = await _service.ValidateCurrentLocationAsync(
+                request.CurrentGovernorateId,
+                request.CurrentCityId);
+            if (locationError != null)
+                return BadRequest(new { message = locationError });
+
+            technician.CurrentGovernorateId = request.CurrentGovernorateId;
+            technician.CurrentCityId = request.CurrentCityId;
+        }
+
+        if (request.CurrentLatitude.HasValue)
+            technician.CurrentLatitude = request.CurrentLatitude;
+        if (request.CurrentLongitude.HasValue)
+            technician.CurrentLongitude = request.CurrentLongitude;
+        if (request.Bio is not null)
+            technician.Bio = request.Bio;
+        if (request.ProfileImageUrl is not null)
+            technician.ProfileImageUrl = request.ProfileImageUrl;
+        if (request.YearsOfExperience.HasValue)
+            technician.YearsOfExperience = request.YearsOfExperience;
+        if (request.IsAvailable.HasValue)
+            technician.IsAvailable = request.IsAvailable.Value;
+        if (User.IsInRole("Admin") && request.IsVerified.HasValue)
+            technician.IsVerified = request.IsVerified.Value;
 
         var specializationWasRequested = request.CategoryId.HasValue || request.ServiceIds is not null;
         if (specializationWasRequested)
         {
-            validationError = await _service.ApplySpecializationAsync(
+            var specializationError = await _service.ApplySpecializationAsync(
                 technician,
                 request.CategoryId,
                 request.ServiceIds);
-            if (validationError != null)
-                return BadRequest(new { message = validationError });
+            if (specializationError != null)
+                return BadRequest(new { message = specializationError });
         }
 
-        technician.Bio = request.Bio;
-        technician.ProfileImageUrl = request.ProfileImageUrl;
-        technician.YearsOfExperience = request.YearsOfExperience;
-        technician.CurrentLatitude = request.CurrentLatitude;
-        technician.CurrentLongitude = request.CurrentLongitude;
-        technician.CurrentGovernorateId = request.CurrentGovernorateId;
-        technician.CurrentCityId = request.CurrentCityId;
-        technician.IsAvailable = request.IsAvailable;
-
-        if (User.IsInRole("Admin"))
-            technician.IsVerified = request.IsVerified;
-
         await _service.UpdateAsync(technician);
-
         return Ok(MapToDto(technician));
     }
 
