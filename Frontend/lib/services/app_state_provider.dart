@@ -178,7 +178,37 @@ class AppStateProvider extends ChangeNotifier {
   Future<void> applyPromoCode(String code) async { try { final dto = await _promoRepo.getPromoCodeByCode(code); if (dto != null && dto.isActive) _appliedPromo = PromoCodeModel(code: dto.code ?? code, title: dto.code ?? 'كود خصم', discount: '${dto.discountValue.toStringAsFixed(0)}%', maxDiscount: 'خصم ${dto.discountValue}', description: 'كود ترويجي', expiry: dto.endDate, discountPercentage: dto.discountValue, maxDiscountAmount: dto.discountValue); else _appliedPromo = null; } catch (_) { _appliedPromo = null; } notifyListeners(); }
   void removePromoCode() { _appliedPromo = null; notifyListeners(); }
 
-  Future<ServiceRequestModel> createServiceRequest({required ServiceModel service, required AddressModel address, required String problemDescription, required String preferredDate, required String preferredTime, List<ServiceRequestFileModel>? files}) async { if (_currentUser == null) throw Exception('User not authenticated'); final requestToCreate = ServiceRequestModel(id: 'req-${DateTime.now().millisecondsSinceEpoch}', serviceId: service.id, serviceNameAr: service.nameAr, categoryNameAr: service.categoryNameAr, customerId: _currentUser!.id, customerName: _currentUser!.fullName, customerPhone: _currentUser!.phoneNumber, address: address, problemDescription: problemDescription, preferredDate: preferredDate, preferredTime: preferredTime, files: files ?? [], status: ServiceRequestStatus.pending, estimatedPriceMin: service.pricing.minPrice, estimatedPriceMax: service.pricing.maxPrice, createdAt: 'الآن', statusHistory: [ServiceRequestStatusHistoryModel(status: ServiceRequestStatus.pending, timestamp: 'الآن', updatedBy: _currentUser!.fullName)]); final newReq = await _requestRepo.createRequest(requestToCreate); _customerRequests.insert(0, newReq); notifyListeners(); return newReq; }
+  Future<ServiceRequestModel> createServiceRequest({required ServiceModel service, required AddressModel address, required String problemDescription, required String preferredDate, required String preferredTime, List<ServiceRequestFileModel>? files}) async {
+    if (_currentUser == null) throw Exception('User not authenticated');
+    final pricing = service.pricing;
+    if (pricing.visitFee == null || pricing.minPrice == null || pricing.maxPrice == null) {
+      throw Exception('لم يتم تحديد تسعير الخدمة لهذا العنوان. يرجى اختيار عنوان صالح والمحاولة مرة أخرى.');
+    }
+
+    final requestToCreate = ServiceRequestModel(
+      id: 'req-${DateTime.now().millisecondsSinceEpoch}',
+      serviceId: service.id,
+      serviceNameAr: service.nameAr,
+      categoryNameAr: service.categoryNameAr,
+      customerId: _currentUser!.id,
+      customerName: _currentUser!.fullName,
+      customerPhone: _currentUser!.phoneNumber,
+      address: address,
+      problemDescription: problemDescription,
+      preferredDate: preferredDate,
+      preferredTime: preferredTime,
+      files: files ?? [],
+      status: ServiceRequestStatus.pending,
+      estimatedPriceMin: pricing.minPrice,
+      estimatedPriceMax: pricing.maxPrice,
+      createdAt: 'الآن',
+      statusHistory: [ServiceRequestStatusHistoryModel(status: ServiceRequestStatus.pending, timestamp: 'الآن', updatedBy: _currentUser!.fullName)],
+    );
+    final newReq = await _requestRepo.createRequest(requestToCreate);
+    _customerRequests.insert(0, newReq);
+    notifyListeners();
+    return newReq;
+  }
   Future<void> cancelRequest(String requestId, String reason) async { await _requestRepo.cancelRequest(requestId, reason); if (_currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); if (isTechnician) _availableTechRequests = await _requestRepo.getAvailableRequestsForTechnicians(); notifyListeners(); }
 
   Future<void> submitTechnicianOffer({required ServiceRequestModel request, required double proposedPrice, String? technicianNote}) async { final requestId = int.tryParse(request.id); if (requestId == null || requestId <= 0) throw Exception('معرف الطلب غير صالح'); final offer = await _offerRepo.createOffer(serviceRequestId: requestId, proposedPrice: proposedPrice, technicianNote: technicianNote); _technicianOffers.insert(0, offer); _availableTechRequests.removeWhere((r) => r.id == request.id); notifyListeners(); }
