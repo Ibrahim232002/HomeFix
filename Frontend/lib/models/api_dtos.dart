@@ -20,7 +20,7 @@ class RegisterRequest {
   final String email;
   final String phoneNumber;
   final String password;
-  final String role; // "Customer" or "Technician"
+  final String role;
 
   RegisterRequest({
     required this.fullName,
@@ -276,7 +276,7 @@ class GovernorateDto {
   GovernorateDto({
     required this.id,
     this.name,
-    this.isActive,
+    required this.isActive,
     required this.createdAt,
   });
 
@@ -945,12 +945,11 @@ class UpdatePaymentRequest {
       };
 }
 
-/// Request sent by client to initiate real Egyptian payment gateway flow (Paymob)
 class InitiatePaymentRequest {
   final int serviceRequestId;
-  final String paymentMethod; // 'Card', 'MobileWallet', 'CashOnDelivery'
-  final String? walletPhoneNumber; // Required for Mobile Wallets (e.g. Vodafone Cash)
-  final String? paymentType; // 'VisitFee', 'FullService'
+  final String paymentMethod;
+  final String? walletPhoneNumber;
+  final String? paymentType;
 
   InitiatePaymentRequest({
     required this.serviceRequestId,
@@ -962,13 +961,11 @@ class InitiatePaymentRequest {
   Map<String, dynamic> toJson() => {
         'serviceRequestId': serviceRequestId,
         'paymentMethod': paymentMethod,
-        if (walletPhoneNumber != null && walletPhoneNumber!.isNotEmpty)
-          'walletPhoneNumber': walletPhoneNumber,
+        if (walletPhoneNumber != null && walletPhoneNumber!.isNotEmpty) 'walletPhoneNumber': walletPhoneNumber,
         'paymentType': paymentType,
       };
 }
 
-/// Gateway session response returned by ASP.NET Core backend to client
 class InitiatePaymentResponse {
   final int paymentId;
   final double amount;
@@ -998,8 +995,7 @@ class InitiatePaymentResponse {
     this.message = '',
   });
 
-  factory InitiatePaymentResponse.fromJson(Map<String, dynamic> json) =>
-      InitiatePaymentResponse(
+  factory InitiatePaymentResponse.fromJson(Map<String, dynamic> json) => InitiatePaymentResponse(
         paymentId: json['paymentId'] is int ? json['paymentId'] : int.tryParse(json['paymentId']?.toString() ?? '0') ?? 0,
         amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
         currency: json['currency'] ?? 'EGP',
@@ -1030,11 +1026,10 @@ class InitiatePaymentResponse {
       };
 }
 
-/// Server verification response after polling or webhook confirmation
 class VerifyPaymentResponse {
   final int paymentId;
   final int serviceRequestId;
-  final String status; // 'Paid', 'Pending', 'Failed', 'Cancelled'
+  final String status;
   final bool isSuccess;
   final String? transactionReference;
   final String? paidAt;
@@ -1050,8 +1045,7 @@ class VerifyPaymentResponse {
     this.message = '',
   });
 
-  factory VerifyPaymentResponse.fromJson(Map<String, dynamic> json) =>
-      VerifyPaymentResponse(
+  factory VerifyPaymentResponse.fromJson(Map<String, dynamic> json) => VerifyPaymentResponse(
         paymentId: json['paymentId'] is int ? json['paymentId'] : int.tryParse(json['paymentId']?.toString() ?? '0') ?? 0,
         serviceRequestId: json['serviceRequestId'] is int ? json['serviceRequestId'] : int.tryParse(json['serviceRequestId']?.toString() ?? '0') ?? 0,
         status: json['status'] ?? 'Pending',
