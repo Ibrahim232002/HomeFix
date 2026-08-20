@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/constants/api_constants.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/network/api_client.dart';
 import '../../models/category_model.dart';
 import '../../models/service_model.dart';
 import '../../repositories/service_category_repository.dart';
@@ -20,7 +18,6 @@ class TechnicianSpecializationCard extends StatefulWidget {
 class _TechnicianSpecializationCardState extends State<TechnicianSpecializationCard> {
   final ServiceCategoryRepository _categoryRepository = ServiceCategoryRepository();
   final ServiceRepository _serviceRepository = ServiceRepository();
-  final ApiClient _client = ApiClient();
 
   bool _loading = true;
   bool _saving = false;
@@ -39,8 +36,10 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
 
   Future<void> _load() async {
     final appState = context.read<AppStateProvider>();
-    final technicianId = int.tryParse(appState.currentTechProfile?.id ?? '');
+    final profile = appState.currentTechProfile;
+    final technicianId = int.tryParse(profile?.id ?? '');
     if (technicianId == null) {
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = 'تعذر تحديد ملف الفني.';
@@ -49,24 +48,17 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
     }
 
     try {
-      final results = await Future.wait([
-        _categoryRepository.getCategories(),
-        _client.get(ApiConstants.technicianProfileById(technicianId)),
-      ]);
+      final categories = await _categoryRepository.getCategories();
+      if (!mounted) return;
 
-      final categories = results[0] as List<CategoryModel>;
-      final profile = results[1] as Map<String, dynamic>;
-      final categoryId = int.tryParse(profile['categoryId']?.toString() ?? '');
-      final serviceIds = (profile['serviceIds'] as List<dynamic>? ?? [])
-          .map((value) => int.tryParse(value.toString()))
-          .whereType<int>()
-          .toSet();
+      final categoryId = profile?.categoryId;
+      final serviceIds = profile?.serviceIds.toSet() ?? <int>{};
 
       List<ServiceModel> services = [];
-      String categoryName = '';
+      String categoryName = profile?.categoryName ?? '';
       if (categoryId != null) {
         final category = categories.where((item) => int.tryParse(item.id) == categoryId).firstOrNull;
-        categoryName = category?.nameAr ?? profile['categoryName']?.toString() ?? '';
+        categoryName = category?.nameAr ?? categoryName;
         services = await _serviceRepository.getServicesByCategory(
           categoryId.toString(),
           categoryNameAr: categoryName,
@@ -79,15 +71,17 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
         _categoryId = categoryId;
         _categoryName = categoryName;
         _services = services;
-        _selectedServiceIds = serviceIds.intersection(services.map((s) => int.tryParse(s.id)).whereType<int>().toSet());
+        _selectedServiceIds = serviceIds.intersection(
+          services.map((s) => int.tryParse(s.id)).whereType<int>().toSet(),
+        );
         _loading = false;
         _error = null;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'تعذر تحميل التخصص والخدمات. حاول مرة أخرى.';
+        _error = _errorMessageFrom(e);
       });
     }
   }
@@ -168,11 +162,11 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
         _services = services;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'تعذر تحميل خدمات التخصص المحدد.';
+        _error = _errorMessageFrom(e);
       });
     }
   }
@@ -190,8 +184,10 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
   }
 
   Future<void> _save() async {
-    final technicianId = int.tryParse(context.read<AppStateProvider>().currentTechProfile?.id ?? '');
+    final appState = context.read<AppStateProvider>();
+    final technicianId = int.tryParse(appState.currentTechProfile?.id ?? '');
     if (technicianId == null || _categoryId == null) {
+      if (!mounted) return;
       setState(() => _error = 'اختر تخصصًا أولًا.');
       return;
     }
@@ -202,25 +198,34 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
     });
 
     try {
-      await _client.put(
-        ApiConstants.technicianProfileById(technicianId),
-        body: {
-          'categoryId': _categoryId,
-          'serviceIds': _selectedServiceIds.toList()..sort(),
-        },
+      await appState.updateTechnicianSpecialization(
+        categoryId: _categoryId!,
+        serviceIds: _selectedServiceIds.toList()..sort(),
       );
+
       if (!mounted) return;
-      setState(() => _saving = false);
+      final updatedProfile = context.read<AppStateProvider>().currentTechProfile;
+      setState(() {
+        _saving = false;
+        _categoryId = updatedProfile?.categoryId ?? _categoryId;
+        _categoryName = updatedProfile?.categoryName ?? _categoryName;
+        _selectedServiceIds = updatedProfile?.serviceIds.toSet() ?? _selectedServiceIds;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم حفظ التخصص والخدمات بنجاح.', style: TextStyle(fontFamily: 'Cairo'))),
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = 'تعذر حفظ التخصص والخدمات. تأكد من اتصالك وحاول مرة أخرى.';
+        _error = _errorMessageFrom(e);
       });
     }
+  }
+
+  String _errorMessageFrom(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    return message.isEmpty ? 'تعذر حفظ التخصص والخدمات.' : message;
   }
 
   @override
