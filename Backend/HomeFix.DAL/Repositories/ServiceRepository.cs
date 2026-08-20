@@ -35,6 +35,17 @@ public class ServiceRepository
             .ToListAsync();
     }
 
+    public async Task<List<Service>> GetActiveByIdsAsync(IEnumerable<int> ids)
+    {
+        var distinctIds = ids.Distinct().ToList();
+        if (distinctIds.Count == 0)
+            return new List<Service>();
+
+        return await _context.Services
+            .Where(s => s.IsActive && distinctIds.Contains(s.Id))
+            .ToListAsync();
+    }
+
     public async Task AddAsync(Service service)
     {
         await _context.Services.AddAsync(service);
