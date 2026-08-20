@@ -58,17 +58,19 @@ public class TechnicianProfileService : ITechnicianProfileService
     {
         var effectiveCategoryId = categoryId ?? technician.CategoryId;
 
-        if (effectiveCategoryId <= 0)
+        if (!effectiveCategoryId.HasValue || effectiveCategoryId.Value <= 0)
             return "Technician category is required.";
 
-        var category = await _serviceCategoryRepository.GetActiveByIdAsync(effectiveCategoryId);
+        var resolvedCategoryId = effectiveCategoryId.Value;
+
+        var category = await _serviceCategoryRepository.GetActiveByIdAsync(resolvedCategoryId);
         if (category is null)
             return "The selected service category is invalid or inactive.";
 
-        var categoryChanged = technician.CategoryId != effectiveCategoryId;
+        var categoryChanged = technician.CategoryId != resolvedCategoryId;
         if (categoryChanged)
         {
-            technician.CategoryId = effectiveCategoryId;
+            technician.CategoryId = resolvedCategoryId;
 
             // A category change invalidates the old concrete services.
             technician.Services.Clear();
@@ -83,7 +85,7 @@ public class TechnicianProfileService : ITechnicianProfileService
         if (services.Count != requestedIds.Count)
             return "One or more selected services are invalid or inactive.";
 
-        var invalidService = services.FirstOrDefault(s => s.CategoryId != effectiveCategoryId);
+        var invalidService = services.FirstOrDefault(s => s.CategoryId != resolvedCategoryId);
         if (invalidService is not null)
         {
             return "A selected service does not belong to the technician's service category.";
