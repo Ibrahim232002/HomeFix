@@ -37,6 +37,9 @@ class TechnicianProfileModel {
   final double? currentLongitude;
   final int? currentGovernorateId;
   final int? currentCityId;
+  final int? categoryId;
+  final String? categoryName;
+  final List<int> serviceIds;
 
   TechnicianProfileModel({
     required this.userId,
@@ -62,6 +65,9 @@ class TechnicianProfileModel {
     this.currentLongitude,
     this.currentGovernorateId,
     this.currentCityId,
+    this.categoryId,
+    this.categoryName,
+    this.serviceIds = const [],
   });
 
   TechnicianProfileModel copyWith({
@@ -88,6 +94,9 @@ class TechnicianProfileModel {
     double? currentLongitude,
     int? currentGovernorateId,
     int? currentCityId,
+    int? categoryId,
+    String? categoryName,
+    List<int>? serviceIds,
   }) {
     return TechnicianProfileModel(
       userId: userId ?? this.userId,
@@ -113,6 +122,9 @@ class TechnicianProfileModel {
       currentLongitude: currentLongitude ?? this.currentLongitude,
       currentGovernorateId: currentGovernorateId ?? this.currentGovernorateId,
       currentCityId: currentCityId ?? this.currentCityId,
+      categoryId: categoryId ?? this.categoryId,
+      categoryName: categoryName ?? this.categoryName,
+      serviceIds: serviceIds ?? this.serviceIds,
     );
   }
 
@@ -140,6 +152,9 @@ class TechnicianProfileModel {
         'currentLongitude': currentLongitude,
         'currentGovernorateId': currentGovernorateId,
         'currentCityId': currentCityId,
+        'categoryId': categoryId,
+        'categoryName': categoryName,
+        'serviceIds': serviceIds,
       };
 
   factory TechnicianProfileModel.fromJson(Map<String, dynamic> json) =>
@@ -167,5 +182,11 @@ class TechnicianProfileModel {
         currentLongitude: (json['currentLongitude'] as num?)?.toDouble(),
         currentGovernorateId: json['currentGovernorateId'] is int ? json['currentGovernorateId'] : int.tryParse(json['currentGovernorateId']?.toString() ?? ''),
         currentCityId: json['currentCityId'] is int ? json['currentCityId'] : int.tryParse(json['currentCityId']?.toString() ?? ''),
+        categoryId: json['categoryId'] is int ? json['categoryId'] : int.tryParse(json['categoryId']?.toString() ?? ''),
+        categoryName: json['categoryName']?.toString(),
+        serviceIds: (json['serviceIds'] as List<dynamic>? ?? [])
+            .map((value) => value is int ? value : int.tryParse(value.toString()))
+            .whereType<int>()
+            .toList(),
       );
 }
