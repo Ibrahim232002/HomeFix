@@ -37,6 +37,12 @@ public partial class HomeFixDbContext
                 .HasForeignKey(e => e.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("FK_Services_ServiceCategories_CategoryId");
+
+            entity.HasMany(e => e.Technicians)
+                .WithOne(e => e.Category)
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_TechnicianProfiles_ServiceCategories_CategoryId");
         });
 
         modelBuilder.Entity<Service>(entity =>
