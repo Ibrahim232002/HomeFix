@@ -4,6 +4,9 @@ public class TechnicianProfileDto
 {
     public int Id { get; set; }
     public int UserId { get; set; }
+    public int CategoryId { get; set; }
+    public string CategoryName { get; set; } = string.Empty;
+    public List<int> ServiceIds { get; set; } = new();
 
     public string? Bio { get; set; }
     public string? ProfileImageUrl { get; set; }
