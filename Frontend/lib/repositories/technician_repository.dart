@@ -45,29 +45,12 @@ class TechnicianRepository implements ITechnicianRepository {
   final ApiClient _client = ApiClient();
 
   TechnicianProfileModel _mapProfile(TechnicianProfileDto dto) => TechnicianProfileModel(
-        id: dto.id.toString(),
-        userId: dto.userId.toString(),
-        fullName: 'فني #${dto.id}',
-        phoneNumber: '',
-        bio: dto.bio ?? '',
-        avatarUrl: dto.profileImageUrl ?? '',
-        rating: dto.averageRating,
-        reviewCount: dto.totalJobs,
-        completedJobsCount: dto.totalJobs,
-        experienceYears: dto.yearsOfExperience ?? 0,
-        verified: dto.isVerified,
-        isAvailable: dto.isAvailable,
-        specialties: dto.categoryName == null || dto.categoryName!.trim().isEmpty ? const [] : [dto.categoryName!],
-        primaryCategory: dto.categoryName ?? '',
-        governorates: const [],
-        cities: const [],
-        workingDays: const [],
-        workingHours: WorkingHoursModel(start: '08:00', end: '20:00'),
-        currentLatitude: dto.currentLatitude,
-        currentLongitude: dto.currentLongitude,
-        categoryId: dto.categoryId,
-        categoryName: dto.categoryName,
-        serviceIds: dto.serviceIds,
+        id: dto.id.toString(), userId: dto.userId.toString(), fullName: 'فني #${dto.id}', phoneNumber: '', bio: dto.bio ?? '',
+        avatarUrl: dto.profileImageUrl ?? '', rating: dto.averageRating, reviewCount: dto.totalJobs, completedJobsCount: dto.totalJobs,
+        experienceYears: dto.yearsOfExperience ?? 0, verified: dto.isVerified, isAvailable: dto.isAvailable,
+        specialties: dto.categoryName == null || dto.categoryName!.trim().isEmpty ? const [] : [dto.categoryName!], primaryCategory: dto.categoryName ?? '', governorates: const [], cities: const [], workingDays: const [],
+        workingHours: WorkingHoursModel(start: '08:00', end: '20:00'), currentLatitude: dto.currentLatitude, currentLongitude: dto.currentLongitude,
+        categoryId: dto.categoryId, categoryName: dto.categoryName, serviceIds: dto.serviceIds,
       );
 
   TechnicianProfileModel _mapProfileResponse(Map<String, dynamic> json) {
@@ -202,28 +185,42 @@ class TechnicianRepository implements ITechnicianRepository {
     double? currentLatitude,
     double? currentLongitude,
   }) async {
-    final dto = await updateApiTechnicianProfile(
-      technicianId,
-      UpdateTechnicianProfileRequest(
-        currentLatitude: currentLatitude,
-        currentLongitude: currentLongitude,
-        currentGovernorateId: currentGovernorateId,
-        currentCityId: currentCityId,
-      ),
-    );
-    return _mapProfile(dto);
+    final body = <String, dynamic>{
+      'currentGovernorateId': currentGovernorateId,
+      'currentCityId': currentCityId,
+      'currentLatitude': currentLatitude,
+      'currentLongitude': currentLongitude,
+    };
+    debugPrint('[TECH_CURRENT_LOCATION] PUT payload:');
+    debugPrint('currentGovernorateId: $currentGovernorateId');
+    debugPrint('currentCityId: $currentCityId');
+    debugPrint('currentLatitude: $currentLatitude');
+    debugPrint('currentLongitude: $currentLongitude');
+
+    try {
+      final response = await _client.put(
+        ApiConstants.technicianProfileById(technicianId),
+        body: body,
+      );
+      final responseMap = response as Map<String, dynamic>;
+      debugPrint('[TECH_CURRENT_LOCATION] backend response: $responseMap');
+      return _mapProfileResponse(responseMap);
+    } catch (e) {
+      debugPrint('[TECH_CURRENT_LOCATION] backend exception: $e');
+      rethrow;
+    }
   }
 
   @override
   Future<List<TechnicianAvailabilityDto>> getAvailabilities(int technicianId) async {
-    final response = await _client.get(ApiConstants.technicianAvailabilities(technicianId));
+    final response = await _client.get(ApiConstants.technicianAvailabilitiesByTechnician(technicianId));
     if (response is List) return response.map((item) => TechnicianAvailabilityDto.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
   @override
   Future<TechnicianAvailabilityDto> createAvailability(CreateTechnicianAvailabilityRequest request) async {
-    final response = await _client.post(ApiConstants.technicianAvailabilitiesBase, body: request.toJson());
+    final response = await _client.post(ApiConstants.technicianAvailabilities, body: request.toJson());
     return TechnicianAvailabilityDto.fromJson(response as Map<String, dynamic>);
   }
 
@@ -235,14 +232,14 @@ class TechnicianRepository implements ITechnicianRepository {
 
   @override
   Future<List<TechnicianDocumentDto>> getDocuments(int technicianId) async {
-    final response = await _client.get(ApiConstants.technicianDocuments(technicianId));
+    final response = await _client.get(ApiConstants.technicianDocumentsByTechnician(technicianId));
     if (response is List) return response.map((item) => TechnicianDocumentDto.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
   @override
   Future<TechnicianDocumentDto> uploadDocument(CreateTechnicianDocumentRequest request) async {
-    final response = await _client.post(ApiConstants.technicianDocumentsBase, body: request.toJson());
+    final response = await _client.post(ApiConstants.technicianDocuments, body: request.toJson());
     return TechnicianDocumentDto.fromJson(response as Map<String, dynamic>);
   }
 
@@ -254,22 +251,19 @@ class TechnicianRepository implements ITechnicianRepository {
 
   @override
   Future<List<TechnicianServiceAreaModel>> getServiceAreas(int technicianId) async {
-    final response = await _client.get(ApiConstants.technicianServiceAreas(technicianId));
+    final response = await _client.get(ApiConstants.technicianServiceAreasByTechnician(technicianId));
     if (response is List) return response.map((item) => TechnicianServiceAreaModel.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
   @override
   Future<TechnicianServiceAreaModel> addServiceArea(int technicianId, int cityId) async {
-    final response = await _client.post(
-      ApiConstants.technicianServiceAreasBase,
-      body: CreateTechnicianServiceAreaRequest(technicianId: technicianId, cityId: cityId).toJson(),
-    );
+    final response = await _client.post(ApiConstants.technicianServiceAreas, body: {'technicianId': technicianId, 'cityId': cityId});
     return TechnicianServiceAreaModel.fromJson(response as Map<String, dynamic>);
   }
 
   @override
   Future<void> deleteServiceArea(int technicianId, int cityId) async {
-    await _client.delete(ApiConstants.technicianServiceAreaByCity(technicianId, cityId));
+    await _client.delete(ApiConstants.deleteTechnicianServiceArea(technicianId, cityId));
   }
 }
