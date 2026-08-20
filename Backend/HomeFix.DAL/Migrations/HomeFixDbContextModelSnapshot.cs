@@ -1291,6 +1291,12 @@ namespace HomeFix.DAL.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(getdate())");
 
+                    b.Property<int?>("CurrentCityId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CurrentGovernorateId")
+                        .HasColumnType("int");
+
                     b.Property<decimal?>("CurrentLatitude")
                         .HasColumnType("decimal(10, 7)");
 
@@ -1318,6 +1324,10 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasKey("Id")
                         .HasName("PK__Technici__3214EC07F1E9D07A");
+
+                    b.HasIndex("CurrentCityId");
+
+                    b.HasIndex("CurrentGovernorateId");
 
                     b.HasIndex(new[] { "UserId" }, "UQ__Technici__1788CC4DC4C75A2C")
                         .IsUnique();
@@ -2030,11 +2040,25 @@ namespace HomeFix.DAL.Migrations
 
             modelBuilder.Entity("HomeFix.DAL.Entities.TechnicianProfile", b =>
                 {
+                    b.HasOne("HomeFix.DAL.Entities.City", "CurrentCity")
+                        .WithMany()
+                        .HasForeignKey("CurrentCityId")
+                        .HasConstraintName("FK_TechnicianProfiles_CurrentCity");
+
+                    b.HasOne("HomeFix.DAL.Entities.Governorate", "CurrentGovernorate")
+                        .WithMany()
+                        .HasForeignKey("CurrentGovernorateId")
+                        .HasConstraintName("FK_TechnicianProfiles_CurrentGovernorate");
+
                     b.HasOne("HomeFix.DAL.Entities.User", "User")
                         .WithOne("TechnicianProfile")
                         .HasForeignKey("HomeFix.DAL.Entities.TechnicianProfile", "UserId")
                         .IsRequired()
                         .HasConstraintName("FK_TechnicianProfiles_Users");
+
+                    b.Navigation("CurrentCity");
+
+                    b.Navigation("CurrentGovernorate");
 
                     b.Navigation("User");
                 });
