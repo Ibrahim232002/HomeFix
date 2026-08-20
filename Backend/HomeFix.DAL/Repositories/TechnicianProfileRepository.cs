@@ -1,4 +1,4 @@
-﻿using HomeFix.DAL.Data;
+using HomeFix.DAL.Data;
 using HomeFix.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,18 +16,24 @@ public class TechnicianProfileRepository
     public async Task<TechnicianProfile?> GetByIdAsync(int id)
     {
         return await _context.TechnicianProfiles
+            .Include(t => t.Category)
+            .Include(t => t.Services)
             .FirstOrDefaultAsync(t => t.Id == id);
     }
 
     public async Task<TechnicianProfile?> GetByUserIdAsync(int userId)
     {
         return await _context.TechnicianProfiles
+            .Include(t => t.Category)
+            .Include(t => t.Services)
             .FirstOrDefaultAsync(t => t.UserId == userId);
     }
 
     public async Task<List<TechnicianProfile>> GetActiveTechniciansAsync()
     {
         return await _context.TechnicianProfiles
+            .Include(t => t.Category)
+            .Include(t => t.Services)
             .Where(t => t.User.IsActive)
             .ToListAsync();
     }
