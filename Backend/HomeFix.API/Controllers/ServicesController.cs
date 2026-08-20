@@ -22,15 +22,7 @@ public class ServicesController : ControllerBase
     {
         var services = await _serviceService.GetAllServicesAsync();
 
-        var result = services.Select(s => new ServiceDto
-        {
-            Id = s.Id,
-            Name = s.Name,
-            Description = s.Description,
-            IsActive = s.IsActive
-        }).ToList();
-
-        return Ok(result);
+        return Ok(services.Select(MapToDto).ToList());
     }
 
     [AllowAnonymous]
@@ -42,15 +34,7 @@ public class ServicesController : ControllerBase
         if (service == null)
             return NotFound();
 
-        var result = new ServiceDto
-        {
-            Id = service.Id,
-            Name = service.Name,
-            Description = service.Description,
-            IsActive = service.IsActive
-        };
-
-        return Ok(result);
+        return Ok(MapToDto(service));
     }
 
     [AllowAnonymous]
@@ -58,13 +42,16 @@ public class ServicesController : ControllerBase
     public async Task<ActionResult<List<ServiceDto>>> GetByCategory(int categoryId)
     {
         var services = await _serviceService.GetActiveServicesByCategoryAsync(categoryId);
-
-        return Ok(services.Select(s => new ServiceDto
-        {
-            Id = s.Id,
-            Name = s.Name,
-            Description = s.Description,
-            IsActive = s.IsActive
-        }).ToList());
+        return Ok(services.Select(MapToDto).ToList());
     }
+
+    private static ServiceDto MapToDto(HomeFix.DAL.Entities.Service service)
+        => new()
+        {
+            Id = service.Id,
+            Name = service.Name,
+            Description = service.Description,
+            CategoryId = service.CategoryId,
+            IsActive = service.IsActive
+        };
 }
