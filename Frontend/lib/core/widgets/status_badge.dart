@@ -23,43 +23,43 @@ class StatusBadge extends StatelessWidget {
       case ServiceRequestStatus.pending:
         return const StatusBadge(
           label: 'قيد الانتظار',
-          backgroundColor: Color(0xFFFEF3C7), // amber-100
-          textColor: Color(0xFFB45309), // amber-700
+          backgroundColor: Color(0xFFFEF3C7),
+          textColor: Color(0xFFB45309),
           icon: Icons.access_time_rounded,
         );
       case ServiceRequestStatus.accepted:
         return const StatusBadge(
           label: 'تم القبول',
-          backgroundColor: Color(0xFFE0F2FE), // sky-100
-          textColor: Color(0xFF0369A1), // sky-700
+          backgroundColor: Color(0xFFE0F2FE),
+          textColor: Color(0xFF0369A1),
           icon: Icons.check_circle_outline_rounded,
         );
       case ServiceRequestStatus.scheduled:
         return const StatusBadge(
           label: 'مجدول',
-          backgroundColor: Color(0xFFEDE9FE), // violet-100
-          textColor: Color(0xFF6D28D9), // violet-700
+          backgroundColor: Color(0xFFEDE9FE),
+          textColor: Color(0xFF6D28D9),
           icon: Icons.calendar_today_rounded,
         );
       case ServiceRequestStatus.inProgress:
         return const StatusBadge(
           label: 'جاري التنفيذ',
-          backgroundColor: Color(0xFFE0F2FE), // sky-100
-          textColor: Color(0xFF0284C7), // sky-600
+          backgroundColor: Color(0xFFE0F2FE),
+          textColor: Color(0xFF0284C7),
           icon: Icons.engineering_rounded,
         );
       case ServiceRequestStatus.completed:
         return const StatusBadge(
           label: 'مكتمل',
-          backgroundColor: Color(0xFFD1FAE5), // emerald-100
-          textColor: Color(0xFF047857), // emerald-700
+          backgroundColor: Color(0xFFD1FAE5),
+          textColor: Color(0xFF047857),
           icon: Icons.verified_rounded,
         );
       case ServiceRequestStatus.cancelled:
         return const StatusBadge(
           label: 'ملغي',
-          backgroundColor: Color(0xFFFFE4E6), // rose-100
-          textColor: Color(0xFFBE123C), // rose-700
+          backgroundColor: Color(0xFFFFE4E6),
+          textColor: Color(0xFFBE123C),
           icon: Icons.cancel_outlined,
         );
     }
@@ -69,10 +69,24 @@ class StatusBadge extends StatelessWidget {
     switch (status) {
       case BookingStatus.upcoming:
         return const StatusBadge(
-          label: 'قادم',
+          label: 'قادم ومؤكد',
           backgroundColor: Color(0xFFEDE9FE),
           textColor: Color(0xFF6D28D9),
-          icon: Icons.calendar_month_rounded,
+          icon: Icons.event_available_rounded,
+        );
+      case BookingStatus.technicianOnTheWay:
+        return const StatusBadge(
+          label: 'الفني في الطريق',
+          backgroundColor: Color(0xFFDBEAFE),
+          textColor: Color(0xFF1D4ED8),
+          icon: Icons.directions_car_rounded,
+        );
+      case BookingStatus.arrived:
+        return const StatusBadge(
+          label: 'وصل الفني',
+          backgroundColor: Color(0xFFDCFCE7),
+          textColor: Color(0xFF15803D),
+          icon: Icons.location_on_rounded,
         );
       case BookingStatus.inProgress:
         return const StatusBadge(
@@ -80,6 +94,13 @@ class StatusBadge extends StatelessWidget {
           backgroundColor: Color(0xFFE0F2FE),
           textColor: Color(0xFF0284C7),
           icon: Icons.build_rounded,
+        );
+      case BookingStatus.awaitingCompletion:
+        return const StatusBadge(
+          label: 'بانتظار تأكيد العميل',
+          backgroundColor: Color(0xFFFEF3C7),
+          textColor: Color(0xFFB45309),
+          icon: Icons.hourglass_bottom_rounded,
         );
       case BookingStatus.completed:
         return const StatusBadge(
@@ -94,6 +115,13 @@ class StatusBadge extends StatelessWidget {
           backgroundColor: Color(0xFFFFE4E6),
           textColor: Color(0xFFBE123C),
           icon: Icons.cancel_rounded,
+        );
+      case BookingStatus.unknown:
+        return const StatusBadge(
+          label: 'حالة غير معروفة',
+          backgroundColor: Color(0xFFF3F4F6),
+          textColor: Color(0xFF374151),
+          icon: Icons.help_outline_rounded,
         );
     }
   }
