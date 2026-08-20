@@ -10,4 +10,5 @@ public interface ITechnicianProfileService
     Task AddAsync(TechnicianProfile technician);
     Task UpdateAsync(TechnicianProfile technician);
     Task<string?> ValidateCurrentLocationAsync(int? governorateId, int? cityId);
+    Task<string?> ApplySpecializationAsync(TechnicianProfile technician, int? categoryId, IReadOnlyCollection<int>? serviceIds);
 }
