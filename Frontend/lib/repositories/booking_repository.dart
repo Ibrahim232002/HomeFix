@@ -8,7 +8,7 @@ abstract class IBookingRepository {
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId);
   Future<List<BookingModel>> getBookingsByCustomer(String customerId);
   Future<BookingModel?> getBookingById(String id);
-  Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus);
+  Future<BookingModel> updateBookingStatus(String bookingId, BookingStatus newStatus);
   Future<BookingModel> createBooking(BookingModel booking);
 
   // Direct OpenAPI DTO methods
@@ -25,66 +25,90 @@ class BookingRepository implements IBookingRepository {
   @override
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId) async {
     final intId = int.tryParse(technicianId);
-    if (intId != null) {
-      try {
-        final dtos = await getApiBookingsByTechnician(intId);
-        return dtos.map((d) => _mapDtoToModel(d)).toList();
-      } catch (_) {}
+    if (intId == null || intId <= 0) return [];
+
+    try {
+      // Use the raw response here so the technician UI receives the authoritative
+      // backend Booking.Status instead of deriving a broad state from timestamps.
+      final response = await _client.get(ApiConstants.bookingsByTechnician(intId));
+      if (response is List) {
+        return response
+            .whereType<Map<String, dynamic>>()
+            .map(_mapRawJsonToModel)
+            .toList();
+      }
+      return [];
+    } catch (_) {
+      // Preserve existing read semantics; transition failures are intentionally
+      // not swallowed in updateBookingStatus below.
+      return [];
     }
-    return [];
   }
 
   @override
   Future<List<BookingModel>> getBookingsByCustomer(String customerId) async {
     final intId = int.tryParse(customerId);
-    if (intId != null) {
-      try {
-        // Fetch customer's service requests to check for attached bookings
-        final reqResponse = await _client.get(ApiConstants.serviceRequestsByCustomer(intId));
-        if (reqResponse is List) {
-          final List<BookingModel> customerBookings = [];
-          for (final reqJson in reqResponse) {
-            final reqDto = ServiceRequestDto.fromJson(reqJson as Map<String, dynamic>);
-            try {
-              final bookingDto = await getApiBookingByRequest(reqDto.id);
-              customerBookings.add(_mapDtoToModel(bookingDto));
-            } catch (_) {}
-          }
-          return customerBookings;
+    if (intId == null) return [];
+
+    try {
+      final reqResponse = await _client.get(ApiConstants.serviceRequestsByCustomer(intId));
+      if (reqResponse is List) {
+        final List<BookingModel> customerBookings = [];
+        for (final reqJson in reqResponse.whereType<Map<String, dynamic>>()) {
+          final requestId = reqJson['id'] is int
+              ? reqJson['id'] as int
+              : int.tryParse(reqJson['id']?.toString() ?? '0') ?? 0;
+          if (requestId <= 0) continue;
+
+          try {
+            final response = await _client.get(ApiConstants.bookingByRequest(requestId));
+            if (response is Map<String, dynamic>) {
+              customerBookings.add(_mapRawJsonToModel(response));
+            }
+          } catch (_) {}
         }
-      } catch (_) {}
-    }
+        return customerBookings;
+      }
+    } catch (_) {}
+
     return [];
   }
 
   @override
   Future<BookingModel?> getBookingById(String id) async {
     final intId = int.tryParse(id);
-    if (intId != null) {
-      try {
-        final dto = await getApiBookingById(intId);
-        return _mapDtoToModel(dto);
-      } catch (_) {}
-    }
+    if (intId == null || intId <= 0) return null;
+
+    try {
+      final response = await _client.get(ApiConstants.bookingById(intId));
+      if (response is Map<String, dynamic>) {
+        return _mapRawJsonToModel(response);
+      }
+    } catch (_) {}
     return null;
   }
 
   @override
-  Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
+  Future<BookingModel> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
     final intId = int.tryParse(bookingId);
-    if (intId != null) {
-      try {
-        final now = DateTime.now().toIso8601String();
-        await updateApiBooking(
-          intId,
-          UpdateBookingRequest(
-            acceptedAt: newStatus == BookingStatus.upcoming ? now : null,
-            startedAt: newStatus == BookingStatus.inProgress ? now : null,
-            completedAt: newStatus == BookingStatus.completed ? now : null,
-          ),
-        );
-      } catch (_) {}
+    if (intId == null || intId <= 0) {
+      throw Exception('معرف الحجز غير صالح');
     }
+
+    // Technician execution MUST use the dedicated transition endpoint. The generic
+    // PUT /api/Bookings/{id} remains an Admin API and is intentionally not used here.
+    final response = await _client.post(
+      ApiConstants.bookingTransition(intId),
+      body: {'status': newStatus.nameStr},
+    );
+
+    if (response is! Map<String, dynamic>) {
+      throw Exception('استجابة انتقال حالة الحجز غير صالحة');
+    }
+
+    // Parse the authoritative response immediately. AppStateProvider already
+    // reloads centralized technician bookings after this method succeeds.
+    return _mapRawJsonToModel(response);
   }
 
   @override
@@ -103,7 +127,52 @@ class BookingRepository implements IBookingRepository {
     return _mapDtoToModel(dto, fallback: booking);
   }
 
+  BookingModel _mapRawJsonToModel(
+    Map<String, dynamic> json, {
+    BookingModel? fallback,
+  }) {
+    return BookingModel(
+      id: json['id']?.toString() ?? fallback?.id ?? '',
+      requestId: json['serviceRequestId']?.toString() ?? fallback?.requestId ?? '',
+      serviceNameAr: fallback?.serviceNameAr ?? '',
+      customerName: fallback?.customerName ?? '',
+      customerPhone: fallback?.customerPhone ?? '',
+      technicianId: json['technicianId']?.toString() ?? fallback?.technicianId ?? '',
+      technicianName: fallback?.technicianName ?? '',
+      address: fallback?.address ??
+          AddressModel(
+            id: '',
+            userId: '',
+            title: 'العنوان',
+            governorate: '',
+            city: '',
+            street: '',
+            building: '',
+            floor: '',
+            apartment: '',
+          ),
+      scheduledDate: json['acceptedAt']?.toString() ?? fallback?.scheduledDate ?? '',
+      scheduledTime: fallback?.scheduledTime ?? '',
+      price: (json['finalPrice'] as num?)?.toDouble() ??
+          (json['agreedPrice'] as num?)?.toDouble() ??
+          fallback?.price ??
+          0.0,
+      status: BookingStatus.fromString(json['status']?.toString() ?? 'Unknown'),
+      createdAt: json['acceptedAt']?.toString() ?? fallback?.createdAt ?? '',
+      completedAt: json['completedAt']?.toString(),
+      notes: json['technicianNotes']?.toString(),
+    );
+  }
+
   BookingModel _mapDtoToModel(BookingDto dto, {BookingModel? fallback}) {
+    final legacyStatus = dto.completedAt != null
+        ? BookingStatus.completed
+        : dto.startedAt != null
+            ? BookingStatus.inProgress
+            : dto.arrivedAt != null
+                ? BookingStatus.arrived
+                : BookingStatus.upcoming;
+
     return BookingModel(
       id: dto.id.toString(),
       requestId: dto.serviceRequestId.toString(),
@@ -124,15 +193,11 @@ class BookingRepository implements IBookingRepository {
             floor: '',
             apartment: '',
           ),
-      scheduledDate: dto.acceptedAt ?? '',
-      scheduledTime: '',
-      price: dto.finalPrice ?? 0.0,
-      status: dto.completedAt != null
-          ? BookingStatus.completed
-          : dto.startedAt != null
-              ? BookingStatus.inProgress
-              : BookingStatus.upcoming,
-      createdAt: dto.acceptedAt ?? '',
+      scheduledDate: dto.acceptedAt ?? fallback?.scheduledDate ?? '',
+      scheduledTime: fallback?.scheduledTime ?? '',
+      price: dto.finalPrice ?? fallback?.price ?? 0.0,
+      status: legacyStatus,
+      createdAt: dto.acceptedAt ?? fallback?.createdAt ?? '',
       completedAt: dto.completedAt,
       notes: dto.technicianNotes,
     );
@@ -155,7 +220,9 @@ class BookingRepository implements IBookingRepository {
   Future<List<BookingDto>> getApiBookingsByTechnician(int technicianId) async {
     final response = await _client.get(ApiConstants.bookingsByTechnician(technicianId));
     if (response is List) {
-      return response.map((item) => BookingDto.fromJson(item as Map<String, dynamic>)).toList();
+      return response
+          .map((item) => BookingDto.fromJson(item as Map<String, dynamic>))
+          .toList();
     }
     return [];
   }
