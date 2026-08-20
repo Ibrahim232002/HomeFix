@@ -1,14 +1,14 @@
 class ServicePricingModel {
-  final double minPrice;
-  final double maxPrice;
-  final double visitFee;
+  final double? minPrice;
+  final double? maxPrice;
+  final double? visitFee;
   final String currency;
   final String unit;
 
   ServicePricingModel({
-    required this.minPrice,
-    required this.maxPrice,
-    required this.visitFee,
+    this.minPrice,
+    this.maxPrice,
+    this.visitFee,
     this.currency = 'ج.م',
     required this.unit,
   });
@@ -23,9 +23,9 @@ class ServicePricingModel {
 
   factory ServicePricingModel.fromJson(Map<String, dynamic> json) =>
       ServicePricingModel(
-        minPrice: (json['minPrice'] as num?)?.toDouble() ?? 0.0,
-        maxPrice: (json['maxPrice'] as num?)?.toDouble() ?? 0.0,
-        visitFee: (json['visitFee'] as num?)?.toDouble() ?? 0.0,
+        minPrice: (json['minPrice'] as num?)?.toDouble(),
+        maxPrice: (json['maxPrice'] as num?)?.toDouble(),
+        visitFee: (json['visitFee'] as num?)?.toDouble(),
         currency: json['currency'] ?? 'ج.م',
         unit: json['unit'] ?? 'لكل زيارة',
       );
@@ -65,6 +65,28 @@ class ServiceModel {
     required this.features,
     this.isPopular = false,
   });
+
+  ServiceModel copyWith({
+    ServicePricingModel? pricing,
+  }) {
+    return ServiceModel(
+      id: id,
+      categoryId: categoryId,
+      categoryNameAr: categoryNameAr,
+      nameAr: nameAr,
+      nameEn: nameEn,
+      descriptionAr: descriptionAr,
+      descriptionEn: descriptionEn,
+      pricing: pricing ?? this.pricing,
+      rating: rating,
+      reviewCount: reviewCount,
+      estimatedDuration: estimatedDuration,
+      iconName: iconName,
+      image: image,
+      features: features,
+      isPopular: isPopular,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
