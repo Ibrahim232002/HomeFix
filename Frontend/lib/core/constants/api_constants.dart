@@ -69,6 +69,7 @@ class ApiConstants {
   static String bookingById(int id) => '/api/Bookings/$id';
   static String bookingByRequest(int serviceRequestId) => '/api/Bookings/request/$serviceRequestId';
   static String bookingsByTechnician(int technicianId) => '/api/Bookings/technician/$technicianId';
+  static String bookingTransition(int id) => '/api/Bookings/$id/transition';
 
   static const String payments = '/api/Payments';
   static String paymentById(int id) => '/api/Payments/$id';
