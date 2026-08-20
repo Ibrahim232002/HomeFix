@@ -10,8 +10,8 @@ public class UpdateTechnicianProfileRequest
 
     public int? YearsOfExperience { get; set; }
 
-    public bool IsVerified { get; set; }
-    public bool IsAvailable { get; set; }
+    public bool? IsVerified { get; set; }
+    public bool? IsAvailable { get; set; }
 
     public decimal? CurrentLatitude { get; set; }
     public decimal? CurrentLongitude { get; set; }
