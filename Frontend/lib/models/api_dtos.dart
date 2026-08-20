@@ -360,6 +360,9 @@ class TechnicianProfileDto {
   final String createdAt;
   final double? currentLatitude;
   final double? currentLongitude;
+  final int? categoryId;
+  final String? categoryName;
+  final List<int> serviceIds;
 
   TechnicianProfileDto({
     required this.id,
@@ -374,6 +377,9 @@ class TechnicianProfileDto {
     required this.createdAt,
     this.currentLatitude,
     this.currentLongitude,
+    this.categoryId,
+    this.categoryName,
+    this.serviceIds = const [],
   });
 
   factory TechnicianProfileDto.fromJson(Map<String, dynamic> json) => TechnicianProfileDto(
@@ -389,6 +395,12 @@ class TechnicianProfileDto {
         createdAt: json['createdAt'] ?? '',
         currentLatitude: (json['currentLatitude'] as num?)?.toDouble(),
         currentLongitude: (json['currentLongitude'] as num?)?.toDouble(),
+        categoryId: json['categoryId'] is int ? json['categoryId'] : int.tryParse(json['categoryId']?.toString() ?? ''),
+        categoryName: json['categoryName']?.toString(),
+        serviceIds: (json['serviceIds'] as List<dynamic>? ?? [])
+            .map((value) => value is int ? value : int.tryParse(value.toString()))
+            .whereType<int>()
+            .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -404,6 +416,9 @@ class TechnicianProfileDto {
         'createdAt': createdAt,
         'currentLatitude': currentLatitude,
         'currentLongitude': currentLongitude,
+        'categoryId': categoryId,
+        'categoryName': categoryName,
+        'serviceIds': serviceIds,
       };
 }
 
@@ -448,6 +463,8 @@ class UpdateTechnicianProfileRequest {
   final bool? isAvailable;
   final double? currentLatitude;
   final double? currentLongitude;
+  final int? categoryId;
+  final List<int>? serviceIds;
 
   UpdateTechnicianProfileRequest({
     this.bio,
@@ -457,6 +474,8 @@ class UpdateTechnicianProfileRequest {
     this.isAvailable,
     this.currentLatitude,
     this.currentLongitude,
+    this.categoryId,
+    this.serviceIds,
   });
 
   Map<String, dynamic> toJson() => {
@@ -467,6 +486,8 @@ class UpdateTechnicianProfileRequest {
         if (isAvailable != null) 'isAvailable': isAvailable,
         if (currentLatitude != null) 'currentLatitude': currentLatitude,
         if (currentLongitude != null) 'currentLongitude': currentLongitude,
+        if (categoryId != null) 'categoryId': categoryId,
+        if (serviceIds != null) 'serviceIds': serviceIds,
       };
 }
 
