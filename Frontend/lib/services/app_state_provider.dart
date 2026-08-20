@@ -164,7 +164,17 @@ class AppStateProvider extends ChangeNotifier {
   Future<List<CityDto>> loadCitiesForTechnician(int governorateId) async { final client = ApiClient(); final response = await client.get(ApiConstants.citiesByGovernorate(governorateId)); if (response is List) return response.map((e) => CityDto.fromJson(e as Map<String, dynamic>)).toList(); return []; }
   Future<String> getCityName(int cityId) async { final client = ApiClient(); try { final response = await client.get(ApiConstants.cityById(cityId)); return CityDto.fromJson(response as Map<String, dynamic>).name ?? 'مدينة $cityId'; } catch (_) { return 'مدينة $cityId'; } }
   Future<void> selectCategory(String categoryId) async { _selectedCategoryId = categoryId; _categoryError = null; _isLoadingCategoryServices = true; notifyListeners(); try { if (categoryId == 'all') _services = await _serviceRepo.getServices(); else { final categoryName = _categories.firstWhere((c) => c.id == categoryId, orElse: () => _categories.first).nameAr; _services = await _serviceRepo.getServicesByCategory(categoryId, categoryNameAr: categoryName); } } catch (e) { _services = []; _categoryError = e.toString(); } finally { _isLoadingCategoryServices = false; notifyListeners(); } }
-  void setSearchQuery(String query) async { _searchQuery = query; _services = await _serviceRepo.searchServices(query); notifyListeners(); }
+  void setSearchQuery(String query) async {
+    _searchQuery = query;
+    _apiError = null;
+    try {
+      _services = await _serviceRepo.searchServices(query);
+    } catch (e) {
+      _apiError = e.toString();
+    } finally {
+      notifyListeners();
+    }
+  }
   Future<void> applyPromoCode(String code) async { try { final dto = await _promoRepo.getPromoCodeByCode(code); if (dto != null && dto.isActive) _appliedPromo = PromoCodeModel(code: dto.code ?? code, title: dto.code ?? 'كود خصم', discount: '${dto.discountValue.toStringAsFixed(0)}%', maxDiscount: 'خصم ${dto.discountValue}', description: 'كود ترويجي', expiry: dto.endDate, discountPercentage: dto.discountValue, maxDiscountAmount: dto.discountValue); else _appliedPromo = null; } catch (_) { _appliedPromo = null; } notifyListeners(); }
   void removePromoCode() { _appliedPromo = null; notifyListeners(); }
 
