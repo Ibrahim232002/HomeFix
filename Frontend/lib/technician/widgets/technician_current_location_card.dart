@@ -1,14 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/api_dtos.dart';
 import '../../models/technician_profile_model.dart';
-import '../../services/app_state_provider.dart';
 import '../../repositories/technician_repository.dart';
+import '../../services/app_state_provider.dart';
+import 'technician_location_picker.dart';
 
 class TechnicianCurrentLocationCard extends StatefulWidget {
-  const TechnicianCurrentLocationCard({Key? key}) : super(key: key);
+  const TechnicianCurrentLocationCard({super.key});
 
   @override
   State<TechnicianCurrentLocationCard> createState() => _TechnicianCurrentLocationCardState();
@@ -20,8 +23,8 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
   int? _technicianId;
   int? _selectedGovernorateId;
   int? _selectedCityId;
-  List<GovernorateDto> _governorates = [];
-  List<CityDto> _cities = [];
+  List<GovernorateDto> _governorates = const [];
+  List<CityDto> _cities = const [];
   TechnicianProfileModel? _profile;
 
   bool _loading = true;
@@ -30,6 +33,7 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
   bool _locating = false;
   String? _errorMessage;
   String? _successMessage;
+  int _citiesRequestVersion = 0;
 
   @override
   void initState() {
@@ -39,7 +43,7 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
 
   Future<void> _loadLocationData() async {
     final appState = Provider.of<AppStateProvider>(context, listen: false);
-    final technicianId = int.tryParse(appState.currentTechProfile?.id ?? '0');
+    final technicianId = int.tryParse(appState.currentTechProfile?.id ?? '');
 
     if (technicianId == null || technicianId <= 0) {
       if (!mounted) return;
@@ -62,22 +66,21 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
       _governorates = governorates;
       _selectedGovernorateId = profile?.currentGovernorateId;
       _selectedCityId = null;
-      _cities = [];
+      _cities = const [];
+      _errorMessage = null;
 
-      if (_selectedGovernorateId != null) {
-        final cities = await appState.loadCitiesForTechnician(_selectedGovernorateId!);
-        if (!mounted) return;
-        _cities = cities;
-        if (cities.any((city) => city.id == profile?.currentCityId)) {
-          _selectedCityId = profile?.currentCityId;
-        }
+      final governorateId = profile?.currentGovernorateId;
+      final savedCityId = profile?.currentCityId;
+      if (governorateId != null) {
+        await _loadCitiesForGovernorate(
+          governorateId,
+          restoreCityId: savedCityId,
+          clearError: false,
+        );
       }
 
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _errorMessage = null;
-      });
+      setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -87,37 +90,168 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
     }
   }
 
-  Future<void> _loadCities(int governorateId) async {
-    setState(() {
-      _selectedCityId = null;
-      _cities = [];
-      _loadingCities = true;
-      _successMessage = null;
-      _errorMessage = null;
-    });
+  Future<void> _loadCitiesForGovernorate(
+    int governorateId, {
+    int? restoreCityId,
+    bool clearError = true,
+  }) async {
+    final requestVersion = ++_citiesRequestVersion;
+
+    if (mounted) {
+      setState(() {
+        _loadingCities = true;
+        _cities = const [];
+        _selectedCityId = null;
+        if (clearError) {
+          _errorMessage = null;
+          _successMessage = null;
+        }
+      });
+    }
+
+    debugPrint('[TECH_LOCATION] loading cities for governorate: $governorateId');
 
     try {
       final cities = await Provider.of<AppStateProvider>(context, listen: false)
           .loadCitiesForTechnician(governorateId);
-      if (!mounted) return;
+      if (!mounted || requestVersion != _citiesRequestVersion) return;
+
+      final matchingCities = cities.where((city) => city.governorateId == governorateId).toList();
+      debugPrint('[TECH_LOCATION] cities loaded: ${cities.length}');
+      if (matchingCities.length != cities.length) {
+        debugPrint(
+          '[TECH_LOCATION] filtered cities whose governorateId did not match selected governorate',
+        );
+      }
+
+      final restoredCityIsValid = restoreCityId != null &&
+          matchingCities.any((city) => city.id == restoreCityId && city.governorateId == governorateId);
+
+      if (restoreCityId != null && !restoredCityIsValid) {
+        debugPrint('[TECH_LOCATION] saved city rejected because city.governorateId does not match selected governorate');
+      }
+
       setState(() {
-        _cities = cities;
+        _cities = matchingCities;
+        _selectedCityId = restoredCityIsValid ? restoreCityId : null;
         _loadingCities = false;
+        if (restoreCityId != null && !restoredCityIsValid) {
+          _errorMessage = 'المدينة المحفوظة لا تتبع المحافظة الحالية. اختر المدينة مرة أخرى.';
+        }
       });
+
+      if (restoreCityId != null) {
+        debugPrint('[TECH_LOCATION] city selected: ${restoredCityIsValid ? restoreCityId : 'null'}');
+        debugPrint('[TECH_LOCATION] selected governorate: $governorateId');
+        debugPrint('[TECH_LOCATION] validation result: $restoredCityIsValid');
+      }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestVersion != _citiesRequestVersion) return;
       setState(() {
         _loadingCities = false;
+        _cities = const [];
+        _selectedCityId = null;
         _errorMessage = _friendlyError(e);
       });
     }
+  }
+
+  Future<void> _selectGovernorate() async {
+    final selectedId = await showTechnicianLocationPicker(
+      context: context,
+      title: 'اختر المحافظة',
+      selectedId: _selectedGovernorateId,
+      options: _governorates
+          .map((governorate) => TechnicianLocationOption(
+                id: governorate.id,
+                label: governorate.name ?? 'محافظة',
+              ))
+          .toList(),
+    );
+    if (!mounted || selectedId == null) return;
+
+    debugPrint('[TECH_LOCATION] governorate selected: $selectedId');
+    setState(() {
+      _selectedGovernorateId = selectedId;
+      _selectedCityId = null;
+      _successMessage = null;
+      _errorMessage = null;
+    });
+
+    await _loadCitiesForGovernorate(selectedId);
+  }
+
+  Future<void> _selectCity() async {
+    final governorateId = _selectedGovernorateId;
+    if (governorateId == null || _loadingCities || _cities.isEmpty) return;
+
+    final validCities = _cities.where((city) => city.governorateId == governorateId).toList();
+    final selectedId = await showTechnicianLocationPicker(
+      context: context,
+      title: 'اختر المدينة',
+      selectedId: _selectedCityId,
+      options: validCities
+          .map((city) => TechnicianLocationOption(
+                id: city.id,
+                label: city.name ?? 'مدينة',
+              ))
+          .toList(),
+    );
+    if (!mounted || selectedId == null) return;
+
+    final selectedCity = validCities.where((city) => city.id == selectedId).firstOrNull;
+    final validSelection = selectedCity != null && selectedCity.governorateId == governorateId;
+
+    debugPrint('[TECH_LOCATION] city selected: $selectedId');
+    debugPrint('[TECH_LOCATION] city governorate: ${selectedCity?.governorateId}');
+    debugPrint('[TECH_LOCATION] selected governorate: $governorateId');
+    debugPrint('[TECH_LOCATION] validation result: $validSelection');
+
+    if (!validSelection) {
+      setState(() {
+        _selectedCityId = null;
+        _errorMessage = 'تعذر اختيار المدينة. أعد تحميل مدن المحافظة ثم حاول مرة أخرى.';
+      });
+      await _loadCitiesForGovernorate(governorateId);
+      return;
+    }
+
+    setState(() {
+      _selectedCityId = selectedId;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+  }
+
+  bool _hasValidCitySelection() {
+    final governorateId = _selectedGovernorateId;
+    final cityId = _selectedCityId;
+    if (governorateId == null || cityId == null) return false;
+
+    final matchingCity = _cities.where((city) => city.id == cityId).firstOrNull;
+    final valid = matchingCity != null && matchingCity.governorateId == governorateId;
+    debugPrint('[TECH_LOCATION] selected governorate: $governorateId');
+    debugPrint('[TECH_LOCATION] city selected: $cityId');
+    debugPrint('[TECH_LOCATION] city governorate: ${matchingCity?.governorateId}');
+    debugPrint('[TECH_LOCATION] validation result: $valid');
+    return valid;
   }
 
   Future<void> _saveSelectedLocation() async {
     final technicianId = _technicianId;
     final governorateId = _selectedGovernorateId;
     final cityId = _selectedCityId;
+
     if (technicianId == null || governorateId == null || cityId == null) return;
+
+    if (!_hasValidCitySelection()) {
+      setState(() {
+        _selectedCityId = null;
+        _errorMessage = 'المدينة لا تتبع المحافظة المحددة. اختر مدينة من القائمة الحالية.';
+      });
+      await _loadCitiesForGovernorate(governorateId);
+      return;
+    }
 
     setState(() {
       _saving = true;
@@ -177,6 +311,8 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
         desiredAccuracy: LocationAccuracy.medium,
       );
 
+      // GPS deliberately uses the last persisted manual location, not the
+      // potentially unsaved dropdown selection.
       final updated = await _technicianRepository.updateCurrentLocation(
         technicianId: technicianId,
         currentGovernorateId: _profile?.currentGovernorateId,
@@ -203,20 +339,28 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
   String _friendlyError(Object error) =>
       error.toString().replaceFirst('Exception: ', '').trim();
 
-  String? _currentLocationLabel() {
-    if (_selectedGovernorateId == null || _selectedCityId == null) return null;
-    final governorates = _governorates.where((item) => item.id == _selectedGovernorateId);
-    final cities = _cities.where((item) => item.id == _selectedCityId);
-    if (governorates.isEmpty || cities.isEmpty) return null;
-    final governorate = governorates.first;
-    final city = cities.first;
-    return '${governorate.name ?? 'المحافظة'} - ${city.name ?? 'المدينة'}';
+  String? _governorateLabel() {
+    final id = _selectedGovernorateId;
+    if (id == null) return null;
+    final match = _governorates.where((item) => item.id == id).firstOrNull;
+    return match?.name;
+  }
+
+  String? _cityLabel() {
+    final governorateId = _selectedGovernorateId;
+    final cityId = _selectedCityId;
+    if (governorateId == null || cityId == null) return null;
+    final match = _cities.where((item) => item.id == cityId && item.governorateId == governorateId).firstOrNull;
+    return match?.name;
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentLocationLabel = _currentLocationLabel();
     final hasGps = _profile?.currentLatitude != null && _profile?.currentLongitude != null;
+    final locationIsPersisted = _profile?.currentGovernorateId == _selectedGovernorateId &&
+        _profile?.currentCityId == _selectedCityId &&
+        _selectedGovernorateId != null &&
+        _selectedCityId != null;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 15, 16, 16),
@@ -225,151 +369,132 @@ class _TechnicianCurrentLocationCardState extends State<TechnicianCurrentLocatio
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'موقع الفني الحالي',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'حدد المحافظة والمدينة التي تتواجد فيها حاليًا.',
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-          ),
-          const SizedBox(height: 12),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_errorMessage != null && _governorates.isEmpty)
-            _InlineState(
-              message: _errorMessage!,
-              actionLabel: 'إعادة المحاولة',
-              onPressed: _loadLocationData,
-            )
-          else ...[
-            const Text('المحافظة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
-            const SizedBox(height: 5),
-            DropdownButtonFormField<int>(
-              value: _selectedGovernorateId,
-              decoration: const InputDecoration(hintText: 'اختر المحافظة'),
-              items: _governorates
-                  .map((governorate) => DropdownMenuItem<int>(
-                        value: governorate.id,
-                        child: Text(governorate.name ?? 'محافظة'),
-                      ))
-                  .toList(),
-              onChanged: _saving || _locating
-                  ? null
-                  : (value) {
-                      if (value == null) return;
-                      setState(() => _selectedGovernorateId = value);
-                      _loadCities(value);
-                    },
+      child: Form(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'موقع الفني الحالي',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
             ),
-            const SizedBox(height: 10),
-            const Text('المدينة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
-            const SizedBox(height: 5),
-            DropdownButtonFormField<int>(
-              value: _selectedCityId,
-              decoration: InputDecoration(
-                hintText: 'اختر المدينة',
-                suffixIcon: _loadingCities
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : null,
+            const SizedBox(height: 4),
+            const Text(
+              'حدد المحافظة والمدينة التي تتواجد فيها حاليًا.',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Cairo'),
+            ),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_errorMessage != null && _governorates.isEmpty)
+              _InlineLocationState(
+                message: _errorMessage!,
+                actionLabel: 'إعادة المحاولة',
+                onPressed: _loadLocationData,
+              )
+            else ...[
+              TechnicianLocationField(
+                label: 'المحافظة',
+                hint: 'اختر المحافظة',
+                valueLabel: _governorateLabel(),
+                enabled: !_saving && !_locating,
+                loading: false,
+                onTap: _selectGovernorate,
               ),
-              items: _cities
-                  .map((city) => DropdownMenuItem<int>(
-                        value: city.id,
-                        child: Text(city.name ?? 'مدينة'),
-                      ))
-                  .toList(),
-              onChanged: _selectedGovernorateId == null || _loadingCities || _saving || _locating
-                  ? null
-                  : (value) => setState(() {
-                        _selectedCityId = value;
-                        _successMessage = null;
-                        _errorMessage = null;
-                      }),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 44,
-              child: ElevatedButton.icon(
-                onPressed: _saving || _locating || _selectedGovernorateId == null || _selectedCityId == null
-                    ? null
-                    : _saveSelectedLocation,
-                icon: _saving
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.save_outlined, size: 19),
-                label: const Text('حفظ الموقع', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              TechnicianLocationField(
+                label: 'المدينة',
+                hint: 'اختر المدينة',
+                valueLabel: _cityLabel(),
+                enabled: _selectedGovernorateId != null && !_saving && !_locating,
+                loading: _loadingCities,
+                onTap: _selectCity,
               ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 42,
-              child: OutlinedButton.icon(
-                onPressed: _locating || _saving ? null : _useGps,
-                icon: const Icon(Icons.my_location_rounded, size: 19),
-                label: Text(
-                  _locating ? 'جاري تحديد الموقع...' : 'تحديد موقعي الحالي',
-                  style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: _saving || _locating || !_hasValidCitySelection()
+                      ? null
+                      : _saveSelectedLocation,
+                  icon: _saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.save_outlined, size: 19),
+                  label: const Text(
+                    'حفظ الموقع',
+                    style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
-            ),
-            if (currentLocationLabel != null &&
-                _profile?.currentGovernorateId == _selectedGovernorateId &&
-                _profile?.currentCityId == _selectedCityId) ...[
-              const SizedBox(height: 10),
-              Text(
-                '✓ موقعك محفوظ: $currentLocationLabel',
-                style: const TextStyle(fontSize: 11, color: AppColors.technicianPrimary, fontWeight: FontWeight.w700, fontFamily: 'Cairo'),
-              ),
-            ],
-            if (hasGps) ...[
-              const SizedBox(height: 6),
-              Text(
-                'الموقع الجغرافي: ${_profile!.currentLatitude!.toStringAsFixed(5)}, ${_profile!.currentLongitude!.toStringAsFixed(5)}',
-                style: const TextStyle(fontSize: 10, color: AppColors.textMuted, fontFamily: 'Cairo'),
-              ),
-            ],
-            if (_successMessage != null) ...[
               const SizedBox(height: 8),
-              _MessageBanner(message: _successMessage!, isError: false),
-            ],
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 8),
-              _MessageBanner(message: _errorMessage!, isError: true),
+              SizedBox(
+                height: 42,
+                child: OutlinedButton.icon(
+                  onPressed: _locating || _saving ? null : _useGps,
+                  icon: const Icon(Icons.my_location_rounded, size: 19),
+                  label: Text(
+                    _locating ? 'جاري تحديد الموقع...' : 'تحديث الموقع الحالي',
+                    style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              if (locationIsPersisted) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '✓ موقعك محفوظ: ${_governorateLabel()} - ${_cityLabel()}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.technicianPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ],
+              if (hasGps) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'GPS: ${_profile!.currentLatitude!.toStringAsFixed(5)}, ${_profile!.currentLongitude!.toStringAsFixed(5)}',
+                  style: const TextStyle(fontSize: 10, color: AppColors.textMuted, fontFamily: 'Cairo'),
+                ),
+              ],
+              if (_successMessage != null) ...[
+                const SizedBox(height: 8),
+                _MessageBanner(message: _successMessage!, isError: false),
+              ],
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 8),
+                _MessageBanner(message: _errorMessage!, isError: true),
+              ],
             ],
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
-class _InlineState extends StatelessWidget {
+class _InlineLocationState extends StatelessWidget {
   final String message;
   final String actionLabel;
   final VoidCallback onPressed;
 
-  const _InlineState({required this.message, required this.actionLabel, required this.onPressed});
+  const _InlineLocationState({
+    required this.message,
+    required this.actionLabel,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) => Column(
         children: [
           _MessageBanner(message: message, isError: true),
           const SizedBox(height: 8),
-          TextButton(onPressed: onPressed, child: Text(actionLabel, style: const TextStyle(fontFamily: 'Cairo'))),
+          TextButton(
+            onPressed: onPressed,
+            child: Text(actionLabel, style: const TextStyle(fontFamily: 'Cairo')),
+          ),
         ],
       );
 }
