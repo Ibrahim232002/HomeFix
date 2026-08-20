@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../core/widgets/empty_state.dart';
+import '../../core/network/api_exception.dart';
 import '../../models/booking_model.dart';
 import '../../services/app_state_provider.dart';
-import '../../common/screens/chat_detail_screen.dart';
 
 class TechnicianBookingsScreen extends StatefulWidget {
   const TechnicianBookingsScreen({Key? key}) : super(key: key);
@@ -17,6 +17,7 @@ class TechnicianBookingsScreen extends StatefulWidget {
 class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final Set<String> _transitioningBookingIds = <String>{};
 
   @override
   void initState() {
@@ -32,15 +33,175 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
 
   List<BookingModel> _filterBookings(List<BookingModel> all, int index) {
     switch (index) {
-      case 0: // Upcoming
-        return all.where((b) => b.status == BookingStatus.upcoming).toList();
-      case 1: // In progress
-        return all.where((b) => b.status == BookingStatus.inProgress).toList();
+      case 0: // Upcoming / pre-execution
+        return all.where((b) =>
+            b.status == BookingStatus.upcoming ||
+            b.status == BookingStatus.technicianOnTheWay ||
+            b.status == BookingStatus.arrived).toList();
+      case 1: // In progress / waiting for completion confirmation
+        return all.where((b) =>
+            b.status == BookingStatus.inProgress ||
+            b.status == BookingStatus.awaitingCompletion).toList();
       case 2: // Completed
         return all.where((b) => b.status == BookingStatus.completed).toList();
       default:
         return all;
     }
+  }
+
+  BookingStatus? _nextTransitionFor(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.upcoming:
+        return BookingStatus.technicianOnTheWay;
+      case BookingStatus.technicianOnTheWay:
+        return BookingStatus.arrived;
+      case BookingStatus.arrived:
+        // InProgress is reached through JobStart verification in Phase 3B.
+        return null;
+      case BookingStatus.inProgress:
+        return BookingStatus.awaitingCompletion;
+      case BookingStatus.awaitingCompletion:
+      case BookingStatus.completed:
+      case BookingStatus.cancelled:
+      case BookingStatus.unknown:
+        return null;
+    }
+  }
+
+  String _actionLabelFor(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.upcoming:
+        return 'في الطريق';
+      case BookingStatus.technicianOnTheWay:
+        return 'وصلت للموقع';
+      case BookingStatus.inProgress:
+        return 'إنهاء العمل';
+      case BookingStatus.arrived:
+        return 'بدء العمل';
+      case BookingStatus.awaitingCompletion:
+        return 'بانتظار تأكيد العميل';
+      case BookingStatus.completed:
+      case BookingStatus.cancelled:
+      case BookingStatus.unknown:
+        return '';
+    }
+  }
+
+  String _successMessage(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.technicianOnTheWay:
+        return 'تم تحديث حالة المهمة: الفني في الطريق.';
+      case BookingStatus.arrived:
+        return 'تم تسجيل وصولك إلى موقع العميل.';
+      case BookingStatus.awaitingCompletion:
+        return 'تم إنهاء العمل، والطلب الآن بانتظار تأكيد العميل.';
+      default:
+        return 'تم تحديث حالة الحجز بنجاح.';
+    }
+  }
+
+  String _errorMessage(Object error) {
+    if (error is ApiException) return error.message;
+    final message = error.toString();
+    return message.startsWith('Exception: ')
+        ? message.substring('Exception: '.length)
+        : message;
+  }
+
+  Future<void> _transitionBooking(BookingModel booking, BookingStatus nextStatus) async {
+    if (_transitioningBookingIds.contains(booking.id)) return;
+
+    setState(() => _transitioningBookingIds.add(booking.id));
+    try {
+      await Provider.of<AppStateProvider>(context, listen: false)
+          .updateBookingStatus(booking.id, nextStatus);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_successMessage(nextStatus))),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_errorMessage(error))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _transitioningBookingIds.remove(booking.id));
+      }
+    }
+  }
+
+  void _showPhase3BDependency() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'بدء العمل الفعلي يحتاج تأكيد JobStart عبر رمز التحقق. هذا المسار سيتم تفعيله في Phase 3B.',
+          style: TextStyle(fontFamily: 'Cairo'),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAction(BookingModel booking) {
+    final transitioning = _transitioningBookingIds.contains(booking.id);
+    final nextStatus = _nextTransitionFor(booking.status);
+
+    if (booking.status == BookingStatus.awaitingCompletion) {
+      return const Text(
+        'بانتظار تأكيد العميل',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textMuted,
+          fontFamily: 'Cairo',
+        ),
+      );
+    }
+
+    if (booking.status == BookingStatus.arrived) {
+      return OutlinedButton(
+        onPressed: transitioning ? null : _showPhase3BDependency,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: AppColors.border),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        child: const Text(
+          'بدء العمل',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
+        ),
+      );
+    }
+
+    if (nextStatus == null) return const SizedBox.shrink();
+
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: booking.status == BookingStatus.inProgress
+            ? AppColors.successDark
+            : AppColors.technicianPrimary,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      onPressed: transitioning
+          ? null
+          : () => _transitionBooking(booking, nextStatus),
+      child: transitioning
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            )
+          : Text(
+              _actionLabelFor(booking.status),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Cairo',
+              ),
+            ),
+    );
   }
 
   @override
@@ -57,7 +218,11 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
           unselectedLabelColor: AppColors.textMuted,
           indicatorColor: AppColors.technicianPrimary,
           indicatorWeight: 3,
-          labelStyle: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 13),
+          labelStyle: const TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
           tabs: const [
             Tab(text: 'القادمة'),
             Tab(text: 'قيد التنفيذ'),
@@ -107,7 +272,12 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
                         children: [
                           Text(
                             'حجز #${b.id}',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo'),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                              fontFamily: 'Cairo',
+                            ),
                           ),
                           StatusBadge.fromBookingStatus(b.status),
                         ],
@@ -115,16 +285,23 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
                       const SizedBox(height: 10),
                       Text(
                         b.serviceNameAr,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Cairo',
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'العميل: ${b.customerName}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Cairo'),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Cairo',
+                        ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Schedule & Address Card
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -135,23 +312,39 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.schedule_rounded, size: 16, color: AppColors.technicianPrimary),
+                                const Icon(
+                                  Icons.schedule_rounded,
+                                  size: 16,
+                                  color: AppColors.technicianPrimary,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'الموعد: ${b.scheduledDate} (${b.scheduledTime})',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Cairo',
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                const Icon(Icons.location_on_rounded, size: 16, color: AppColors.technicianPrimary),
+                                const Icon(
+                                  Icons.location_on_rounded,
+                                  size: 16,
+                                  color: AppColors.technicianPrimary,
+                                ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     '${b.address.city} - ${b.address.fullAddressDescription}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Cairo',
+                                    ),
                                   ),
                                 ),
                               ],
@@ -160,56 +353,19 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
                         ),
                       ),
                       const Divider(height: 24),
-
-                      // Actions
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             'المبلغ: ${b.price.toInt()} ج.م',
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.technicianDark, fontFamily: 'Cairo'),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.technicianDark,
+                              fontFamily: 'Cairo',
+                            ),
                           ),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.technicianPrimary),
-                                onPressed: () {
-                                  appState.setTechnicianNavIndex(0); // or start conversation
-                                },
-                              ),
-                              if (b.status == BookingStatus.upcoming) ...[
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.technicianPrimary,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  onPressed: () {
-                                    appState.updateBookingStatus(b.id, BookingStatus.inProgress);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('تم بدء تنفيذ المهمة!')),
-                                    );
-                                  },
-                                  child: const Text('بدء العمل', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-                                ),
-                              ] else if (b.status == BookingStatus.inProgress) ...[
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.successDark,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  onPressed: () {
-                                    appState.updateBookingStatus(b.id, BookingStatus.completed);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('تم إنهاء المهمة وإيداع الأجر في المحفظة!')),
-                                    );
-                                  },
-                                  child: const Text('إنهاء المهمة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-                                ),
-                              ],
-                            ],
-                          ),
+                          _buildAction(b),
                         ],
                       ),
                     ],
