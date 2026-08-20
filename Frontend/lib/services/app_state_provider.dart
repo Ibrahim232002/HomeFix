@@ -199,8 +199,8 @@ class AppStateProvider extends ChangeNotifier {
       preferredTime: preferredTime,
       files: files ?? [],
       status: ServiceRequestStatus.pending,
-      estimatedPriceMin: pricing.minPrice,
-      estimatedPriceMax: pricing.maxPrice,
+      estimatedPriceMin: pricing.minPrice!,
+      estimatedPriceMax: pricing.maxPrice!,
       createdAt: 'الآن',
       statusHistory: [ServiceRequestStatusHistoryModel(status: ServiceRequestStatus.pending, timestamp: 'الآن', updatedBy: _currentUser!.fullName)],
     );
@@ -216,24 +216,12 @@ class AppStateProvider extends ChangeNotifier {
   Future<void> acceptCustomerOffer(String offerId, String requestId) async { final id = int.tryParse(offerId); if (id == null || id <= 0) throw Exception('معرف العرض غير صالح'); await _offerRepo.acceptOffer(id); if (_currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); _customerOffers = await _offerRepo.getOffersForRequest(int.tryParse(requestId) ?? 0); notifyListeners(); }
   Future<void> rejectCustomerOffer(String offerId, String requestId) async { final id = int.tryParse(offerId); if (id == null || id <= 0) throw Exception('معرف العرض غير صالح'); await _offerRepo.rejectOffer(id); _customerOffers = await _offerRepo.getOffersForRequest(int.tryParse(requestId) ?? 0); notifyListeners(); }
 
-  Future<void> updateTechnicianSpecialization({
-    required int categoryId,
-    required List<int> serviceIds,
-  }) async {
+  Future<void> updateTechnicianSpecialization({required int categoryId, required List<int> serviceIds}) async {
     final profile = _currentTechProfile;
     if (profile == null) throw Exception('تعذر تحديد ملف الفني');
-
     final technicianId = int.tryParse(profile.id);
-    if (technicianId == null || technicianId <= 0) {
-      throw Exception('معرف ملف الفني غير صالح');
-    }
-
-    final updatedProfile = await _techRepo.updateTechnicianSpecialization(
-      technicianId,
-      categoryId: categoryId,
-      serviceIds: serviceIds,
-    );
-
+    if (technicianId == null || technicianId <= 0) throw Exception('معرف ملف الفني غير صالح');
+    final updatedProfile = await _techRepo.updateTechnicianSpecialization(technicianId, categoryId: categoryId, serviceIds: serviceIds);
     _currentTechProfile = updatedProfile;
     notifyListeners();
   }
