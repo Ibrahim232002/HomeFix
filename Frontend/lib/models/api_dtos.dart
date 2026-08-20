@@ -276,7 +276,7 @@ class GovernorateDto {
   GovernorateDto({
     required this.id,
     this.name,
-    this.isActive,
+    this.isActive = true,
     required this.createdAt,
   });
 
@@ -1241,7 +1241,7 @@ class UpdatePromoCodeRequest {
     this.maxUses,
     this.startDate,
     this.endDate,
-    this.isActive,
+    this.isActive = true,
   });
 
   Map<String, dynamic> toJson() => {
