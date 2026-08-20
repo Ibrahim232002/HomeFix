@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 
-T? firstOrNull<T>(Iterable<T> values) => values.isEmpty ? null : values.first;
-
 class TechnicianLocationOption {
   final int id;
   final String label;
@@ -29,9 +27,12 @@ Future<int?> showTechnicianLocationPicker({
     backgroundColor: Colors.transparent,
     builder: (sheetContext) => Directionality(
       textDirection: TextDirection.rtl,
-      child: FractionallySizedBox(
-        heightFactor: 0.78,
-        child: Material(
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.52,
+        minChildSize: 0.30,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (dragContext, scrollController) => Material(
           color: Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           clipBehavior: Clip.antiAlias,
@@ -80,6 +81,7 @@ Future<int?> showTechnicianLocationPicker({
                           ),
                         )
                       : ListView.separated(
+                          controller: scrollController,
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           itemCount: uniqueOptions.length,
                           separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
