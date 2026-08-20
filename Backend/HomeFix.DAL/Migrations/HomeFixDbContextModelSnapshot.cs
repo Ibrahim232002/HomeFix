@@ -294,8 +294,7 @@ namespace HomeFix.DAL.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getdate())");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
                         .HasMaxLength(255)
@@ -1286,6 +1285,9 @@ namespace HomeFix.DAL.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -1324,6 +1326,8 @@ namespace HomeFix.DAL.Migrations
 
                     b.HasKey("Id")
                         .HasName("PK__Technici__3214EC07F1E9D07A");
+
+                    b.HasIndex("CategoryId");
 
                     b.HasIndex("CurrentCityId");
 
@@ -2040,6 +2044,12 @@ namespace HomeFix.DAL.Migrations
 
             modelBuilder.Entity("HomeFix.DAL.Entities.TechnicianProfile", b =>
                 {
+                    b.HasOne("HomeFix.DAL.Entities.ServiceCategory", "Category")
+                        .WithMany("Technicians")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_TechnicianProfiles_ServiceCategories_CategoryId");
+
                     b.HasOne("HomeFix.DAL.Entities.City", "CurrentCity")
                         .WithMany()
                         .HasForeignKey("CurrentCityId")
@@ -2055,6 +2065,8 @@ namespace HomeFix.DAL.Migrations
                         .HasForeignKey("HomeFix.DAL.Entities.TechnicianProfile", "UserId")
                         .IsRequired()
                         .HasConstraintName("FK_TechnicianProfiles_Users");
+
+                    b.Navigation("Category");
 
                     b.Navigation("CurrentCity");
 
@@ -2244,6 +2256,8 @@ namespace HomeFix.DAL.Migrations
             modelBuilder.Entity("HomeFix.DAL.Entities.ServiceCategory", b =>
                 {
                     b.Navigation("Services");
+
+                    b.Navigation("Technicians");
                 });
 
             modelBuilder.Entity("HomeFix.DAL.Entities.ServiceRequest", b =>
