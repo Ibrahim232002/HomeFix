@@ -11,7 +11,7 @@ abstract class IServiceRepository {
     String categoryNameAr = '',
   });
   Future<List<ServiceModel>> searchServices(String query);
-  
+
   // Direct OpenAPI DTO methods
   Future<List<ServiceDto>> getApiServices();
   Future<ServiceDto> getApiServiceById(int id);
@@ -24,33 +24,27 @@ class ServiceRepository implements IServiceRepository {
 
   @override
   Future<List<ServiceModel>> getServices() async {
-    try {
-      final apiServices = await getApiServices();
-      if (apiServices.isNotEmpty) {
-        final List<ServiceModel> list = [];
-        for (final dto in apiServices) {
-          final pricings = await getServicePricingsByService(dto.id);
-          list.add(_mapService(dto, pricings));
-        }
-        return list;
-      }
-    } catch (_) {
-      // Return empty list if API fails or empty
+    final apiServices = await getApiServices();
+    final list = <ServiceModel>[];
+    for (final dto in apiServices) {
+      final pricings = await getServicePricingsByService(dto.id);
+      list.add(_mapService(dto, pricings));
     }
-    return [];
+    return list;
   }
 
   @override
   Future<ServiceModel?> getServiceById(String id) async {
     final intId = int.tryParse(id);
-    if (intId != null) {
-      try {
-        final dto = await getApiServiceById(intId);
-        final pricings = await getServicePricingsByService(dto.id);
-        return _mapService(dto, pricings);
-      } catch (_) {}
+    if (intId == null) return null;
+
+    try {
+      final dto = await getApiServiceById(intId);
+      final pricings = await getServicePricingsByService(dto.id);
+      return _mapService(dto, pricings);
+    } catch (_) {
+      return null;
     }
-    return null;
   }
 
   @override
@@ -75,7 +69,6 @@ class ServiceRepository implements IServiceRepository {
         _mapService(
           dto,
           pricings,
-          categoryId: categoryId,
           categoryNameAr: categoryNameAr,
         ),
       );
@@ -171,7 +164,6 @@ class ServiceRepository implements IServiceRepository {
   ServiceModel _mapService(
     ServiceDto dto,
     List<ServicePricingDto> pricings, {
-    String categoryId = '',
     String categoryNameAr = '',
   }) {
     final visitFee = pricings.isNotEmpty ? pricings.first.visitFee : 0.0;
@@ -181,7 +173,7 @@ class ServiceRepository implements IServiceRepository {
 
     return ServiceModel(
       id: dto.id.toString(),
-      categoryId: categoryId,
+      categoryId: dto.categoryId.toString(),
       categoryNameAr: categoryNameAr,
       nameAr: dto.name ?? '',
       nameEn: dto.name ?? '',
