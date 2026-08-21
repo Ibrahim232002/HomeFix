@@ -3,9 +3,10 @@ import '../core/constants/api_constants.dart';
 import '../models/api_dtos.dart';
 import '../models/service_request_model.dart';
 import '../models/address_model.dart';
+import 'customer_profile_repository.dart';
 
 abstract class IServiceRequestRepository {
-  Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerId);
+  Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerUserId);
   Future<List<ServiceRequestModel>> getAvailableRequestsForTechnicians({String? serviceId, String? governorate});
   Future<ServiceRequestModel?> getRequestById(String id);
   Future<ServiceRequestModel> createRequest(ServiceRequestModel request);
@@ -25,6 +26,7 @@ abstract class IServiceRequestRepository {
 
 class ServiceRequestRepository implements IServiceRequestRepository {
   final ApiClient _client = ApiClient();
+  final CustomerProfileRepository _customerProfileRepo = CustomerProfileRepository();
 
   String _serializePreferredDate(String value) {
     switch (value.trim()) {
@@ -62,13 +64,12 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
   @override
-  Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerId) async {
-    final intId = int.tryParse(customerId);
-    if (intId != null) {
-      final dtos = await getApiServiceRequestsByCustomer(intId);
-      return dtos.map((d) => _mapDtoToModel(d)).toList();
-    }
-    return [];
+  Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerUserId) async {
+    final userId = int.tryParse(customerUserId);
+    if (userId == null || userId <= 0) throw Exception('معرف المستخدم غير صالح');
+    final profile = await _customerProfileRepo.getProfileByUserId(userId);
+    final dtos = await getApiServiceRequestsByCustomer(profile.id);
+    return dtos.map((d) => _mapDtoToModel(d)).toList();
   }
 
   @override
