@@ -33,16 +33,16 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
 
   List<BookingModel> _filterBookings(List<BookingModel> all, int index) {
     switch (index) {
-      case 0: // Upcoming / pre-execution
+      case 0:
         return all.where((b) =>
             b.status == BookingStatus.upcoming ||
             b.status == BookingStatus.technicianOnTheWay ||
             b.status == BookingStatus.arrived).toList();
-      case 1: // In progress / waiting for completion confirmation
+      case 1:
         return all.where((b) =>
             b.status == BookingStatus.inProgress ||
             b.status == BookingStatus.awaitingCompletion).toList();
-      case 2: // Completed
+      case 2:
         return all.where((b) => b.status == BookingStatus.completed).toList();
       default:
         return all;
@@ -56,7 +56,6 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
       case BookingStatus.technicianOnTheWay:
         return BookingStatus.arrived;
       case BookingStatus.arrived:
-        // InProgress is reached through JobStart verification in Phase 3B.
         return null;
       case BookingStatus.inProgress:
         return BookingStatus.awaitingCompletion;
@@ -132,15 +131,42 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
     }
   }
 
-  void _showPhase3BDependency() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'بدء العمل الفعلي يحتاج تأكيد JobStart عبر رمز التحقق. هذا المسار سيتم تفعيله في Phase 3B.',
-          style: TextStyle(fontFamily: 'Cairo'),
+  Future<void> _startJob(BookingModel booking) async {
+    if (booking.status != BookingStatus.arrived) return;
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
+
+    setState(() => _transitioningBookingIds.add(booking.id));
+    try {
+      await provider.requestJobStartCode(booking.id);
+      if (!mounted) return;
+
+      final verified = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => BookingVerificationDialog(
+          title: 'تأكيد بدء العمل',
+          description: 'أدخل رمز التحقق المكون من 6 أرقام لبدء تنفيذ الخدمة.',
+          onVerify: (code) => provider.verifyJobStart(booking.id, code),
+          onResend: () => provider.requestJobStartCode(booking.id),
         ),
-      ),
-    );
+      );
+
+      if (!mounted) return;
+      if (verified == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم تأكيد بدء العمل وتحديث حالة الحجز.')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_errorMessage(error))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _transitioningBookingIds.remove(booking.id));
+      }
+    }
   }
 
   Widget _buildAction(BookingModel booking) {
@@ -161,16 +187,26 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
 
     if (booking.status == BookingStatus.arrived) {
       return OutlinedButton(
-        onPressed: transitioning ? null : _showPhase3BDependency,
+        onPressed: transitioning ? null : () => _startJob(booking),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: AppColors.border),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        child: const Text(
-          'بدء العمل',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
-        ),
+        child: transitioning
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text(
+                'بدء العمل',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Cairo',
+                ),
+              ),
       );
     }
 
@@ -376,6 +412,152 @@ class _TechnicianBookingsScreenState extends State<TechnicianBookingsScreen>
           );
         }),
       ),
+    );
+  }
+}
+
+class BookingVerificationDialog extends StatefulWidget {
+  final String title;
+  final String description;
+  final Future<BookingModel> Function(String code) onVerify;
+  final Future<BookingVerificationIssueResult> Function() onResend;
+
+  const BookingVerificationDialog({
+    super.key,
+    required this.title,
+    required this.description,
+    required this.onVerify,
+    required this.onResend,
+  });
+
+  @override
+  State<BookingVerificationDialog> createState() => _BookingVerificationDialogState();
+}
+
+class _BookingVerificationDialogState extends State<BookingVerificationDialog> {
+  final _controller = TextEditingController();
+  bool _verifying = false;
+  bool _resending = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _errorMessage(Object error) {
+    if (error is ApiException) return error.message;
+    final message = error.toString();
+    return message.startsWith('Exception: ')
+        ? message.substring('Exception: '.length)
+        : message;
+  }
+
+  Future<void> _verify() async {
+    if (_verifying || _resending) return;
+    final code = _controller.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      setState(() => _error = 'أدخل رمز التحقق المكون من 6 أرقام.');
+      return;
+    }
+
+    setState(() {
+      _verifying = true;
+      _error = null;
+    });
+    try {
+      await widget.onVerify(code);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) setState(() => _error = _errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _verifying = false);
+    }
+  }
+
+  Future<void> _resend() async {
+    if (_verifying || _resending) return;
+    setState(() {
+      _resending = true;
+      _error = null;
+    });
+    try {
+      final result = await widget.onResend();
+      if (!mounted) return;
+      if (result.developmentCode != null && result.developmentCode!.isNotEmpty) {
+        setState(() => _error = 'رمز التطوير: ${result.developmentCode}');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = _errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(widget.description, style: const TextStyle(fontFamily: 'Cairo', fontSize: 12)),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            enabled: !_verifying && !_resending,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            maxLength: 6,
+            decoration: const InputDecoration(
+              counterText: '',
+              hintText: '••••••',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: const TextStyle(
+                color: Colors.red,
+                fontSize: 12,
+                fontFamily: 'Cairo',
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: _verifying || _resending ? null : _resend,
+            child: Text(
+              _resending ? 'جاري إعادة الإرسال...' : 'إعادة إرسال الرمز',
+              style: const TextStyle(fontFamily: 'Cairo'),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _verifying || _resending ? null : () => Navigator.of(context).pop(false),
+          child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+        ),
+        ElevatedButton(
+          onPressed: _verifying || _resending ? null : _verify,
+          child: _verifying
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('تأكيد', style: TextStyle(fontFamily: 'Cairo')),
+        ),
+      ],
     );
   }
 }
