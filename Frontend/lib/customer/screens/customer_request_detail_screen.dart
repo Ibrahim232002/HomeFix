@@ -72,12 +72,13 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
 
   Future<void> _loadBooking() async {
     try {
-      final booking = await Provider.of<AppStateProvider>(context, listen: false)
-          .loadBookingForRequest(widget.requestId);
+      final booking = await Provider.of<AppStateProvider>(context, listen: false).loadBookingForRequest(widget.requestId);
       if (!mounted) return;
       setState(() => _booking = booking);
-    } catch (_) {
-      if (mounted) setState(() => _booking = null);
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _bookingLoading = false);
     }
@@ -88,13 +89,9 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
     try {
       await Provider.of<AppStateProvider>(context, listen: false).acceptCustomerOffer(offerId, widget.requestId);
       await _loadBooking();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم قبول العرض وتأكيد الحجز بنجاح.')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم قبول العرض وتأكيد الحجز بنجاح.')));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
     } finally {
       if (mounted) setState(() => _actingOffers.remove(offerId));
     }
@@ -104,13 +101,9 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
     setState(() => _actingOffers.add(offerId));
     try {
       await Provider.of<AppStateProvider>(context, listen: false).rejectCustomerOffer(offerId, widget.requestId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفض العرض.')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفض العرض.')));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
     } finally {
       if (mounted) setState(() => _actingOffers.remove(offerId));
     }
@@ -143,15 +136,11 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
       if (verified == true) {
         await _loadBooking();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم تأكيد إتمام الخدمة بنجاح.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تأكيد إتمام الخدمة بنجاح.')));
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_errorMessage(error))),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
     } finally {
       if (mounted) setState(() => _completionActionLoading = false);
     }
@@ -160,10 +149,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppStateProvider>(context);
-    final request = appState.customerRequests.firstWhere(
-      (r) => r.id == widget.requestId,
-      orElse: () => appState.customerRequests.first,
-    );
+    final request = appState.customerRequests.firstWhere((r) => r.id == widget.requestId, orElse: () => appState.customerRequests.first);
     final currentStep = _getStatusStepIndex(request.status);
     final offers = appState.customerOffers;
 
@@ -291,15 +277,10 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
                   children: [
                     CircleAvatar(radius: 26, backgroundImage: NetworkImage(request.technicianAvatar ?? '')),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(request.technicianName!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
-                          Text(request.technicianPhone ?? '+20 10 9876 5432', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo')),
-                        ],
-                      ),
-                    ),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(request.technicianName!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
+                      Text(request.technicianPhone ?? '+20 10 9876 5432', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo')),
+                    ])),
                     if (request.status != ServiceRequestStatus.cancelled)
                       ElevatedButton.icon(
                         onPressed: () async {
@@ -319,147 +300,113 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('تفاصيل العطل والخدمة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
-                  const SizedBox(height: 10),
-                  Text(request.problemDescription, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5, fontFamily: 'Cairo')),
-                  if (request.files.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    const Text('الصور المرفقة:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 80,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: request.files.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final f = request.files[index];
-                          return ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(f.url, width: 80, height: 80, fit: BoxFit.cover));
-                        },
-                      ),
-                    ),
-                  ],
-                  const Divider(height: 24),
-                  Row(
-                    children: [
-                      const Icon(Icons.schedule_rounded, size: 16, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Text('الموعد المفضل: ${request.preferredDate} (${request.preferredTime})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
-                    ],
-                  ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('تفاصيل العطل والخدمة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
+                const SizedBox(height: 10),
+                Text(request.problemDescription, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5, fontFamily: 'Cairo')),
+                if (request.files.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Text('الصور المرفقة:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
+                  const SizedBox(height: 8),
+                  SizedBox(height: 80, child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: request.files.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final f = request.files[index];
+                      return ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(f.url, width: 80, height: 80, fit: BoxFit.cover));
+                    },
+                  )),
                 ],
-              ),
+                const Divider(height: 24),
+                Row(children: [
+                  const Icon(Icons.schedule_rounded, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Text('الموعد المفضل: ${request.preferredDate} (${request.preferredTime})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
+                ]),
+              ]),
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.location_pin, color: AppColors.primary, size: 18),
-                      SizedBox(width: 6),
-                      Text('عنوان تقديم الخدمة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo')),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(request.address.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
-                  const SizedBox(height: 2),
-                  Text(request.address.fullAddressDescription, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo')),
-                ],
-              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: const [
+                  Icon(Icons.location_pin, color: AppColors.primary, size: 18),
+                  SizedBox(width: 6),
+                  Text('عنوان تقديم الخدمة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo')),
+                ]),
+                const SizedBox(height: 8),
+                Text(request.address.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
+                const SizedBox(height: 2),
+                Text(request.address.fullAddressDescription, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo')),
+              ]),
             ),
             const SizedBox(height: 16),
             if (!_bookingLoading && _booking != null)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('حالة الحجز الفعلية', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
-                        StatusBadge.fromBookingStatus(_booking!.status),
-                      ],
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    const Text('حالة الحجز الفعلية', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
+                    StatusBadge.fromBookingStatus(_booking!.status),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(_booking!.status.displayNameAr, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo')),
+                  if (_booking!.status == BookingStatus.awaitingCompletion) ...[
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _completionActionLoading ? null : _verifyJobCompletion,
+                      icon: _completionActionLoading
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.verified_rounded, size: 18),
+                      label: Text(_completionActionLoading ? 'جاري تجهيز رمز التحقق...' : 'تأكيد إتمام الخدمة', style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _booking!.status.displayNameAr,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'),
-                    ),
-                    if (_booking!.status == BookingStatus.awaitingCompletion) ...[
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        onPressed: _completionActionLoading ? null : _verifyJobCompletion,
-                        icon: _completionActionLoading
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.verified_rounded, size: 18),
-                        label: Text(
-                          _completionActionLoading ? 'جاري تجهيز رمز التحقق...' : 'تأكيد إتمام الخدمة',
-                          style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+                ]),
               ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('تفاصيل الفاتورة والحساب', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
-                  const SizedBox(height: 12),
-                  _buildPriceRow(label: 'رسوم الكشف والزيارة', value: '80.00 ج.م'),
-                  const SizedBox(height: 6),
-                  _buildPriceRow(label: 'أجور الفحص وخدمة الصيانة', value: '${((request.finalPrice ?? request.estimatedPriceMin) - 80).clamp(0, 9999).toInt()}.00 ج.م'),
-                  const Divider(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('المبلغ الإجمالي المتوقع', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
-                      Text(request.finalPrice != null ? '${request.finalPrice!.toInt()} ج.م' : '${request.estimatedPriceMin.toInt()} - ${request.estimatedPriceMax.toInt()} ج.م', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primaryDark, fontFamily: 'Cairo')),
-                    ],
-                  ),
-                ],
-              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('تفاصيل الفاتورة والحساب', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
+                const SizedBox(height: 12),
+                _buildPriceRow(label: 'رسوم الكشف والزيارة', value: '80.00 ج.م'),
+                const SizedBox(height: 6),
+                _buildPriceRow(label: 'أجور الفحص وخدمة الصيانة', value: '${((request.finalPrice ?? request.estimatedPriceMin) - 80).clamp(0, 9999).toInt()}.00 ج.م'),
+                const Divider(height: 20),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  const Text('المبلغ الإجمالي المتوقع', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
+                  Text(request.finalPrice != null ? '${request.finalPrice!.toInt()} ج.م' : '${request.estimatedPriceMin.toInt()} - ${request.estimatedPriceMax.toInt()} ج.م', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primaryDark, fontFamily: 'Cairo')),
+                ]),
+              ]),
             ),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('خيارات السداد الإلكتروني والنقدي', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
-                  const SizedBox(height: 6),
-                  const Text('يمكن اختيار طريقة الدفع بعد تأكيد الحجز مع الفني.', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Cairo')),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                    icon: const Icon(Icons.credit_card_rounded, size: 18),
-                    label: const Text('سداد التكلفة / اختيار طريقة الدفع', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 13)),
-                    onPressed: () async {
-                      final hasBooking = await _hasConfirmedBooking(request.id);
-                      if (!context.mounted) return;
-                      if (!hasBooking) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('السداد متاح بعد تأكيد الحجز مع الفني.')));
-                        return;
-                      }
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerPaymentScreen(request: request)));
-                    },
-                  ),
-                ],
-              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                const Text('خيارات السداد الإلكتروني والنقدي', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
+                const SizedBox(height: 6),
+                const Text('يمكن اختيار طريقة الدفع بعد تأكيد الحجز مع الفني.', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Cairo')),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                  icon: const Icon(Icons.credit_card_rounded, size: 18),
+                  label: const Text('سداد التكلفة / اختيار طريقة الدفع', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 13)),
+                  onPressed: () async {
+                    final hasBooking = await _hasConfirmedBooking(request.id);
+                    if (!context.mounted) return;
+                    if (!hasBooking) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('السداد متاح بعد تأكيد الحجز مع الفني.')));
+                      return;
+                    }
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerPaymentScreen(request: request)));
+                  },
+                ),
+              ]),
             ),
             const SizedBox(height: 16),
             if (_booking?.status == BookingStatus.completed)
