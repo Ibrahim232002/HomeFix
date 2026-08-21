@@ -5,6 +5,7 @@ import '../models/api_dtos.dart';
 import '../models/booking_contract_dto.dart';
 import '../models/booking_model.dart';
 import '../models/address_model.dart';
+import 'customer_profile_repository.dart';
 
 class BookingVerificationIssueResult {
   final String message;
@@ -22,7 +23,7 @@ class BookingVerificationIssueResult {
 
 abstract class IBookingRepository {
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId);
-  Future<List<BookingModel>> getBookingsByCustomer(String customerId);
+  Future<List<BookingModel>> getBookingsByCustomer(String customerUserId);
   Future<BookingModel?> getBookingById(String id);
   Future<BookingModel?> getBookingByRequest(String requestId);
   Future<BookingModel> updateBookingStatus(String bookingId, BookingStatus newStatus);
@@ -39,40 +40,38 @@ abstract class IBookingRepository {
 
 class BookingRepository implements IBookingRepository {
   final ApiClient _client = ApiClient();
+  final CustomerProfileRepository _customerProfileRepo = CustomerProfileRepository();
 
   @override
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId) async {
     final intId = int.tryParse(technicianId);
     if (intId == null || intId <= 0) return [];
-    try {
-      final response = await _client.get(ApiConstants.bookingsByTechnician(intId));
-      if (response is List) return response.whereType<Map<String, dynamic>>().map(_mapRawJsonToModel).toList();
-      return [];
-    } catch (_) {
-      return [];
-    }
+    final response = await _client.get(ApiConstants.bookingsByTechnician(intId));
+    if (response is List) return response.whereType<Map<String, dynamic>>().map(_mapRawJsonToModel).toList();
+    return [];
   }
 
   @override
-  Future<List<BookingModel>> getBookingsByCustomer(String customerId) async {
-    final intId = int.tryParse(customerId);
-    if (intId == null) return [];
-    try {
-      final reqResponse = await _client.get(ApiConstants.serviceRequestsByCustomer(intId));
-      if (reqResponse is List) {
-        final List<BookingModel> customerBookings = [];
-        for (final reqJson in reqResponse.whereType<Map<String, dynamic>>()) {
-          final requestId = reqJson['id'] is int ? reqJson['id'] as int : int.tryParse(reqJson['id']?.toString() ?? '0') ?? 0;
-          if (requestId <= 0) continue;
-          try {
-            final response = await _client.get(ApiConstants.bookingByRequest(requestId));
-            if (response is Map<String, dynamic>) customerBookings.add(_mapRawJsonToModel(response));
-          } catch (_) {}
-        }
-        return customerBookings;
+  Future<List<BookingModel>> getBookingsByCustomer(String customerUserId) async {
+    final userId = int.tryParse(customerUserId);
+    if (userId == null || userId <= 0) throw Exception('معرف المستخدم غير صالح');
+    final profile = await _customerProfileRepo.getProfileByUserId(userId);
+    final reqResponse = await _client.get(ApiConstants.serviceRequestsByCustomer(profile.id));
+    if (reqResponse is! List) return [];
+
+    final List<BookingModel> customerBookings = [];
+    for (final reqJson in reqResponse.whereType<Map<String, dynamic>>()) {
+      final requestId = reqJson['id'] is int ? reqJson['id'] as int : int.tryParse(reqJson['id']?.toString() ?? '0') ?? 0;
+      if (requestId <= 0) continue;
+      try {
+        final response = await _client.get(ApiConstants.bookingByRequest(requestId));
+        if (response is Map<String, dynamic>) customerBookings.add(_mapRawJsonToModel(response));
+      } catch (error) {
+        if (error is ApiException && error.statusCode == 404) continue;
+        rethrow;
       }
-    } catch (_) {}
-    return [];
+    }
+    return customerBookings;
   }
 
   @override
