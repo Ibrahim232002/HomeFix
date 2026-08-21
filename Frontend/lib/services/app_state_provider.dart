@@ -117,6 +117,7 @@ class AppStateProvider extends ChangeNotifier {
     catch (e) { _apiError = e.toString(); }
     finally { _isLoadingPublic = false; notifyListeners(); }
   }
+
   Future<void> refreshPublicData() async => _loadPublicData();
 
   Future<void> login(String email, String password, UserRole role) async { _isLoading = true; _errorMessage = null; notifyListeners(); try { _currentUser = await _userRepo.login(email, password, role); if (_currentUser?.role == UserRole.technician) _technicianNavIndex = 0; else _customerNavIndex = 0; await _loadInitialData(); } catch (e) { _errorMessage = e.toString().replaceAll('Exception: ', ''); } finally { _isLoading = false; notifyListeners(); } }
@@ -127,16 +128,41 @@ class AppStateProvider extends ChangeNotifier {
   void setCustomerNavIndex(int index) { _customerNavIndex = index; notifyListeners(); }
   void setTechnicianNavIndex(int index) { _technicianNavIndex = index; notifyListeners(); }
 
+  List<ServiceRequestModel> _enrichRequests(List<ServiceRequestModel> requests, {List<AddressModel> addresses = const []}) {
+    return requests.map((request) {
+      ServiceModel? service;
+      for (final item in _services) {
+        if (item.id == request.serviceId) { service = item; break; }
+      }
+      AddressModel? address;
+      for (final item in addresses) {
+        if (item.id == request.address.id) { address = item; break; }
+      }
+      return request.copyWith(
+        serviceNameAr: service?.nameAr ?? request.serviceNameAr,
+        categoryNameAr: service?.categoryNameAr ?? request.categoryNameAr,
+        address: address ?? request.address,
+      );
+    }).toList();
+  }
+
+  Future<void> _refreshAvailableTechnicianRequests() async {
+    if (!isTechnician) return;
+    final requests = await _requestRepo.getAvailableRequestsForTechnicians();
+    _availableTechRequests = _enrichRequests(requests);
+  }
+
   Future<void> _loadInitialData() async {
     try {
       _services = await _serviceRepo.getServices();
       _technicians = await _techRepo.getTechnicians();
       if (_currentUser != null) {
         if (isCustomer) {
-          _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
           _savedAddresses = await _userRepo.getUserAddresses(_currentUser!.id);
+          _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses);
+          _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id);
         } else {
-          _availableTechRequests = await _requestRepo.getAvailableRequestsForTechnicians();
+          _availableTechRequests = _enrichRequests(await _requestRepo.getAvailableRequestsForTechnicians());
           final userId = _currentUser!.id;
           final profile = await _techRepo.getTechnicianByUserId(userId);
           if (profile == null || profile.id.isEmpty) throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
@@ -205,15 +231,38 @@ class AppStateProvider extends ChangeNotifier {
       statusHistory: [ServiceRequestStatusHistoryModel(status: ServiceRequestStatus.pending, timestamp: 'الآن', updatedBy: _currentUser!.fullName)],
     );
     final newReq = await _requestRepo.createRequest(requestToCreate);
+    _customerOffers = [];
     _customerRequests.insert(0, newReq);
     notifyListeners();
     return newReq;
   }
-  Future<void> cancelRequest(String requestId, String reason) async { await _requestRepo.cancelRequest(requestId, reason); if (_currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); if (isTechnician) _availableTechRequests = await _requestRepo.getAvailableRequestsForTechnicians(); notifyListeners(); }
+
+  Future<void> cancelRequest(String requestId, String reason) async {
+    await _requestRepo.cancelRequest(requestId, reason);
+    if (_currentUser != null && isCustomer) {
+      _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses);
+    }
+    if (isTechnician) await _refreshAvailableTechnicianRequests();
+    notifyListeners();
+  }
 
   Future<void> submitTechnicianOffer({required ServiceRequestModel request, required double proposedPrice, String? technicianNote}) async { final requestId = int.tryParse(request.id); if (requestId == null || requestId <= 0) throw Exception('معرف الطلب غير صالح'); final offer = await _offerRepo.createOffer(serviceRequestId: requestId, proposedPrice: proposedPrice, technicianNote: technicianNote); _technicianOffers.insert(0, offer); _availableTechRequests.removeWhere((r) => r.id == request.id); notifyListeners(); }
   Future<void> loadOffersForCustomerRequest(String requestId) async { final id = int.tryParse(requestId); if (id == null || id <= 0) { _customerOffers = []; notifyListeners(); return; } _customerOffers = await _offerRepo.getOffersForRequest(id); notifyListeners(); }
-  Future<void> acceptCustomerOffer(String offerId, String requestId) async { final id = int.tryParse(offerId); if (id == null || id <= 0) throw Exception('معرف العرض غير صالح'); await _offerRepo.acceptOffer(id); if (_currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); _customerOffers = await _offerRepo.getOffersForRequest(int.tryParse(requestId) ?? 0); notifyListeners(); }
+
+  Future<void> acceptCustomerOffer(String offerId, String requestId) async {
+    final id = int.tryParse(offerId);
+    if (id == null || id <= 0) throw Exception('معرف العرض غير صالح');
+    final requestIdValue = int.tryParse(requestId);
+    if (requestIdValue == null || requestIdValue <= 0) throw Exception('معرف الطلب غير صالح');
+    await _offerRepo.acceptOffer(id);
+    if (_currentUser != null && isCustomer) {
+      _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses);
+      _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id);
+    }
+    _customerOffers = await _offerRepo.getOffersForRequest(requestIdValue);
+    notifyListeners();
+  }
+
   Future<void> rejectCustomerOffer(String offerId, String requestId) async { final id = int.tryParse(offerId); if (id == null || id <= 0) throw Exception('معرف العرض غير صالح'); await _offerRepo.rejectOffer(id); _customerOffers = await _offerRepo.getOffersForRequest(int.tryParse(requestId) ?? 0); notifyListeners(); }
 
   Future<void> updateTechnicianSpecialization({required int categoryId, required List<int> serviceIds}) async {
@@ -223,12 +272,13 @@ class AppStateProvider extends ChangeNotifier {
     if (technicianId == null || technicianId <= 0) throw Exception('معرف ملف الفني غير صالح');
     final updatedProfile = await _techRepo.updateTechnicianSpecialization(technicianId, categoryId: categoryId, serviceIds: serviceIds);
     _currentTechProfile = updatedProfile;
+    await _refreshAvailableTechnicianRequests();
     notifyListeners();
   }
 
   Future<void> loadServiceAreas() async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId > 0) { _serviceAreas = await _techRepo.getServiceAreas(techId); notifyListeners(); } }
-  Future<void> addTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.addServiceArea(techId, cityId); await loadServiceAreas(); }
-  Future<void> removeTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.deleteServiceArea(techId, cityId); await loadServiceAreas(); }
+  Future<void> addTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.addServiceArea(techId, cityId); await loadServiceAreas(); await _refreshAvailableTechnicianRequests(); }
+  Future<void> removeTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.deleteServiceArea(techId, cityId); await loadServiceAreas(); await _refreshAvailableTechnicianRequests(); }
   Future<void> updateTechnicianCurrentLocation(double latitude, double longitude) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); final dto = await _techRepo.updateApiTechnicianProfile(techId, UpdateTechnicianProfileRequest(currentLatitude: latitude, currentLongitude: longitude)); _currentTechProfile = _currentTechProfile?.copyWith(currentLatitude: dto.currentLatitude, currentLongitude: dto.currentLongitude); notifyListeners(); }
 
   void _upsertBooking(BookingModel booking) {
@@ -249,9 +299,7 @@ class AppStateProvider extends ChangeNotifier {
     return booking;
   }
 
-  Future<BookingVerificationIssueResult> requestJobStartCode(String bookingId) async {
-    return _bookingRepo.issueBookingVerificationCode(bookingId, 'JobStart');
-  }
+  Future<BookingVerificationIssueResult> requestJobStartCode(String bookingId) async { return _bookingRepo.issueBookingVerificationCode(bookingId, 'JobStart'); }
 
   Future<BookingModel> verifyJobStart(String bookingId, String code) async {
     final verified = await _bookingRepo.verifyBookingCode(bookingId, 'JobStart', code);
@@ -261,26 +309,25 @@ class AppStateProvider extends ChangeNotifier {
     return refreshed;
   }
 
-  Future<BookingVerificationIssueResult> requestJobCompletionCode(String bookingId) async {
-    return _bookingRepo.issueBookingVerificationCode(bookingId, 'JobCompletion');
-  }
+  Future<BookingVerificationIssueResult> requestJobCompletionCode(String bookingId) async { return _bookingRepo.issueBookingVerificationCode(bookingId, 'JobCompletion'); }
 
   Future<BookingModel> verifyJobCompletion(String bookingId, String code) async {
     final verified = await _bookingRepo.verifyBookingCode(bookingId, 'JobCompletion', code);
     final refreshed = await _bookingRepo.getBookingById(bookingId) ?? verified;
     _upsertBooking(refreshed);
     if (_currentUser != null && isCustomer) {
-      _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
+      _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses);
+      _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id);
     }
     notifyListeners();
     return refreshed;
   }
 
   Future<void> updateBookingStatus(String bookingId, BookingStatus status) async { await _bookingRepo.updateBookingStatus(bookingId, status); if (_currentTechProfile != null) _bookings = await _bookingRepo.getBookingsByTechnician(_currentTechProfile!.id); notifyListeners(); }
-  Future<void> toggleTechnicianAvailability() async { if (_currentTechProfile == null) return; final newStatus = !_currentTechProfile!.isAvailable; await _techRepo.updateAvailability(_currentTechProfile!.id, newStatus); _currentTechProfile = _currentTechProfile!.copyWith(isAvailable: newStatus); notifyListeners(); }
+  Future<void> toggleTechnicianAvailability() async { if (_currentTechProfile == null) return; final newStatus = !_currentTechProfile!.isAvailable; await _techRepo.updateAvailability(_currentTechProfile!.id, newStatus); _currentTechProfile = _currentTechProfile!.copyWith(isAvailable: newStatus); await _refreshAvailableTechnicianRequests(); notifyListeners(); }
   Future<MessageModel> sendMessage(String conversationId, String text, {String? attachmentUrl}) async { if (_currentUser == null) throw Exception('Not logged in'); final msg = await _chatRepo.sendMessage(conversationId: conversationId, sender: _currentUser!, text: text, attachmentUrl: attachmentUrl); _conversations = await _chatRepo.getConversations(_currentUser!.id); notifyListeners(); return msg; }
   Future<ConversationModel> startConversationWithTechnician({required TechnicianProfileModel technician, String? serviceNameAr, String? requestId}) async { if (_currentUser == null) throw Exception('Not logged in'); final conv = await _chatRepo.getOrCreateConversation(customerId: _currentUser!.id, customerName: _currentUser!.fullName, customerAvatar: _currentUser!.avatarUrl, technicianId: technician.userId, technicianName: technician.fullName, technicianAvatar: technician.avatarUrl, serviceNameAr: serviceNameAr, requestId: requestId); _conversations = await _chatRepo.getConversations(_currentUser!.id); notifyListeners(); return conv; }
-  Future<void> addAddress(AddressModel address) async { final added = await _userRepo.addAddress(address); _savedAddresses.add(added); notifyListeners(); }
+  Future<void> addAddress(AddressModel address) async { final added = await _userRepo.addAddress(address); _savedAddresses = await _userRepo.getUserAddresses(_currentUser?.id ?? address.userId); notifyListeners(); }
   Future<void> requestWithdrawal(double amount, String iban) async { if (_currentTechProfile == null) throw Exception('تعذر تحديد ملف الفني'); await _walletRepo.requestWithdrawal(_currentTechProfile!.id, amount, iban); _wallet = await _walletRepo.getWalletByTechnician(_currentTechProfile!.id); notifyListeners(); }
   void markNotificationAsRead(String id) { _userRepo.markNotificationAsRead(id); final index = _notifications.indexWhere((n) => n.id == id); if (index != -1) { _notifications[index] = _notifications[index].copyWith(isRead: true); notifyListeners(); } }
   Future<void> markAllNotificationsAsRead() async { for (var i = 0; i < _notifications.length; i++) { if (!_notifications[i].isRead) { _notifications[i] = _notifications[i].copyWith(isRead: true); _userRepo.markNotificationAsRead(_notifications[i].id); } } notifyListeners(); }
@@ -288,6 +335,6 @@ class AppStateProvider extends ChangeNotifier {
   Future<void> uploadDocument({required String titleAr, required String titleEn, required String documentType, String? documentNumber, String? fileUrl}) async { final profile = _currentTechProfile; if (profile == null) throw Exception('تعذر تحديد ملف الفني'); final techId = int.tryParse(profile.id); if (techId == null || techId <= 0) throw Exception('معرف ملف الفني غير صالح'); final docDto = await _techRepo.uploadDocument(CreateTechnicianDocumentRequest(technicianId: techId, documentType: documentType, documentUrl: fileUrl ?? 'https://example.com/doc.pdf')); _technicianDocuments.add(TechnicianDocumentModel(id: docDto.id.toString(), technicianId: docDto.technicianId.toString(), titleAr: titleAr, titleEn: titleEn, documentType: docDto.documentType ?? documentType, documentNumber: documentNumber, fileUrl: docDto.documentUrl ?? '', status: DocumentStatus.fromString(docDto.status ?? 'Pending'), submittedAt: docDto.uploadedAt.isNotEmpty ? docDto.uploadedAt : 'الآن')); notifyListeners(); }
   Future<List<PaymentModel>> loadPaymentsForRequest(String requestId) async { final reqId = int.tryParse(requestId) ?? 0; if (reqId == 0) return []; try { final dtoList = await _paymentRepo.getPaymentsByRequestId(reqId); final mapped = dtoList.map((d) => PaymentModel.fromDto(d)).toList(); _payments = mapped; notifyListeners(); return mapped; } catch (_) { return []; } }
   Future<InitiatePaymentResponse> initiatePayment({required String serviceRequestId, required PaymentMethodType method, String? walletPhoneNumber, String paymentType = 'FullService'}) async { final reqId = int.tryParse(serviceRequestId) ?? 0; if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح'); _isLoading = true; _errorMessage = null; notifyListeners(); try { final response = await _paymentRepo.initiatePayment(InitiatePaymentRequest(serviceRequestId: reqId, paymentMethod: method.nameStr, walletPhoneNumber: walletPhoneNumber, paymentType: paymentType)); _activePayment = PaymentModel.fromInitiateResponse(response, serviceRequestId, response.amount); _isLoading = false; notifyListeners(); return response; } catch (e) { _isLoading = false; _errorMessage = e.toString(); notifyListeners(); rethrow; } }
-  Future<VerifyPaymentResponse> verifyPayment(int paymentId) async { _isLoading = true; notifyListeners(); try { final verifyResp = await _paymentRepo.verifyPayment(paymentId); if (_activePayment != null && _activePayment!.id == paymentId.toString()) _activePayment = _activePayment!.copyWith(status: PaymentStatusTypeExtension.fromString(verifyResp.status), transactionReference: verifyResp.transactionReference, paidAt: verifyResp.paidAt); if (verifyResp.isSuccess && _currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); _isLoading = false; notifyListeners(); return verifyResp; } catch (e) { _isLoading = false; notifyListeners(); rethrow; } }
-  Future<PaymentDto> selectCashOnDelivery(String serviceRequestId) async { final reqId = int.tryParse(serviceRequestId) ?? 0; if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح'); _isLoading = true; notifyListeners(); try { final dto = await _paymentRepo.setCashPayment(reqId); _activePayment = PaymentModel.fromDto(dto); if (_currentUser != null) _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); _isLoading = false; notifyListeners(); return dto; } catch (e) { _isLoading = false; _errorMessage = e.toString(); notifyListeners(); rethrow; } }
+  Future<VerifyPaymentResponse> verifyPayment(int paymentId) async { _isLoading = true; notifyListeners(); try { final verifyResp = await _paymentRepo.verifyPayment(paymentId); if (_activePayment != null && _activePayment!.id == paymentId.toString()) _activePayment = _activePayment!.copyWith(status: PaymentStatusTypeExtension.fromString(verifyResp.status), transactionReference: verifyResp.transactionReference, paidAt: verifyResp.paidAt); if (verifyResp.isSuccess && _currentUser != null) _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); _isLoading = false; notifyListeners(); return verifyResp; } catch (e) { _isLoading = false; notifyListeners(); rethrow; } }
+  Future<PaymentDto> selectCashOnDelivery(String serviceRequestId) async { final reqId = int.tryParse(serviceRequestId) ?? 0; if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح'); _isLoading = true; notifyListeners(); try { final dto = await _paymentRepo.setCashPayment(reqId); _activePayment = PaymentModel.fromDto(dto); if (_currentUser != null) _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); _isLoading = false; notifyListeners(); return dto; } catch (e) { _isLoading = false; _errorMessage = e.toString(); notifyListeners(); rethrow; } }
 }
