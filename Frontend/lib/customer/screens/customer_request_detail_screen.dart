@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/service_request_model.dart';
+import '../../models/booking_model.dart';
 import '../../services/app_state_provider.dart';
 import '../../repositories/booking_repository.dart';
 import '../../common/screens/chat_detail_screen.dart';
 import '../../common/widgets/review_dialog.dart';
+import '../../common/widgets/booking_verification_dialog.dart';
 import 'customer_payment_screen.dart';
 
 class CustomerRequestDetailScreen extends StatefulWidget {
@@ -20,6 +22,9 @@ class CustomerRequestDetailScreen extends StatefulWidget {
 
 class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScreen> {
   bool _offersLoading = true;
+  bool _bookingLoading = true;
+  bool _completionActionLoading = false;
+  BookingModel? _booking;
   final Set<String> _actingOffers = {};
 
   int _getStatusStepIndex(ServiceRequestStatus status) {
@@ -54,6 +59,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   void initState() {
     super.initState();
     _loadOffers();
+    _loadBooking();
   }
 
   Future<void> _loadOffers() async {
@@ -64,10 +70,24 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
     }
   }
 
+  Future<void> _loadBooking() async {
+    try {
+      final booking = await Provider.of<AppStateProvider>(context, listen: false)
+          .loadBookingForRequest(widget.requestId);
+      if (!mounted) return;
+      setState(() => _booking = booking);
+    } catch (_) {
+      if (mounted) setState(() => _booking = null);
+    } finally {
+      if (mounted) setState(() => _bookingLoading = false);
+    }
+  }
+
   Future<void> _acceptOffer(String offerId) async {
     setState(() => _actingOffers.add(offerId));
     try {
       await Provider.of<AppStateProvider>(context, listen: false).acceptCustomerOffer(offerId, widget.requestId);
+      await _loadBooking();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم قبول العرض وتأكيد الحجز بنجاح.')));
       }
@@ -96,10 +116,54 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
     }
   }
 
+  String _errorMessage(Object error) => error.toString().replaceFirst('Exception: ', '');
+
+  Future<void> _verifyJobCompletion() async {
+    final booking = _booking;
+    if (booking == null || booking.status != BookingStatus.awaitingCompletion) return;
+
+    setState(() => _completionActionLoading = true);
+    try {
+      final provider = Provider.of<AppStateProvider>(context, listen: false);
+      await provider.requestJobCompletionCode(booking.id);
+      if (!mounted) return;
+
+      final verified = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => BookingVerificationDialog(
+          title: 'تأكيد إتمام الخدمة',
+          description: 'أدخل رمز التحقق المكون من 6 أرقام لتأكيد اكتمال الخدمة.',
+          onVerify: (code) => provider.verifyJobCompletion(booking.id, code),
+          onResend: () => provider.requestJobCompletionCode(booking.id),
+        ),
+      );
+
+      if (!mounted) return;
+      if (verified == true) {
+        await _loadBooking();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم تأكيد إتمام الخدمة بنجاح.')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_errorMessage(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _completionActionLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppStateProvider>(context);
-    final request = appState.customerRequests.firstWhere((r) => r.id == widget.requestId, orElse: () => appState.customerRequests.first);
+    final request = appState.customerRequests.firstWhere(
+      (r) => r.id == widget.requestId,
+      orElse: () => appState.customerRequests.first,
+    );
     final currentStep = _getStatusStepIndex(request.status);
     final offers = appState.customerOffers;
 
@@ -311,6 +375,42 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
               ),
             ),
             const SizedBox(height: 16),
+            if (!_bookingLoading && _booking != null)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('حالة الحجز الفعلية', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
+                        StatusBadge.fromBookingStatus(_booking!.status),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _booking!.status.displayNameAr,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'),
+                    ),
+                    if (_booking!.status == BookingStatus.awaitingCompletion) ...[
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: _completionActionLoading ? null : _verifyJobCompletion,
+                        icon: _completionActionLoading
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.verified_rounded, size: 18),
+                        label: Text(
+                          _completionActionLoading ? 'جاري تجهيز رمز التحقق...' : 'تأكيد إتمام الخدمة',
+                          style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
@@ -362,7 +462,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
               ),
             ),
             const SizedBox(height: 16),
-            if (request.status == ServiceRequestStatus.completed)
+            if (_booking?.status == BookingStatus.completed)
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), padding: const EdgeInsets.symmetric(vertical: 14)),
                 icon: const Icon(Icons.star_rounded, color: Colors.white),
