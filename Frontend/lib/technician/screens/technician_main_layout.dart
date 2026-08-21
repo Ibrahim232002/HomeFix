@@ -9,7 +9,7 @@ import 'technician_wallet_screen.dart';
 import 'technician_profile_screen.dart';
 
 class TechnicianMainLayout extends StatelessWidget {
-  const TechnicianMainLayout({Key? key}) : super(key: key);
+  const TechnicianMainLayout({super.key});
 
   static final List<Widget> _screens = [
     const TechnicianDashboardScreen(),
