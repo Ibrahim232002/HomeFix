@@ -72,7 +72,7 @@ class UserRepository implements IUserRepository {
     return dtos
         .map((d) => AddressModel(
               id: d.id.toString(),
-              userId: d.customerId.toString(),
+              userId: userId,
               title: d.label ?? d.buildingNumber ?? 'العنوان المسجل',
               governorate: '',
               city: '',
@@ -109,7 +109,7 @@ class UserRepository implements IUserRepository {
         isDefault: address.isDefault,
       ),
     );
-    return address.copyWith(id: dto.id.toString(), userId: profile.id.toString());
+    return address.copyWith(id: dto.id.toString(), userId: address.userId);
   }
 
   @override
