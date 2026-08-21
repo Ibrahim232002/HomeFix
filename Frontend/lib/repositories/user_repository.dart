@@ -4,6 +4,7 @@ import '../models/notification_model.dart';
 import 'auth_repository.dart';
 import 'address_repository.dart';
 import 'notification_repository.dart';
+import 'customer_profile_repository.dart';
 import '../models/api_dtos.dart';
 
 abstract class IUserRepository {
@@ -20,6 +21,7 @@ class UserRepository implements IUserRepository {
   final AuthRepository _authRepo = AuthRepository();
   final AddressRepository _addressRepo = AddressRepository();
   final NotificationRepository _notifRepo = NotificationRepository();
+  final CustomerProfileRepository _customerProfileRepo = CustomerProfileRepository();
 
   @override
   Future<UserModel> login(String email, String password, UserRole role) async {
@@ -60,42 +62,43 @@ class UserRepository implements IUserRepository {
 
   @override
   Future<List<AddressModel>> getUserAddresses(String userId) async {
-    final intUserId = int.tryParse(userId);
-    if (intUserId != null) {
-      try {
-        final dtos = await _addressRepo.getAddressesByCustomerId(intUserId);
-        return dtos
-            .map((d) => AddressModel(
-                  id: d.id.toString(),
-                  userId: d.customerId.toString(),
-                  title: d.label ?? d.buildingNumber ?? 'العنوان المسجل',
-                  governorate: '',
-                  city: '',
-                  street: d.fullAddress ?? '',
-                  building: d.buildingNumber ?? '',
-                  floor: d.floorNumber ?? '',
-                  apartment: d.apartmentNumber ?? '',
-                  isDefault: d.isDefault,
-                  governorateId: d.governorateId,
-                  cityId: d.cityId,
-                ))
-            .toList();
-      } catch (_) {}
+    final userIdValue = int.tryParse(userId);
+    if (userIdValue == null || userIdValue <= 0) {
+      throw Exception('معرف المستخدم غير صالح');
     }
-    return [];
+
+    final profile = await _customerProfileRepo.getProfileByUserId(userIdValue);
+    final dtos = await _addressRepo.getAddressesByCustomerId(profile.id);
+    return dtos
+        .map((d) => AddressModel(
+              id: d.id.toString(),
+              userId: d.customerId.toString(),
+              title: d.label ?? d.buildingNumber ?? 'العنوان المسجل',
+              governorate: '',
+              city: '',
+              street: d.fullAddress ?? '',
+              building: d.buildingNumber ?? '',
+              floor: d.floorNumber ?? '',
+              apartment: d.apartmentNumber ?? '',
+              isDefault: d.isDefault,
+              governorateId: d.governorateId,
+              cityId: d.cityId,
+            ))
+        .toList();
   }
 
   @override
   Future<AddressModel> addAddress(AddressModel address) async {
-    final intUserId = int.tryParse(address.userId);
-    if (intUserId == null) throw Exception('معرف المستخدم غير صالح');
+    final userIdValue = int.tryParse(address.userId);
+    if (userIdValue == null || userIdValue <= 0) throw Exception('معرف المستخدم غير صالح');
     if (address.cityId == null || address.governorateId == null) {
       throw Exception('يرجى اختيار المحافظة والمدينة');
     }
 
+    final profile = await _customerProfileRepo.getProfileByUserId(userIdValue);
     final dto = await _addressRepo.createAddress(
       CreateAddressRequest(
-        customerId: intUserId,
+        customerId: profile.id,
         label: address.title,
         cityId: address.cityId,
         governorateId: address.governorateId,
@@ -106,7 +109,7 @@ class UserRepository implements IUserRepository {
         isDefault: address.isDefault,
       ),
     );
-    return address.copyWith(id: dto.id.toString());
+    return address.copyWith(id: dto.id.toString(), userId: profile.id.toString());
   }
 
   @override
