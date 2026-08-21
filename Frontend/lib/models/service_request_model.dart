@@ -2,6 +2,8 @@ import 'address_model.dart';
 
 enum ServiceRequestStatus {
   pending,
+  open,
+  offerPending,
   accepted,
   scheduled,
   inProgress,
@@ -12,6 +14,10 @@ enum ServiceRequestStatus {
     switch (this) {
       case ServiceRequestStatus.pending:
         return 'قيد الانتظار';
+      case ServiceRequestStatus.open:
+        return 'مفتوح';
+      case ServiceRequestStatus.offerPending:
+        return 'بانتظار عروض الفنيين';
       case ServiceRequestStatus.accepted:
         return 'تم القبول';
       case ServiceRequestStatus.scheduled:
@@ -26,7 +32,13 @@ enum ServiceRequestStatus {
   }
 
   static ServiceRequestStatus fromString(String val) {
-    switch (val.toLowerCase()) {
+    switch (val.toLowerCase().replaceAll('_', '')) {
+      case 'pending':
+        return ServiceRequestStatus.pending;
+      case 'open':
+        return ServiceRequestStatus.open;
+      case 'offerpending':
+        return ServiceRequestStatus.offerPending;
       case 'accepted':
         return ServiceRequestStatus.accepted;
       case 'scheduled':
@@ -36,6 +48,7 @@ enum ServiceRequestStatus {
       case 'completed':
         return ServiceRequestStatus.completed;
       case 'cancelled':
+      case 'canceled':
         return ServiceRequestStatus.cancelled;
       default:
         return ServiceRequestStatus.pending;
@@ -46,6 +59,10 @@ enum ServiceRequestStatus {
     switch (this) {
       case ServiceRequestStatus.pending:
         return 'Pending';
+      case ServiceRequestStatus.open:
+        return 'Open';
+      case ServiceRequestStatus.offerPending:
+        return 'OfferPending';
       case ServiceRequestStatus.accepted:
         return 'Accepted';
       case ServiceRequestStatus.scheduled:
