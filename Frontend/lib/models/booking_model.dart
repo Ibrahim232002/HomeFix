@@ -32,7 +32,6 @@ enum BookingStatus {
     }
   }
 
-  /// Exact backend Booking.Status value represented by this enum member.
   String get nameStr {
     switch (this) {
       case BookingStatus.upcoming:
@@ -71,8 +70,6 @@ enum BookingStatus {
       case 'cancelled':
         return BookingStatus.cancelled;
       default:
-        // Unknown backend values must remain explicitly unknown rather than being
-        // silently converted into a valid booking state.
         return BookingStatus.unknown;
     }
   }
@@ -102,7 +99,12 @@ class BookingModel {
   final double price;
   final BookingStatus status;
   final String createdAt;
+  final String? acceptedAt;
+  final String? arrivedAt;
+  final String? startedAt;
   final String? completedAt;
+  final double? agreedPrice;
+  final double? finalPrice;
   final String? notes;
 
   BookingModel({
@@ -119,7 +121,12 @@ class BookingModel {
     required this.price,
     required this.status,
     required this.createdAt,
+    this.acceptedAt,
+    this.arrivedAt,
+    this.startedAt,
     this.completedAt,
+    this.agreedPrice,
+    this.finalPrice,
     this.notes,
   });
 
@@ -137,7 +144,12 @@ class BookingModel {
     double? price,
     BookingStatus? status,
     String? createdAt,
+    String? acceptedAt,
+    String? arrivedAt,
+    String? startedAt,
     String? completedAt,
+    double? agreedPrice,
+    double? finalPrice,
     String? notes,
   }) {
     return BookingModel(
@@ -154,7 +166,12 @@ class BookingModel {
       price: price ?? this.price,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      acceptedAt: acceptedAt ?? this.acceptedAt,
+      arrivedAt: arrivedAt ?? this.arrivedAt,
+      startedAt: startedAt ?? this.startedAt,
       completedAt: completedAt ?? this.completedAt,
+      agreedPrice: agreedPrice ?? this.agreedPrice,
+      finalPrice: finalPrice ?? this.finalPrice,
       notes: notes ?? this.notes,
     );
   }
@@ -173,7 +190,12 @@ class BookingModel {
         'price': price,
         'status': status.nameStr,
         'createdAt': createdAt,
+        'acceptedAt': acceptedAt,
+        'arrivedAt': arrivedAt,
+        'startedAt': startedAt,
         'completedAt': completedAt,
+        'agreedPrice': agreedPrice,
+        'finalPrice': finalPrice,
         'notes': notes,
       };
 
@@ -191,7 +213,12 @@ class BookingModel {
         price: (json['price'] as num?)?.toDouble() ?? 0.0,
         status: BookingStatus.fromString(json['status']?.toString() ?? 'Unknown'),
         createdAt: json['createdAt']?.toString() ?? '',
+        acceptedAt: json['acceptedAt']?.toString(),
+        arrivedAt: json['arrivedAt']?.toString(),
+        startedAt: json['startedAt']?.toString(),
         completedAt: json['completedAt']?.toString(),
+        agreedPrice: (json['agreedPrice'] as num?)?.toDouble(),
+        finalPrice: (json['finalPrice'] as num?)?.toDouble(),
         notes: json['notes']?.toString(),
       );
 }
