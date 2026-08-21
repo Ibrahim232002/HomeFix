@@ -4,14 +4,30 @@ import '../models/api_dtos.dart';
 import '../models/booking_model.dart';
 import '../models/address_model.dart';
 
+class BookingVerificationIssueResult {
+  final String message;
+  final String? developmentCode;
+
+  const BookingVerificationIssueResult({required this.message, this.developmentCode});
+
+  factory BookingVerificationIssueResult.fromJson(Map<String, dynamic> json) {
+    return BookingVerificationIssueResult(
+      message: json['message']?.toString() ?? 'تم إرسال رمز التحقق.',
+      developmentCode: json['developmentCode']?.toString(),
+    );
+  }
+}
+
 abstract class IBookingRepository {
   Future<List<BookingModel>> getBookingsByTechnician(String technicianId);
   Future<List<BookingModel>> getBookingsByCustomer(String customerId);
   Future<BookingModel?> getBookingById(String id);
+  Future<BookingModel?> getBookingByRequest(String requestId);
   Future<BookingModel> updateBookingStatus(String bookingId, BookingStatus newStatus);
   Future<BookingModel> createBooking(BookingModel booking);
+  Future<BookingVerificationIssueResult> issueBookingVerificationCode(String bookingId, String purpose);
+  Future<BookingModel> verifyBookingCode(String bookingId, String purpose, String code);
 
-  // Direct OpenAPI DTO methods
   Future<BookingDto> getApiBookingById(int id);
   Future<BookingDto> getApiBookingByRequest(int serviceRequestId);
   Future<List<BookingDto>> getApiBookingsByTechnician(int technicianId);
@@ -28,8 +44,6 @@ class BookingRepository implements IBookingRepository {
     if (intId == null || intId <= 0) return [];
 
     try {
-      // Use the raw response here so the technician UI receives the authoritative
-      // backend Booking.Status instead of deriving a broad state from timestamps.
       final response = await _client.get(ApiConstants.bookingsByTechnician(intId));
       if (response is List) {
         return response
@@ -39,8 +53,6 @@ class BookingRepository implements IBookingRepository {
       }
       return [];
     } catch (_) {
-      // Preserve existing read semantics; transition failures are intentionally
-      // not swallowed in updateBookingStatus below.
       return [];
     }
   }
@@ -79,13 +91,29 @@ class BookingRepository implements IBookingRepository {
     final intId = int.tryParse(id);
     if (intId == null || intId <= 0) return null;
 
+    final response = await _client.get(ApiConstants.bookingById(intId));
+    if (response is! Map<String, dynamic>) {
+      throw Exception('استجابة الحجز غير صالحة');
+    }
+    return _mapRawJsonToModel(response);
+  }
+
+  @override
+  Future<BookingModel?> getBookingByRequest(String requestId) async {
+    final intId = int.tryParse(requestId);
+    if (intId == null || intId <= 0) return null;
+
     try {
-      final response = await _client.get(ApiConstants.bookingById(intId));
-      if (response is Map<String, dynamic>) {
-        return _mapRawJsonToModel(response);
+      final response = await _client.get(ApiConstants.bookingByRequest(intId));
+      if (response is! Map<String, dynamic>) {
+        throw Exception('استجابة الحجز غير صالحة');
       }
-    } catch (_) {}
-    return null;
+      return _mapRawJsonToModel(response);
+    } catch (e) {
+      // A missing booking is a valid state before offer acceptance.
+      if (e.toString().contains('404')) return null;
+      rethrow;
+    }
   }
 
   @override
@@ -95,8 +123,6 @@ class BookingRepository implements IBookingRepository {
       throw Exception('معرف الحجز غير صالح');
     }
 
-    // Technician execution MUST use the dedicated transition endpoint. The generic
-    // PUT /api/Bookings/{id} remains an Admin API and is intentionally not used here.
     final response = await _client.post(
       ApiConstants.bookingTransition(intId),
       body: {'status': newStatus.nameStr},
@@ -106,8 +132,54 @@ class BookingRepository implements IBookingRepository {
       throw Exception('استجابة انتقال حالة الحجز غير صالحة');
     }
 
-    // Parse the authoritative response immediately. AppStateProvider already
-    // reloads centralized technician bookings after this method succeeds.
+    return _mapRawJsonToModel(response);
+  }
+
+  @override
+  Future<BookingVerificationIssueResult> issueBookingVerificationCode(
+    String bookingId,
+    String purpose,
+  ) async {
+    final id = int.tryParse(bookingId);
+    if (id == null || id <= 0) {
+      throw Exception('معرف الحجز غير صالح');
+    }
+    if (purpose != 'JobStart' && purpose != 'JobCompletion') {
+      throw Exception('غرض التحقق غير صالح');
+    }
+
+    final response = await _client.post(ApiConstants.bookingVerificationCode(id, purpose));
+    if (response is! Map<String, dynamic>) {
+      throw Exception('استجابة طلب رمز التحقق غير صالحة');
+    }
+    return BookingVerificationIssueResult.fromJson(response);
+  }
+
+  @override
+  Future<BookingModel> verifyBookingCode(
+    String bookingId,
+    String purpose,
+    String code,
+  ) async {
+    final id = int.tryParse(bookingId);
+    if (id == null || id <= 0) {
+      throw Exception('معرف الحجز غير صالح');
+    }
+    if (purpose != 'JobStart' && purpose != 'JobCompletion') {
+      throw Exception('غرض التحقق غير صالح');
+    }
+    final normalizedCode = code.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(normalizedCode)) {
+      throw Exception('يجب إدخال رمز تحقق مكون من 6 أرقام.');
+    }
+
+    final response = await _client.post(
+      ApiConstants.bookingVerifyCode(id, purpose),
+      body: normalizedCode,
+    );
+    if (response is! Map<String, dynamic>) {
+      throw Exception('استجابة التحقق غير صالحة');
+    }
     return _mapRawJsonToModel(response);
   }
 
@@ -115,7 +187,6 @@ class BookingRepository implements IBookingRepository {
   Future<BookingModel> createBooking(BookingModel booking) async {
     final requestId = int.tryParse(booking.requestId);
     final technicianId = int.tryParse(booking.technicianId);
-
     if (requestId == null || technicianId == null) {
       throw Exception('بيانات الحجز غير صالحة');
     }
@@ -131,6 +202,9 @@ class BookingRepository implements IBookingRepository {
     Map<String, dynamic> json, {
     BookingModel? fallback,
   }) {
+    final agreedPrice = (json['agreedPrice'] as num?)?.toDouble();
+    final finalPrice = (json['finalPrice'] as num?)?.toDouble();
+
     return BookingModel(
       id: json['id']?.toString() ?? fallback?.id ?? '',
       requestId: json['serviceRequestId']?.toString() ?? fallback?.requestId ?? '',
@@ -153,14 +227,16 @@ class BookingRepository implements IBookingRepository {
           ),
       scheduledDate: json['acceptedAt']?.toString() ?? fallback?.scheduledDate ?? '',
       scheduledTime: fallback?.scheduledTime ?? '',
-      price: (json['finalPrice'] as num?)?.toDouble() ??
-          (json['agreedPrice'] as num?)?.toDouble() ??
-          fallback?.price ??
-          0.0,
+      price: finalPrice ?? agreedPrice ?? fallback?.price ?? 0.0,
       status: BookingStatus.fromString(json['status']?.toString() ?? 'Unknown'),
       createdAt: json['acceptedAt']?.toString() ?? fallback?.createdAt ?? '',
+      acceptedAt: json['acceptedAt']?.toString(),
+      arrivedAt: json['arrivedAt']?.toString(),
+      startedAt: json['startedAt']?.toString(),
       completedAt: json['completedAt']?.toString(),
-      notes: json['technicianNotes']?.toString(),
+      agreedPrice: agreedPrice,
+      finalPrice: finalPrice,
+      notes: json['technicianNotes']?.toString() ?? fallback?.notes,
     );
   }
 
@@ -198,12 +274,16 @@ class BookingRepository implements IBookingRepository {
       price: dto.finalPrice ?? fallback?.price ?? 0.0,
       status: legacyStatus,
       createdAt: dto.acceptedAt ?? fallback?.createdAt ?? '',
+      acceptedAt: dto.acceptedAt,
+      arrivedAt: dto.arrivedAt,
+      startedAt: dto.startedAt,
       completedAt: dto.completedAt,
+      agreedPrice: fallback?.agreedPrice,
+      finalPrice: dto.finalPrice,
       notes: dto.technicianNotes,
     );
   }
 
-  // --- Direct OpenAPI Implementations ---
   @override
   Future<BookingDto> getApiBookingById(int id) async {
     final response = await _client.get(ApiConstants.bookingById(id));
