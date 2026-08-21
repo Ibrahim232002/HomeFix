@@ -30,6 +30,8 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   int _getStatusStepIndex(ServiceRequestStatus status) {
     switch (status) {
       case ServiceRequestStatus.pending:
+      case ServiceRequestStatus.open:
+      case ServiceRequestStatus.offerPending:
         return 0;
       case ServiceRequestStatus.accepted:
         return 1;
@@ -210,7 +212,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
               ),
             ),
             const SizedBox(height: 16),
-            if (request.status == ServiceRequestStatus.pending || request.status == ServiceRequestStatus.accepted)
+            if (request.status == ServiceRequestStatus.open || request.status == ServiceRequestStatus.offerPending || request.status == ServiceRequestStatus.accepted)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
@@ -258,7 +260,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
                               Text('حالة العرض: ${offer.status}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
                               if (offer.expiresAt != null && offer.expiresAt!.isNotEmpty)
                                 Text('ينتهي: ${offer.expiresAt}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
-                              if (pending && request.status == ServiceRequestStatus.pending) ...[
+                              if (pending && (request.status == ServiceRequestStatus.open || request.status == ServiceRequestStatus.offerPending)) ...[
                                 const SizedBox(height: 10),
                                 Row(
                                   children: [
