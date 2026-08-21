@@ -1,5 +1,6 @@
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
+import '../core/network/api_exception.dart';
 import '../models/api_dtos.dart';
 import '../models/service_model.dart';
 
@@ -92,30 +93,11 @@ class ServiceRepository implements IServiceRepository {
 
   @override
   Future<List<ServiceDto>> getApiServices() async {
-    // ignore: avoid_print
-    print('=== HOMEFIX GET /api/Services ===');
-    try {
-      final response = await _client.get(ApiConstants.services, includeAuth: false);
-      if (response is List) {
-        final list = response
-            .map((item) => ServiceDto.fromJson(item as Map<String, dynamic>))
-            .toList();
-        // ignore: avoid_print
-        print('=== API STATUS: SUCCESS ===');
-        // ignore: avoid_print
-        print('=== API SERVICES COUNT: ${list.length} ===');
-        return list;
-      }
-      // ignore: avoid_print
-      print('=== API STATUS: SUCCESS (NOT LIST) ===');
-      // ignore: avoid_print
-      print('=== API SERVICES COUNT: 0 ===');
-    } catch (e) {
-      // ignore: avoid_print
-      print('=== API STATUS: ERROR ($e) ===');
-      // ignore: avoid_print
-      print('=== API SERVICES COUNT: 0 ===');
-      rethrow;
+    final response = await _client.get(ApiConstants.services, includeAuth: false);
+    if (response is List) {
+      return response
+          .map((item) => ServiceDto.fromJson(item as Map<String, dynamic>))
+          .toList();
     }
     return [];
   }
@@ -135,15 +117,20 @@ class ServiceRepository implements IServiceRepository {
     if (serviceId != null) queryParams['serviceId'] = serviceId;
     if (cityId != null) queryParams['cityId'] = cityId;
 
-    final response = await _client.get(
-      ApiConstants.servicePricings,
-      queryParameters: queryParams,
-      includeAuth: false,
-    );
-    if (response is Map<String, dynamic>) {
-      return ServicePricingDto.fromJson(response);
+    try {
+      final response = await _client.get(
+        ApiConstants.servicePricings,
+        queryParameters: queryParams,
+        includeAuth: false,
+      );
+      if (response is Map<String, dynamic>) {
+        return ServicePricingDto.fromJson(response);
+      }
+      return null;
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
     }
-    return null;
   }
 
   @override
