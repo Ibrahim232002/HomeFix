@@ -230,6 +230,52 @@ class AppStateProvider extends ChangeNotifier {
   Future<void> addTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.addServiceArea(techId, cityId); await loadServiceAreas(); }
   Future<void> removeTechnicianServiceArea(int cityId) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); await _techRepo.deleteServiceArea(techId, cityId); await loadServiceAreas(); }
   Future<void> updateTechnicianCurrentLocation(double latitude, double longitude) async { final techId = int.tryParse(_currentTechProfile?.id ?? '0') ?? 0; if (techId <= 0) throw Exception('تعذر تحديد ملف الفني'); final dto = await _techRepo.updateApiTechnicianProfile(techId, UpdateTechnicianProfileRequest(currentLatitude: latitude, currentLongitude: longitude)); _currentTechProfile = _currentTechProfile?.copyWith(currentLatitude: dto.currentLatitude, currentLongitude: dto.currentLongitude); notifyListeners(); }
+
+  void _upsertBooking(BookingModel booking) {
+    final index = _bookings.indexWhere((item) => item.id == booking.id);
+    if (index == -1) {
+      _bookings.add(booking);
+    } else {
+      _bookings[index] = booking;
+    }
+  }
+
+  Future<BookingModel?> loadBookingForRequest(String requestId) async {
+    final booking = await _bookingRepo.getBookingByRequest(requestId);
+    if (booking != null) {
+      _upsertBooking(booking);
+      notifyListeners();
+    }
+    return booking;
+  }
+
+  Future<BookingVerificationIssueResult> requestJobStartCode(String bookingId) async {
+    return _bookingRepo.issueBookingVerificationCode(bookingId, 'JobStart');
+  }
+
+  Future<BookingModel> verifyJobStart(String bookingId, String code) async {
+    final verified = await _bookingRepo.verifyBookingCode(bookingId, 'JobStart', code);
+    final refreshed = await _bookingRepo.getBookingById(bookingId) ?? verified;
+    _upsertBooking(refreshed);
+    notifyListeners();
+    return refreshed;
+  }
+
+  Future<BookingVerificationIssueResult> requestJobCompletionCode(String bookingId) async {
+    return _bookingRepo.issueBookingVerificationCode(bookingId, 'JobCompletion');
+  }
+
+  Future<BookingModel> verifyJobCompletion(String bookingId, String code) async {
+    final verified = await _bookingRepo.verifyBookingCode(bookingId, 'JobCompletion', code);
+    final refreshed = await _bookingRepo.getBookingById(bookingId) ?? verified;
+    _upsertBooking(refreshed);
+    if (_currentUser != null && isCustomer) {
+      _customerRequests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
+    }
+    notifyListeners();
+    return refreshed;
+  }
+
   Future<void> updateBookingStatus(String bookingId, BookingStatus status) async { await _bookingRepo.updateBookingStatus(bookingId, status); if (_currentTechProfile != null) _bookings = await _bookingRepo.getBookingsByTechnician(_currentTechProfile!.id); notifyListeners(); }
   Future<void> toggleTechnicianAvailability() async { if (_currentTechProfile == null) return; final newStatus = !_currentTechProfile!.isAvailable; await _techRepo.updateAvailability(_currentTechProfile!.id, newStatus); _currentTechProfile = _currentTechProfile!.copyWith(isAvailable: newStatus); notifyListeners(); }
   Future<MessageModel> sendMessage(String conversationId, String text, {String? attachmentUrl}) async { if (_currentUser == null) throw Exception('Not logged in'); final msg = await _chatRepo.sendMessage(conversationId: conversationId, sender: _currentUser!, text: text, attachmentUrl: attachmentUrl); _conversations = await _chatRepo.getConversations(_currentUser!.id); notifyListeners(); return msg; }
