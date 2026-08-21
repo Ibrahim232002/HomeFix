@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../models/service_request_model.dart';
+import '../../models/booking_model.dart';
 import '../../services/app_state_provider.dart';
 import 'customer_request_detail_screen.dart';
 import 'create_request_screen.dart';
@@ -33,19 +34,44 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
     super.dispose();
   }
 
-  List<ServiceRequestModel> _filterRequests(List<ServiceRequestModel> all, int tabIndex) {
+  BookingModel? _bookingForRequest(AppStateProvider appState, ServiceRequestModel request) {
+    for (final booking in appState.bookings) {
+      if (booking.requestId == request.id) return booking;
+    }
+    return null;
+  }
+
+  List<ServiceRequestModel> _filterRequests(List<ServiceRequestModel> all, AppStateProvider appState, int tabIndex) {
     switch (tabIndex) {
       case 1:
-        return all.where((r) => r.status == ServiceRequestStatus.pending).toList();
-      case 2:
         return all.where((r) =>
-          r.status == ServiceRequestStatus.accepted ||
-          r.status == ServiceRequestStatus.scheduled ||
-          r.status == ServiceRequestStatus.inProgress).toList();
+          r.status == ServiceRequestStatus.pending ||
+          r.status == ServiceRequestStatus.open ||
+          r.status == ServiceRequestStatus.offerPending).toList();
+      case 2:
+        return all.where((r) {
+          final booking = _bookingForRequest(appState, r);
+          return r.status == ServiceRequestStatus.accepted ||
+              r.status == ServiceRequestStatus.scheduled ||
+              r.status == ServiceRequestStatus.inProgress ||
+              (booking != null && {
+                BookingStatus.upcoming,
+                BookingStatus.technicianOnTheWay,
+                BookingStatus.arrived,
+                BookingStatus.inProgress,
+                BookingStatus.awaitingCompletion,
+              }.contains(booking.status));
+        }).toList();
       case 3:
-        return all.where((r) => r.status == ServiceRequestStatus.completed).toList();
+        return all.where((r) {
+          final booking = _bookingForRequest(appState, r);
+          return r.status == ServiceRequestStatus.completed || booking?.status == BookingStatus.completed;
+        }).toList();
       case 4:
-        return all.where((r) => r.status == ServiceRequestStatus.cancelled).toList();
+        return all.where((r) {
+          final booking = _bookingForRequest(appState, r);
+          return r.status == ServiceRequestStatus.cancelled || booking?.status == BookingStatus.cancelled;
+        }).toList();
       default:
         return all;
     }
@@ -92,7 +118,7 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
       body: TabBarView(
         controller: _tabController,
         children: List.generate(5, (tabIndex) {
-          final requests = _filterRequests(appState.customerRequests, tabIndex);
+          final requests = _filterRequests(appState.customerRequests, appState, tabIndex);
 
           if (requests.isEmpty) {
             return EmptyStateWidget(
@@ -115,6 +141,12 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
             itemCount: requests.length,
             itemBuilder: (context, index) {
               final req = requests[index];
+              final booking = _bookingForRequest(appState, req);
+              final requestCompleted = req.status == ServiceRequestStatus.completed || booking?.status == BookingStatus.completed;
+              final effectiveStatusBadge = booking != null
+                  ? StatusBadge.fromBookingStatus(booking.status)
+                  : StatusBadge.fromRequestStatus(req.status);
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
@@ -140,11 +172,15 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                             const SizedBox(width: 8),
                             Text('#${req.id}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo')),
                           ]),
-                          StatusBadge.fromRequestStatus(req.status),
+                          effectiveStatusBadge,
                         ],
                       ),
                       const SizedBox(height: 12),
                       Text(req.serviceNameAr, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Cairo')),
+                      if (req.categoryNameAr.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(req.categoryNameAr, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
+                      ],
                       const SizedBox(height: 4),
                       Text(req.problemDescription, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Cairo', height: 1.4)),
                       const SizedBox(height: 12),
@@ -158,7 +194,7 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                           const Spacer(),
                           const Icon(Icons.location_on_rounded, size: 16, color: AppColors.textMuted),
                           const SizedBox(width: 4),
-                          Flexible(child: Text(req.address.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'))),
+                          Flexible(child: Text(req.address.title.isNotEmpty ? req.address.title : 'العنوان المحدد', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'))),
                         ]),
                       ),
                       if (req.technicianName != null) ...[
@@ -187,16 +223,16 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            const Text('التكلفة التقديرية', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
-                            Text(req.finalPrice != null ? '${req.finalPrice!.toInt()} ج.م' : '${req.estimatedPriceMin.toInt()} - ${req.estimatedPriceMax.toInt()} ج.م', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Cairo')),
+                            const Text('رسوم الزيارة', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
+                            Text('${req.estimatedPriceMin.toInt()} ج.م', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Cairo')),
                           ]),
                           Row(children: [
-                            if (req.status == ServiceRequestStatus.pending)
+                            if (req.status == ServiceRequestStatus.open)
                               TextButton(
                                 onPressed: () => _showCancelDialog(context, req),
                                 child: const Text('إلغاء الطلب', style: TextStyle(color: AppColors.error, fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
                               ),
-                            if (req.status == ServiceRequestStatus.completed)
+                            if (requestCompleted)
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
                                 icon: const Icon(Icons.star_rounded, size: 16, color: Colors.white),
