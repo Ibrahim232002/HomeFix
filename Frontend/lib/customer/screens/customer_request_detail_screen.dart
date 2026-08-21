@@ -170,7 +170,14 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(request.serviceNameAr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
+                      Expanded(
+                        child: Text(
+                          request.serviceNameAr,
+                          maxLines: 2,
+                          softWrap: true,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, fontFamily: 'Cairo'),
+                        ),
+                      ),
                       StatusBadge.fromRequestStatus(request.status),
                     ],
                   ),
