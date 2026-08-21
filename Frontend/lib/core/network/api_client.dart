@@ -55,7 +55,6 @@ class ApiClient {
       final response = await _httpClient
           .get(uri, headers: headers)
           .timeout(ApiConstants.timeoutDuration);
-      _logHttpTransaction(method: 'GET', uri: uri, body: null, response: response);
       return _handleResponse(response);
     }, endpoint: endpoint);
   }
@@ -73,7 +72,6 @@ class ApiClient {
       final response = await _httpClient
           .post(uri, headers: headers, body: encodedBody)
           .timeout(ApiConstants.timeoutDuration);
-      _logHttpTransaction(method: 'POST', uri: uri, body: body, response: response);
       return _handleResponse(response);
     }, endpoint: endpoint);
   }
@@ -91,7 +89,6 @@ class ApiClient {
       final response = await _httpClient
           .put(uri, headers: headers, body: encodedBody)
           .timeout(ApiConstants.timeoutDuration);
-      _logHttpTransaction(method: 'PUT', uri: uri, body: body, response: response);
       return _handleResponse(response);
     }, endpoint: endpoint);
   }
@@ -109,51 +106,8 @@ class ApiClient {
       final response = await _httpClient
           .delete(uri, headers: headers, body: encodedBody)
           .timeout(ApiConstants.timeoutDuration);
-      _logHttpTransaction(method: 'DELETE', uri: uri, body: body, response: response);
       return _handleResponse(response);
     }, endpoint: endpoint);
-  }
-
-  void _logHttpTransaction({
-    required String method,
-    required Uri uri,
-    required dynamic body,
-    required http.Response response,
-  }) {
-    final safeBody = _sanitizeDiagnosticBody(body);
-    print('[HTTP]');
-    print('METHOD: $method');
-    print('URL: $uri');
-    print('BODY: ${safeBody ?? 'null'}');
-    print('STATUS: ${response.statusCode}');
-    print('RESPONSE: ${response.body}');
-  }
-
-  dynamic _sanitizeDiagnosticBody(dynamic value) {
-    if (value == null) return null;
-    if (value is Map) {
-      return value.map((key, item) {
-        final normalizedKey = key.toString().toLowerCase();
-        const sensitiveKeys = {
-          'authorization',
-          'password',
-          'refreshpassword',
-          'refreshtoken',
-          'accesstoken',
-          'token',
-          'secret',
-          'code',
-        };
-        return MapEntry(
-          key,
-          sensitiveKeys.contains(normalizedKey) ? '***REDACTED***' : _sanitizeDiagnosticBody(item),
-        );
-      });
-    }
-    if (value is Iterable) {
-      return value.map(_sanitizeDiagnosticBody).toList();
-    }
-    return value;
   }
 
   Future<dynamic> _sendRequest(Future<dynamic> Function() requestFn, {required String endpoint}) async {
@@ -191,7 +145,6 @@ class ApiClient {
       final body = jsonEncode({'refreshToken': _tokenStorage.refreshToken});
       
       final response = await _httpClient.post(uri, headers: headers, body: body);
-      _logHttpTransaction(method: 'POST', uri: uri, body: {'refreshToken': '***REDACTED***'}, response: response);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is Map<String, dynamic> && data.containsKey('token')) {
