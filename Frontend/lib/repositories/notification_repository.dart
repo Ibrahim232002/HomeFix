@@ -21,34 +21,32 @@ class NotificationRepository implements INotificationRepository {
   @override
   Future<List<NotificationModel>> getUserNotifications(String userId) async {
     final intUserId = int.tryParse(userId);
-    if (intUserId != null) {
-      try {
-        final dtos = await getApiNotificationsByUser(intUserId);
-        return dtos
-            .map((d) => NotificationModel(
-                  id: d.id.toString(),
-                  recipientId: d.userId.toString(),
-                  recipientRole: UserRole.customer,
-                  title: d.title ?? 'تنبيه',
-                  message: d.message ?? '',
-                  type: NotificationType.system,
-                  createdAt: d.createdAt.isNotEmpty ? d.createdAt : '',
-                  isRead: d.isRead,
-                ))
-            .toList();
-      } catch (_) {}
+    if (intUserId == null || intUserId <= 0) {
+      throw Exception('معرف المستخدم غير صالح');
     }
-    return [];
+
+    final dtos = await getApiNotificationsByUser(intUserId);
+    return dtos
+        .map((d) => NotificationModel(
+              id: d.id.toString(),
+              recipientId: d.userId.toString(),
+              recipientRole: UserRole.customer,
+              title: d.title ?? 'تنبيه',
+              message: d.message ?? '',
+              type: NotificationType.system,
+              createdAt: d.createdAt.isNotEmpty ? d.createdAt : '',
+              isRead: d.isRead,
+            ))
+        .toList();
   }
 
   @override
   Future<void> markAsRead(String notificationId) async {
     final intId = int.tryParse(notificationId);
-    if (intId != null) {
-      try {
-        await markApiNotificationAsRead(intId);
-      } catch (_) {}
+    if (intId == null || intId <= 0) {
+      throw Exception('معرف الإشعار غير صالح');
     }
+    await markApiNotificationAsRead(intId);
   }
 
   // --- Direct OpenAPI Implementations ---
