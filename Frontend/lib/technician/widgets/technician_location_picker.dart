@@ -89,7 +89,9 @@ Future<int?> showTechnicianLocationPicker({
                             final option = uniqueOptions[index];
                             final selected = option.id == selectedId;
                             return Material(
-                              color: Colors.transparent,
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              clipBehavior: Clip.antiAlias,
                               child: ListTile(
                                 minVerticalPadding: 8,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 18),
