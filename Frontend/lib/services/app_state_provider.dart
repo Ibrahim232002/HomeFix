@@ -49,6 +49,8 @@ class AppStateProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isLoadingPublic = false;
   bool _isLoadingCategoryServices = false;
+  bool _publicDataLoadSucceeded = false;
+  Future<void>? _publicDataFuture;
   String? _errorMessage;
   String? _apiError;
   String? _categoryError;
@@ -109,16 +111,16 @@ class AppStateProvider extends ChangeNotifier {
   List<TechnicianServiceAreaModel> get serviceAreas => _serviceAreas;
   int get unreadNotificationsCount => _notifications.where((n) => !n.isRead).length;
 
-  AppStateProvider() { _loadPublicData(); }
+  AppStateProvider() { _publicDataFuture = _loadPublicData(); }
 
   Future<void> _loadPublicData() async {
-    _isLoadingPublic = true; _categoryError = null; _apiError = null; notifyListeners();
-    try { _categories = await _serviceCategoryRepo.getCategories(); _services = await _serviceRepo.getServices(); _technicians = await _techRepo.getTechnicians(); }
+    _isLoadingPublic = true; _categoryError = null; _apiError = null; _publicDataLoadSucceeded = false; notifyListeners();
+    try { _categories = await _serviceCategoryRepo.getCategories(); _services = await _serviceRepo.getServices(includePricing: false); _technicians = await _techRepo.getTechnicians(); _publicDataLoadSucceeded = true; }
     catch (e) { _apiError = e.toString(); }
     finally { _isLoadingPublic = false; notifyListeners(); }
   }
 
-  Future<void> refreshPublicData() async => _loadPublicData();
+  Future<void> refreshPublicData() { _publicDataFuture = _loadPublicData(); return _publicDataFuture!; }
 
   Future<void> login(String email, String password, UserRole role) async { _isLoading = true; _errorMessage = null; notifyListeners(); try { _currentUser = await _userRepo.login(email, password, role); if (_currentUser?.role == UserRole.technician) _technicianNavIndex = 0; else _customerNavIndex = 0; await _loadInitialData(); } catch (e) { _errorMessage = e.toString().replaceAll('Exception: ', ''); } finally { _isLoading = false; notifyListeners(); } }
   Future<void> register({required String fullName, required String email, required String phoneNumber, required String password, required UserRole role}) async { _isLoading = true; _errorMessage = null; notifyListeners(); try { _currentUser = await _userRepo.register(RegisterRequest(fullName: fullName, email: email, phoneNumber: phoneNumber, password: password, role: role == UserRole.technician ? 'Technician' : 'Customer')); if (_currentUser?.role == UserRole.technician) _technicianNavIndex = 0; else _customerNavIndex = 0; await _loadInitialData(); } catch (e) { _errorMessage = e.toString().replaceAll('Exception: ', ''); } finally { _isLoading = false; notifyListeners(); } }
@@ -154,8 +156,9 @@ class AppStateProvider extends ChangeNotifier {
 
   Future<void> _loadInitialData() async {
     try {
-      _services = await _serviceRepo.getServices();
-      _technicians = await _techRepo.getTechnicians();
+      final publicDataFuture = _publicDataFuture;
+      if (publicDataFuture != null) await publicDataFuture;
+      if (!_publicDataLoadSucceeded) { _publicDataFuture = _loadPublicData(); await _publicDataFuture!; }
       if (_currentUser != null) {
         if (isCustomer) {
           _savedAddresses = await _userRepo.getUserAddresses(_currentUser!.id);

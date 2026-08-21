@@ -5,7 +5,7 @@ import '../models/api_dtos.dart';
 import '../models/service_model.dart';
 
 abstract class IServiceRepository {
-  Future<List<ServiceModel>> getServices();
+  Future<List<ServiceModel>> getServices({bool includePricing = true});
   Future<ServiceModel?> getServiceById(String id);
   Future<List<ServiceModel>> getServicesByCategory(
     String categoryId, {
@@ -23,8 +23,11 @@ class ServiceRepository implements IServiceRepository {
   final ApiClient _client = ApiClient();
 
   @override
-  Future<List<ServiceModel>> getServices() async {
+  Future<List<ServiceModel>> getServices({bool includePricing = true}) async {
     final apiServices = await getApiServices();
+    if (!includePricing) {
+      return apiServices.map((dto) => _mapService(dto, const [])).toList();
+    }
     final list = <ServiceModel>[];
     for (final dto in apiServices) {
       final pricings = await getServicePricingsByService(dto.id);
