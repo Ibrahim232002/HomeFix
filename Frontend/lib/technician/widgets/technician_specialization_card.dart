@@ -288,17 +288,22 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
                       final selected = _selectedServiceIds.contains(int.tryParse(service.id));
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
+                        child: Material(
                           color: selected ? AppColors.technicianLight : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: selected ? AppColors.technicianPrimary : AppColors.border),
-                        ),
-                        child: CheckboxListTile(
-                          value: selected,
-                          onChanged: (_) => _toggleService(service.id),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                          title: Text(service.nameAr, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(
+                              color: selected ? AppColors.technicianPrimary : AppColors.border,
+                            ),
+                          ),
+                          child: CheckboxListTile(
+                            value: selected,
+                            onChanged: (_) => _toggleService(service.id),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                            title: Text(service.nameAr, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
+                          ),
                         ),
                       );
                     }),
