@@ -93,11 +93,30 @@ class ServiceRepository implements IServiceRepository {
 
   @override
   Future<List<ServiceDto>> getApiServices() async {
-    final response = await _client.get(ApiConstants.services, includeAuth: false);
-    if (response is List) {
-      return response
-          .map((item) => ServiceDto.fromJson(item as Map<String, dynamic>))
-          .toList();
+    // ignore: avoid_print
+    print('=== HOMEFIX GET /api/Services ===');
+    try {
+      final response = await _client.get(ApiConstants.services, includeAuth: false);
+      if (response is List) {
+        final list = response
+            .map((item) => ServiceDto.fromJson(item as Map<String, dynamic>))
+            .toList();
+        // ignore: avoid_print
+        print('=== API STATUS: SUCCESS ===');
+        // ignore: avoid_print
+        print('=== API SERVICES COUNT: ${list.length} ===');
+        return list;
+      }
+      // ignore: avoid_print
+      print('=== API STATUS: SUCCESS (NOT LIST) ===');
+      // ignore: avoid_print
+      print('=== API SERVICES COUNT: 0 ===');
+    } catch (e) {
+      // ignore: avoid_print
+      print('=== API STATUS: ERROR ($e) ===');
+      // ignore: avoid_print
+      print('=== API SERVICES COUNT: 0 ===');
+      rethrow;
     }
     return [];
   }
