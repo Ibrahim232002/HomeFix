@@ -8,7 +8,7 @@ import '../../common/screens/chat_list_screen.dart';
 import 'customer_profile_screen.dart';
 
 class CustomerMainLayout extends StatelessWidget {
-  const CustomerMainLayout({Key? key}) : super(key: key);
+  const CustomerMainLayout({super.key});
 
   static final List<Widget> _screens = [
     const CustomerHomeScreen(),
