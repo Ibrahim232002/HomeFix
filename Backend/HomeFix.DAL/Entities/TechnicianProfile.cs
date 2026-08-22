@@ -45,6 +45,8 @@ public partial class TechnicianProfile
 
     public virtual ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
 
+    public virtual ICollection<Inspection> Inspections { get; set; } = new List<Inspection>();
+
     public virtual ICollection<Payout> Payouts { get; set; } = new List<Payout>();
 
     public virtual ICollection<ServiceRequestOffer> ServiceRequestOffers { get; set; } = new List<ServiceRequestOffer>();

@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<UserDeviceRepository>();
         services.AddScoped<ServiceRequestOfferRepository>();
         services.AddScoped<PaymentAttemptRepository>();
+        services.AddScoped<InspectionRepository>();
 
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICustomerProfileService, CustomerProfileService>();
@@ -40,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IServiceRequestOfferService, ServiceRequestOfferService>();
         services.AddScoped<IServiceRequestFileService, ServiceRequestFileService>();
         services.AddScoped<IServiceRequestStatusHistoryService, ServiceRequestStatusHistoryService>();
+        services.AddScoped<IInspectionService, InspectionService>();
 
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IReviewService, ReviewService>();
