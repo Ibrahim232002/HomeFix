@@ -396,6 +396,7 @@ public partial class HomeFixDbContext : DbContext
             entity.Property(e => e.MaximumPrice).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.MinimumPrice).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.VisitFee).HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.InspectionFee).HasColumnType("decimal(10, 2)");
 
             entity.HasIndex(e => new { e.ServiceId, e.CityId })
                 .HasDatabaseName("UX_ServicePricing_Active_Service_City")

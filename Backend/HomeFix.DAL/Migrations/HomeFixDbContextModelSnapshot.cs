@@ -812,6 +812,9 @@ namespace HomeFix.DAL.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("PricingMode")
+                        .HasColumnType("int");
+
                     b.HasKey("Id")
                         .HasName("PK__Services__3214EC07AD91B341");
 
@@ -875,6 +878,9 @@ namespace HomeFix.DAL.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(getdate())");
+
+                    b.Property<decimal?>("InspectionFee")
+                        .HasColumnType("decimal(10, 2)");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
