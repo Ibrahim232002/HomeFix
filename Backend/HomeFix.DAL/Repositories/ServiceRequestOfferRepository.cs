@@ -10,7 +10,7 @@ public class ServiceRequestOfferRepository
     public ServiceRequestOfferRepository(HomeFixDbContext context) => _context = context;
 
     public Task<ServiceRequestOffer?> GetByIdAsync(int id) =>
-        _context.ServiceRequestOffers.Include(x => x.ServiceRequest).ThenInclude(r => r.Customer).Include(x => x.Technician).FirstOrDefaultAsync(x => x.Id == id);
+        _context.ServiceRequestOffers.Include(x => x.ServiceRequest).ThenInclude(r => r.Customer).Include(x => x.ServiceRequest).ThenInclude(r => r.Service).Include(x => x.Technician).FirstOrDefaultAsync(x => x.Id == id);
 
     public Task<List<ServiceRequestOffer>> GetByRequestIdAsync(int requestId) =>
         _context.ServiceRequestOffers.Include(x => x.Technician).ThenInclude(t => t.User).Where(x => x.ServiceRequestId == requestId).OrderByDescending(x => x.CreatedAt).ToListAsync();
