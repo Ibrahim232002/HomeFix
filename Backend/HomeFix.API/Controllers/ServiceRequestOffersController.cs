@@ -94,5 +94,18 @@ public class ServiceRequestOffersController : ControllerBase
     private bool TryGetUserId(out int userId) => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
     private static ServiceRequestOfferDto Map(HomeFix.DAL.Entities.ServiceRequestOffer offer) => new()
-    { Id = offer.Id, ServiceRequestId = offer.ServiceRequestId, TechnicianId = offer.TechnicianId, TechnicianName = offer.Technician?.User?.FullName, ProposedPrice = offer.ProposedPrice, TechnicianNote = offer.TechnicianNote, Status = offer.Status, CreatedAt = offer.CreatedAt, ExpiresAt = offer.ExpiresAt, RespondedAt = offer.RespondedAt };
+    {
+        Id = offer.Id,
+        ServiceRequestId = offer.ServiceRequestId,
+        ServiceId = offer.ServiceRequest.ServiceId,
+        PricingMode = (int)offer.ServiceRequest.Service.PricingMode,
+        TechnicianId = offer.TechnicianId,
+        TechnicianName = offer.Technician?.User?.FullName,
+        ProposedPrice = offer.ProposedPrice,
+        TechnicianNote = offer.TechnicianNote,
+        Status = offer.Status,
+        CreatedAt = offer.CreatedAt,
+        ExpiresAt = offer.ExpiresAt,
+        RespondedAt = offer.RespondedAt
+    };
 }

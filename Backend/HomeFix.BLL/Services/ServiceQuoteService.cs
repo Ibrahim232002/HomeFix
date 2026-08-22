@@ -279,24 +279,59 @@ public class ServiceQuoteService : IServiceQuoteService
 
     public async Task<(bool Success, string? Error)> RejectAsync(int quoteId, int customerUserId)
     {
-        var quote = await _quoteRepository.GetByIdAsync(quoteId);
-        if (quote == null) return (false, "Quote not found.");
-        if (quote.Inspection.Status != "Completed") return (false, "The inspection is not completed.");
-        if (quote.Inspection.ServiceRequest.Customer.UserId != customerUserId)
-            return (false, "You are not allowed to reject this quote.");
-        if (quote.Status != PendingCustomer) return (false, "Quote is no longer available.");
-
-        if (quote.ExpiresAt.HasValue && quote.ExpiresAt.Value <= DateTime.UtcNow)
+        await using var tx = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
         {
-            quote.Status = Expired;
-            _quoteRepository.Update(quote);
-            await _unitOfWork.SaveChangesAsync();
-            return (false, "Quote has expired.");
-        }
+            var quote = await _quoteRepository.GetByIdAsync(quoteId);
+            if (quote == null)
+            {
+                await tx.RollbackAsync();
+                return (false, "Quote not found.");
+            }
 
-        quote.Status = Rejected;
-        _quoteRepository.Update(quote);
-        await _unitOfWork.SaveChangesAsync();
-        return (true, null);
+            if (quote.Inspection.Status != "Completed")
+            {
+                await tx.RollbackAsync();
+                return (false, "The inspection is not completed.");
+            }
+
+            if (quote.Inspection.ServiceRequest.Customer.UserId != customerUserId)
+            {
+                await tx.RollbackAsync();
+                return (false, "You are not allowed to reject this quote.");
+            }
+
+            var currentQuote = await _quoteRepository.GetByIdAsync(quoteId);
+            if (currentQuote == null || currentQuote.Status != PendingCustomer)
+            {
+                await tx.RollbackAsync();
+                return (false, "Quote is no longer available.");
+            }
+
+            if (currentQuote.ExpiresAt.HasValue && currentQuote.ExpiresAt.Value <= DateTime.UtcNow)
+            {
+                currentQuote.Status = Expired;
+                _quoteRepository.Update(currentQuote);
+                await _unitOfWork.SaveChangesAsync();
+                await tx.CommitAsync();
+                return (false, "Quote has expired.");
+            }
+
+            currentQuote.Status = Rejected;
+            _quoteRepository.Update(currentQuote);
+            await _unitOfWork.SaveChangesAsync();
+            await tx.CommitAsync();
+            return (true, null);
+        }
+        catch (DbUpdateException)
+        {
+            await tx.RollbackAsync();
+            return (false, "The quote could not be rejected because the request was updated concurrently. Please retry.");
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 }

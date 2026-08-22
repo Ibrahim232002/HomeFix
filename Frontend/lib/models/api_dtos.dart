@@ -430,19 +430,21 @@ class ServiceDto {
   final String? name;
   final String? description;
   final int categoryId;
+  final int pricingMode;
   final bool isActive;
 
-  ServiceDto({required this.id, this.name, this.description, required this.categoryId, required this.isActive});
+  ServiceDto({required this.id, this.name, this.description, required this.categoryId, this.pricingMode = 0, required this.isActive});
 
   factory ServiceDto.fromJson(Map<String, dynamic> json) => ServiceDto(
         id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
         name: json['name'],
         description: json['description'],
         categoryId: json['categoryId'] is int ? json['categoryId'] : int.tryParse(json['categoryId']?.toString() ?? '0') ?? 0,
+        pricingMode: json['pricingMode'] is num ? (json['pricingMode'] as num).toInt() : int.tryParse(json['pricingMode']?.toString() ?? '') ?? 0,
         isActive: json['isActive'] ?? true,
       );
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'description': description, 'categoryId': categoryId, 'isActive': isActive};
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'description': description, 'categoryId': categoryId, 'pricingMode': pricingMode, 'isActive': isActive};
 }
 
 class ServicePricingDto {
@@ -452,6 +454,7 @@ class ServicePricingDto {
   final double visitFee;
   final double? minimumPrice;
   final double? maximumPrice;
+  final double? inspectionFee;
   final bool isActive;
   final String createdAt;
 
@@ -462,6 +465,7 @@ class ServicePricingDto {
     required this.visitFee,
     this.minimumPrice,
     this.maximumPrice,
+    this.inspectionFee,
     required this.isActive,
     required this.createdAt,
   });
@@ -473,6 +477,7 @@ class ServicePricingDto {
         visitFee: (json['visitFee'] as num?)?.toDouble() ?? 0.0,
         minimumPrice: (json['minimumPrice'] as num?)?.toDouble(),
         maximumPrice: (json['maximumPrice'] as num?)?.toDouble(),
+        inspectionFee: (json['inspectionFee'] as num?)?.toDouble(),
         isActive: json['isActive'] ?? true,
         createdAt: json['createdAt'] ?? '',
       );
@@ -484,6 +489,7 @@ class ServicePricingDto {
         'visitFee': visitFee,
         'minimumPrice': minimumPrice,
         'maximumPrice': maximumPrice,
+        'inspectionFee': inspectionFee,
         'isActive': isActive,
         'createdAt': createdAt,
       };
@@ -584,32 +590,13 @@ class CreateBookingRequest { final int serviceRequestId; final int technicianId;
 class UpdateBookingRequest { final String? acceptedAt; final String? arrivedAt; final String? startedAt; final String? completedAt; final double? finalPrice; final String? technicianNotes; UpdateBookingRequest({this.acceptedAt, this.arrivedAt, this.startedAt, this.completedAt, this.finalPrice, this.technicianNotes}); Map<String, dynamic> toJson() => {if (acceptedAt != null) 'acceptedAt': acceptedAt, if (arrivedAt != null) 'arrivedAt': arrivedAt, if (startedAt != null) 'startedAt': startedAt, if (completedAt != null) 'completedAt': completedAt, if (finalPrice != null) 'finalPrice': finalPrice, if (technicianNotes != null) 'technicianNotes': technicianNotes}; }
 
 // --- Payment DTOs ---
-class PaymentDto {
-  final int id; final int serviceRequestId; final double amount; final String? currency; final String? paymentType; final String? paymentMethod; final String? status; final String? transactionReference; final String? gatewayOrderId; final String? paidAt; final String createdAt;
-  PaymentDto({required this.id, required this.serviceRequestId, required this.amount, this.currency = 'EGP', this.paymentType, this.paymentMethod, this.status, this.transactionReference, this.gatewayOrderId, this.paidAt, required this.createdAt});
-  factory PaymentDto.fromJson(Map<String, dynamic> json) => PaymentDto(id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0, serviceRequestId: json['serviceRequestId'] is int ? json['serviceRequestId'] : int.tryParse(json['serviceRequestId']?.toString() ?? '0') ?? 0, amount: (json['amount'] as num?)?.toDouble() ?? 0.0, currency: json['currency'] ?? 'EGP', paymentType: json['paymentType'], paymentMethod: json['paymentMethod'], status: json['status'], transactionReference: json['transactionReference']?.toString(), gatewayOrderId: json['gatewayOrderId']?.toString(), paidAt: json['paidAt'], createdAt: json['createdAt'] ?? '');
-  Map<String, dynamic> toJson() => {'id': id, 'serviceRequestId': serviceRequestId, 'amount': amount, 'currency': currency, 'paymentType': paymentType, 'paymentMethod': paymentMethod, 'status': status, 'transactionReference': transactionReference, 'gatewayOrderId': gatewayOrderId, 'paidAt': paidAt, 'createdAt': createdAt};
-}
+class PaymentDto { final int id; final int serviceRequestId; final double amount; final String? currency; final String? paymentType; final String? paymentMethod; final String? status; final String? transactionReference; final String? gatewayOrderId; final String? paidAt; final String createdAt; PaymentDto({required this.id, required this.serviceRequestId, required this.amount, this.currency = 'EGP', this.paymentType, this.paymentMethod, this.status, this.transactionReference, this.gatewayOrderId, this.paidAt, required this.createdAt}); factory PaymentDto.fromJson(Map<String, dynamic> json) => PaymentDto(id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0, serviceRequestId: json['serviceRequestId'] is int ? json['serviceRequestId'] : int.tryParse(json['serviceRequestId']?.toString() ?? '0') ?? 0, amount: (json['amount'] as num?)?.toDouble() ?? 0.0, currency: json['currency'] ?? 'EGP', paymentType: json['paymentType'], paymentMethod: json['paymentMethod'], status: json['status'], transactionReference: json['transactionReference']?.toString(), gatewayOrderId: json['gatewayOrderId']?.toString(), paidAt: json['paidAt'], createdAt: json['createdAt'] ?? ''); Map<String, dynamic> toJson() => {'id': id, 'serviceRequestId': serviceRequestId, 'amount': amount, 'currency': currency, 'paymentType': paymentType, 'paymentMethod': paymentMethod, 'status': status, 'transactionReference': transactionReference, 'gatewayOrderId': gatewayOrderId, 'paidAt': paidAt, 'createdAt': createdAt}; }
 class CreatePaymentRequest { final int serviceRequestId; final double amount; final String? paymentType; final String? paymentMethod; CreatePaymentRequest({required this.serviceRequestId, required this.amount, this.paymentType, this.paymentMethod}); Map<String, dynamic> toJson() => {'serviceRequestId': serviceRequestId, 'amount': amount, 'paymentType': paymentType, 'paymentMethod': paymentMethod}; }
 class UpdatePaymentRequest { final String? status; final String? transactionReference; final String? paidAt; UpdatePaymentRequest({this.status, this.transactionReference, this.paidAt}); Map<String, dynamic> toJson() => {if (status != null) 'status': status, if (transactionReference != null) 'transactionReference': transactionReference, if (paidAt != null) 'paidAt': paidAt}; }
 
-class InitiatePaymentRequest {
-  final int serviceRequestId; final String paymentMethod; final String? walletPhoneNumber; final String? paymentType;
-  InitiatePaymentRequest({required this.serviceRequestId, required this.paymentMethod, this.walletPhoneNumber, this.paymentType = 'FullService'});
-  Map<String, dynamic> toJson() => {'serviceRequestId': serviceRequestId, 'paymentMethod': paymentMethod, if (walletPhoneNumber != null && walletPhoneNumber!.isNotEmpty) 'walletPhoneNumber': walletPhoneNumber, 'paymentType': paymentType};
-}
-class InitiatePaymentResponse {
-  final int paymentId; final double amount; final String currency; final String paymentMethod; final String status; final String? paymentToken; final String? iframeUrl; final String? redirectUrl; final String? gatewayOrderId; final String? transactionReference; final bool isCash; final String message;
-  InitiatePaymentResponse({required this.paymentId, required this.amount, this.currency = 'EGP', required this.paymentMethod, required this.status, this.paymentToken, this.iframeUrl, this.redirectUrl, this.gatewayOrderId, this.transactionReference, this.isCash = false, this.message = ''});
-  factory InitiatePaymentResponse.fromJson(Map<String, dynamic> json) => InitiatePaymentResponse(paymentId: json['paymentId'] is int ? json['paymentId'] : int.tryParse(json['paymentId']?.toString() ?? '0') ?? 0, amount: (json['amount'] as num?)?.toDouble() ?? 0.0, currency: json['currency'] ?? 'EGP', paymentMethod: json['paymentMethod'] ?? 'Card', status: json['status'] ?? 'Pending', paymentToken: json['paymentToken']?.toString(), iframeUrl: json['iframeUrl']?.toString(), redirectUrl: json['redirectUrl']?.toString(), gatewayOrderId: json['gatewayOrderId']?.toString(), transactionReference: json['transactionReference']?.toString(), isCash: json['isCash'] ?? false, message: json['message'] ?? '');
-  Map<String, dynamic> toJson() => {'paymentId': paymentId, 'amount': amount, 'currency': currency, 'paymentMethod': paymentMethod, 'status': status, 'paymentToken': paymentToken, 'iframeUrl': iframeUrl, 'redirectUrl': redirectUrl, 'gatewayOrderId': gatewayOrderId, 'transactionReference': transactionReference, 'isCash': isCash, 'message': message};
-}
-class VerifyPaymentResponse {
-  final int paymentId; final int serviceRequestId; final String status; final bool isSuccess; final String? transactionReference; final String? paidAt; final String message;
-  VerifyPaymentResponse({required this.paymentId, required this.serviceRequestId, required this.status, required this.isSuccess, this.transactionReference, this.paidAt, this.message = ''});
-  factory VerifyPaymentResponse.fromJson(Map<String, dynamic> json) => VerifyPaymentResponse(paymentId: json['paymentId'] is int ? json['paymentId'] : int.tryParse(json['paymentId']?.toString() ?? '0') ?? 0, serviceRequestId: json['serviceRequestId'] is int ? json['serviceRequestId'] : int.tryParse(json['serviceRequestId']?.toString() ?? '0') ?? 0, status: json['status'] ?? 'Pending', isSuccess: json['isSuccess'] ?? (json['status']?.toString().toLowerCase() == 'paid'), transactionReference: json['transactionReference']?.toString(), paidAt: json['paidAt']?.toString(), message: json['message'] ?? '');
-  Map<String, dynamic> toJson() => {'paymentId': paymentId, 'serviceRequestId': serviceRequestId, 'status': status, 'isSuccess': isSuccess, 'transactionReference': transactionReference, 'paidAt': paidAt, 'message': message};
-}
+class InitiatePaymentRequest { final int serviceRequestId; final String paymentMethod; final String? walletPhoneNumber; final String? paymentType; InitiatePaymentRequest({required this.serviceRequestId, required this.paymentMethod, this.walletPhoneNumber, this.paymentType = 'FullService'}); Map<String, dynamic> toJson() => {'serviceRequestId': serviceRequestId, 'paymentMethod': paymentMethod, if (walletPhoneNumber != null && walletPhoneNumber!.isNotEmpty) 'walletPhoneNumber': walletPhoneNumber, 'paymentType': paymentType}; }
+class InitiatePaymentResponse { final int paymentId; final double amount; final String currency; final String paymentMethod; final String status; final String? paymentToken; final String? iframeUrl; final String? redirectUrl; final String? gatewayOrderId; final String? transactionReference; final bool isCash; final String message; InitiatePaymentResponse({required this.paymentId, required this.amount, this.currency = 'EGP', required this.paymentMethod, required this.status, this.paymentToken, this.iframeUrl, this.redirectUrl, this.gatewayOrderId, this.transactionReference, this.isCash = false, this.message = ''}); factory InitiatePaymentResponse.fromJson(Map<String, dynamic> json) => InitiatePaymentResponse(paymentId: json['paymentId'] is int ? json['paymentId'] : int.tryParse(json['paymentId']?.toString() ?? '0') ?? 0, amount: (json['amount'] as num?)?.toDouble() ?? 0.0, currency: json['currency'] ?? 'EGP', paymentMethod: json['paymentMethod'] ?? 'Card', status: json['status'] ?? 'Pending', paymentToken: json['paymentToken']?.toString(), iframeUrl: json['iframeUrl']?.toString(), redirectUrl: json['redirectUrl']?.toString(), gatewayOrderId: json['gatewayOrderId']?.toString(), transactionReference: json['transactionReference']?.toString(), isCash: json['isCash'] ?? false, message: json['message'] ?? ''); Map<String, dynamic> toJson() => {'paymentId': paymentId, 'amount': amount, 'currency': currency, 'paymentMethod': paymentMethod, 'status': status, 'paymentToken': paymentToken, 'iframeUrl': iframeUrl, 'redirectUrl': redirectUrl, 'gatewayOrderId': gatewayOrderId, 'transactionReference': transactionReference, 'isCash': isCash, 'message': message}; }
+class VerifyPaymentResponse { final int paymentId; final int serviceRequestId; final String status; final bool isSuccess; final String? transactionReference; final String? paidAt; final String message; VerifyPaymentResponse({required this.paymentId, required this.serviceRequestId, required this.status, required this.isSuccess, this.transactionReference, this.paidAt, this.message = ''}); factory VerifyPaymentResponse.fromJson(Map<String, dynamic> json) => VerifyPaymentResponse(paymentId: json['paymentId'] is int ? json['paymentId'] : int.tryParse(json['paymentId']?.toString() ?? '0') ?? 0, serviceRequestId: json['serviceRequestId'] is int ? json['serviceRequestId'] : int.tryParse(json['serviceRequestId']?.toString() ?? '0') ?? 0, status: json['status'] ?? 'Pending', isSuccess: json['isSuccess'] ?? (json['status']?.toString().toLowerCase() == 'paid'), transactionReference: json['transactionReference']?.toString(), paidAt: json['paidAt']?.toString(), message: json['message'] ?? ''); Map<String, dynamic> toJson() => {'paymentId': paymentId, 'serviceRequestId': serviceRequestId, 'status': status, 'isSuccess': isSuccess, 'transactionReference': transactionReference, 'paidAt': paidAt, 'message': message}; }
 
 // --- Review DTOs ---
 class ReviewDto { final int id; final int serviceRequestId; final int customerId; final int technicianId; final int rating; final String? comment; final String createdAt; ReviewDto({required this.id, required this.serviceRequestId, required this.customerId, required this.technicianId, required this.rating, this.comment, required this.createdAt}); factory ReviewDto.fromJson(Map<String, dynamic> json) => ReviewDto(id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '0') ?? 0, serviceRequestId: json['serviceRequestId'] is int ? json['serviceRequestId'] : int.tryParse(json['serviceRequestId']?.toString() ?? '0') ?? 0, customerId: json['customerId'] is int ? json['customerId'] : int.tryParse(json['customerId']?.toString() ?? '0') ?? 0, technicianId: json['technicianId'] is int ? json['technicianId'] : int.tryParse(json['technicianId']?.toString() ?? '0') ?? 0, rating: (json['rating'] as num?)?.toInt() ?? 5, comment: json['comment'], createdAt: json['createdAt'] ?? ''); Map<String, dynamic> toJson() => {'id': id, 'serviceRequestId': serviceRequestId, 'customerId': customerId, 'technicianId': technicianId, 'rating': rating, 'comment': comment, 'createdAt': createdAt}; }
