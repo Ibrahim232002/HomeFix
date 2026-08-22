@@ -7,6 +7,7 @@ import 'technician_requests_screen.dart';
 import 'technician_bookings_screen.dart';
 import 'technician_wallet_screen.dart';
 import 'technician_profile_screen.dart';
+import 'technician_inspections_screen.dart';
 
 class TechnicianMainLayout extends StatelessWidget {
   const TechnicianMainLayout({Key? key}) : super(key: key);
@@ -29,6 +30,14 @@ class TechnicianMainLayout extends StatelessWidget {
         body: IndexedStack(
           index: appState.technicianNavIndex,
           children: _screens,
+        ),
+        floatingActionButton: FloatingActionButton.small(
+          tooltip: 'المعاينات والتسعير',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TechnicianInspectionsScreen()),
+          ),
+          child: const Icon(Icons.fact_check_rounded),
         ),
         bottomNavigationBar: TechnicianBottomNav(
           currentIndex: appState.technicianNavIndex,
