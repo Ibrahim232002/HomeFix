@@ -34,9 +34,6 @@ class _TechnicianServiceAreaCardState extends State<TechnicianServiceAreaCard> {
       final governorates = await appState.loadGovernoratesForTechnician();
       if (!mounted) return;
 
-      await appState.loadServiceAreas();
-      if (!mounted) return;
-
       setState(() {
         _governorates = governorates;
         _loading = false;
@@ -98,8 +95,6 @@ class _TechnicianServiceAreaCardState extends State<TechnicianServiceAreaCard> {
         ),
       );
 
-      if (!mounted) return;
-      await appState.loadServiceAreas();
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;

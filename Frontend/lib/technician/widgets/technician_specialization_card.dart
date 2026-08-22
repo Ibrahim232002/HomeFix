@@ -4,8 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/category_model.dart';
 import '../../models/service_model.dart';
-import '../../repositories/service_category_repository.dart';
-import '../../repositories/service_repository.dart';
 import '../../services/app_state_provider.dart';
 
 class TechnicianSpecializationCard extends StatefulWidget {
@@ -16,9 +14,6 @@ class TechnicianSpecializationCard extends StatefulWidget {
 }
 
 class _TechnicianSpecializationCardState extends State<TechnicianSpecializationCard> {
-  final ServiceCategoryRepository _categoryRepository = ServiceCategoryRepository();
-  final ServiceRepository _serviceRepository = ServiceRepository();
-
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -47,43 +42,32 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
       return;
     }
 
-    try {
-      final categories = await _categoryRepository.getCategories();
-      if (!mounted) return;
-
-      final categoryId = profile?.categoryId;
-      final serviceIds = profile?.serviceIds.toSet() ?? <int>{};
-
-      List<ServiceModel> services = [];
-      String categoryName = profile?.categoryName ?? '';
-      if (categoryId != null) {
-        final category = categories.where((item) => int.tryParse(item.id) == categoryId).firstOrNull;
-        categoryName = category?.nameAr ?? categoryName;
-        services = await _serviceRepository.getServicesByCategory(
-          categoryId.toString(),
-          categoryNameAr: categoryName,
-        );
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _categories = categories;
-        _categoryId = categoryId;
-        _categoryName = categoryName;
-        _services = services;
-        _selectedServiceIds = serviceIds.intersection(
-          services.map((s) => int.tryParse(s.id)).whereType<int>().toSet(),
-        );
-        _loading = false;
-        _error = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = _errorMessageFrom(e);
-      });
+    final categories = appState.categories;
+    final allServices = appState.services;
+    final categoryId = profile?.categoryId;
+    final serviceIds = profile?.serviceIds.toSet() ?? <int>{};
+    String categoryName = profile?.categoryName ?? '';
+    if (categoryId != null) {
+      final category = categories.where((item) => int.tryParse(item.id) == categoryId).firstOrNull;
+      categoryName = category?.nameAr ?? categoryName;
     }
+
+    final services = categoryId == null
+        ? <ServiceModel>[]
+        : allServices.where((service) => int.tryParse(service.categoryId) == categoryId).toList();
+
+    if (!mounted) return;
+    setState(() {
+      _categories = categories;
+      _categoryId = categoryId;
+      _categoryName = categoryName;
+      _services = services;
+      _selectedServiceIds = serviceIds.intersection(
+        services.map((s) => int.tryParse(s.id)).whereType<int>().toSet(),
+      );
+      _loading = false;
+      _error = null;
+    });
   }
 
   Future<void> _selectCategory() async {
@@ -118,16 +102,19 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
                     itemBuilder: (_, index) {
                       final category = _categories[index];
                       final isSelected = int.tryParse(category.id) == _categoryId;
-                      return ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        tileColor: isSelected ? AppColors.technicianLight : Colors.white,
-                        leading: CircleAvatar(
-                          backgroundColor: AppColors.technicianLight,
-                          child: Icon(Icons.build_rounded, color: AppColors.technicianPrimary),
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          tileColor: isSelected ? AppColors.technicianLight : Colors.white,
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.technicianLight,
+                            child: Icon(Icons.build_rounded, color: AppColors.technicianPrimary),
+                          ),
+                          title: Text(category.nameAr, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
+                          trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.technicianPrimary) : null,
+                          onTap: () => Navigator.pop(context, category),
                         ),
-                        title: Text(category.nameAr, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
-                        trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppColors.technicianPrimary) : null,
-                        onTap: () => Navigator.pop(context, category),
                       );
                     },
                   ),
@@ -153,10 +140,10 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
     });
 
     try {
-      final services = await _serviceRepository.getServicesByCategory(
-        selected.id,
-        categoryNameAr: selected.nameAr,
-      );
+      final allServices = context.read<AppStateProvider>().services;
+      final services = allServices
+          .where((service) => int.tryParse(service.categoryId) == newCategoryId)
+          .toList();
       if (!mounted) return;
       setState(() {
         _services = services;
