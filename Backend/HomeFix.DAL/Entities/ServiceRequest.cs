@@ -35,6 +35,8 @@ public partial class ServiceRequest
 
     public virtual CustomerProfile Customer { get; set; } = null!;
 
+    public virtual Inspection? Inspection { get; set; }
+
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     public virtual Review? Review { get; set; }

@@ -10,13 +10,26 @@ public class ServiceRequestOfferRepository
     public ServiceRequestOfferRepository(HomeFixDbContext context) => _context = context;
 
     public Task<ServiceRequestOffer?> GetByIdAsync(int id) =>
-        _context.ServiceRequestOffers.Include(x => x.ServiceRequest).ThenInclude(r => r.Customer).Include(x => x.Technician).FirstOrDefaultAsync(x => x.Id == id);
+        _context.ServiceRequestOffers
+            .Include(x => x.ServiceRequest).ThenInclude(r => r.Customer)
+            .Include(x => x.ServiceRequest).ThenInclude(r => r.Service)
+            .Include(x => x.ServiceRequest).ThenInclude(r => r.Address)
+            .Include(x => x.Technician)
+            .FirstOrDefaultAsync(x => x.Id == id);
 
     public Task<List<ServiceRequestOffer>> GetByRequestIdAsync(int requestId) =>
-        _context.ServiceRequestOffers.Include(x => x.Technician).ThenInclude(t => t.User).Where(x => x.ServiceRequestId == requestId).OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _context.ServiceRequestOffers
+            .Include(x => x.Technician).ThenInclude(t => t.User)
+            .Where(x => x.ServiceRequestId == requestId)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
 
     public Task<List<ServiceRequestOffer>> GetByTechnicianIdAsync(int technicianId) =>
-        _context.ServiceRequestOffers.Include(x => x.ServiceRequest).ThenInclude(r => r.Service).Where(x => x.TechnicianId == technicianId).OrderByDescending(x => x.CreatedAt).ToListAsync();
+        _context.ServiceRequestOffers
+            .Include(x => x.ServiceRequest).ThenInclude(r => r.Service)
+            .Where(x => x.TechnicianId == technicianId)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
 
     public Task<bool> ExistsForTechnicianAsync(int requestId, int technicianId) =>
         _context.ServiceRequestOffers.AnyAsync(x => x.ServiceRequestId == requestId && x.TechnicianId == technicianId && x.Status == "Pending");

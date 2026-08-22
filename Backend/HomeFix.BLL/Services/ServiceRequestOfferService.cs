@@ -1,6 +1,7 @@
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL;
 using HomeFix.DAL.Entities;
+using HomeFix.DAL.Enums;
 using HomeFix.DAL.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
@@ -13,11 +14,23 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
     private readonly ServiceRequestRepository _requestRepository;
     private readonly BookingRepository _bookingRepository;
     private readonly TechnicianProfileRepository _technicianRepository;
+    private readonly IInspectionService _inspectionService;
     private readonly UnitOfWork _unitOfWork;
 
-    public ServiceRequestOfferService(ServiceRequestOfferRepository offerRepository, ServiceRequestRepository requestRepository, BookingRepository bookingRepository, TechnicianProfileRepository technicianRepository, UnitOfWork unitOfWork)
+    public ServiceRequestOfferService(
+        ServiceRequestOfferRepository offerRepository,
+        ServiceRequestRepository requestRepository,
+        BookingRepository bookingRepository,
+        TechnicianProfileRepository technicianRepository,
+        IInspectionService inspectionService,
+        UnitOfWork unitOfWork)
     {
-        _offerRepository = offerRepository; _requestRepository = requestRepository; _bookingRepository = bookingRepository; _technicianRepository = technicianRepository; _unitOfWork = unitOfWork;
+        _offerRepository = offerRepository;
+        _requestRepository = requestRepository;
+        _bookingRepository = bookingRepository;
+        _technicianRepository = technicianRepository;
+        _inspectionService = inspectionService;
+        _unitOfWork = unitOfWork;
     }
 
     public Task<List<ServiceRequestOffer>> GetByRequestIdAsync(int requestId) => _offerRepository.GetByRequestIdAsync(requestId);
@@ -49,8 +62,6 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
                 return (false, "Technician is not eligible for this request.", null);
             }
 
-            // Re-check inside the serialized transaction so concurrent submissions
-            // cannot create duplicate pending offers for the same technician/request pair.
             if (await _offerRepository.ExistsForTechnicianAsync(requestId, technicianId))
             {
                 await tx.RollbackAsync();
@@ -105,8 +116,13 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
                 return (false, "This request already has a booking.");
             }
 
-            // Re-read the offer inside the serialized transaction so concurrent acceptance
-            // cannot leave more than one accepted offer/booking for the same request.
+            var existingInspection = await _inspectionService.GetByRequestIdAsync(offer.ServiceRequestId);
+            if (existingInspection != null)
+            {
+                await tx.RollbackAsync();
+                return (false, "This request already has an inspection.");
+            }
+
             var currentOffer = await _offerRepository.GetByIdAsync(offerId);
             if (currentOffer == null || currentOffer.Status != "Pending")
             {
@@ -130,15 +146,30 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
 
             currentOffer.ServiceRequest.Status = "Accepted";
             currentOffer.ServiceRequest.UpdatedAt = DateTime.UtcNow;
-            await _bookingRepository.AddAsync(new Booking
+
+            if (currentOffer.ServiceRequest.Service.PricingMode == PricingMode.Inspection)
             {
-                ServiceRequestId = currentOffer.ServiceRequestId,
-                TechnicianId = currentOffer.TechnicianId,
-                Status = "Confirmed",
-                AgreedPrice = currentOffer.ProposedPrice,
-                FinalPrice = null,
-                AcceptedAt = DateTime.UtcNow
-            });
+                var inspectionResult = await _inspectionService.CreateForAcceptedOfferAsync(
+                    currentOffer.ServiceRequestId,
+                    currentOffer.TechnicianId);
+                if (!inspectionResult.Success)
+                {
+                    await tx.RollbackAsync();
+                    return (false, inspectionResult.Error);
+                }
+            }
+            else
+            {
+                await _bookingRepository.AddAsync(new Booking
+                {
+                    ServiceRequestId = currentOffer.ServiceRequestId,
+                    TechnicianId = currentOffer.TechnicianId,
+                    Status = "Confirmed",
+                    AgreedPrice = currentOffer.ProposedPrice,
+                    FinalPrice = null,
+                    AcceptedAt = DateTime.UtcNow
+                });
+            }
 
             await _unitOfWork.SaveChangesAsync();
             await tx.CommitAsync();
@@ -149,6 +180,11 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
             await tx.RollbackAsync();
             return (false, "The offer could not be accepted because the request was updated concurrently. Please retry.");
         }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<(bool Success, string? Error)> RejectAsync(int offerId, int customerUserId)
@@ -157,7 +193,8 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
         if (offer == null) return (false, "Offer not found.");
         if (offer.ServiceRequest.Customer.UserId != customerUserId) return (false, "You are not allowed to reject this offer.");
         if (offer.Status != "Pending") return (false, "Offer is no longer pending.");
-        offer.Status = "Rejected"; offer.RespondedAt = DateTime.UtcNow;
+        offer.Status = "Rejected";
+        offer.RespondedAt = DateTime.UtcNow;
         await _unitOfWork.SaveChangesAsync();
         return (true, null);
     }
