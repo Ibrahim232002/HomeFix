@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 ﻿using HomeFix.API.DTOs.Services;
 using HomeFix.BLL.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -15,22 +16,16 @@ public class ServicesController : ControllerBase
         _serviceService = serviceService;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<List<ServiceDto>>> GetAll()
     {
         var services = await _serviceService.GetAllServicesAsync();
 
-        var result = services.Select(s => new ServiceDto
-        {
-            Id = s.Id,
-            Name = s.Name,
-            Description = s.Description,
-            IsActive = s.IsActive
-        }).ToList();
-
-        return Ok(result);
+        return Ok(services.Select(MapToDto).ToList());
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ServiceDto>> GetById(int id)
     {
@@ -39,14 +34,25 @@ public class ServicesController : ControllerBase
         if (service == null)
             return NotFound();
 
-        var result = new ServiceDto
+        return Ok(MapToDto(service));
+    }
+
+    [AllowAnonymous]
+    [HttpGet("category/{categoryId:int}")]
+    public async Task<ActionResult<List<ServiceDto>>> GetByCategory(int categoryId)
+    {
+        var services = await _serviceService.GetActiveServicesByCategoryAsync(categoryId);
+        return Ok(services.Select(MapToDto).ToList());
+    }
+
+    private static ServiceDto MapToDto(HomeFix.DAL.Entities.Service service)
+        => new()
         {
             Id = service.Id,
             Name = service.Name,
             Description = service.Description,
+            CategoryId = service.CategoryId,
+            PricingMode = service.PricingMode,
             IsActive = service.IsActive
         };
-
-        return Ok(result);
-    }
 }

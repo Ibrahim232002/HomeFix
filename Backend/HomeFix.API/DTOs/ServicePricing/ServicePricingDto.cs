@@ -12,6 +12,10 @@ public class ServicePricingDto
 
     public decimal? MinimumPrice { get; set; }
 
+    public decimal? MaximumPrice { get; set; }
+
+    public decimal? InspectionFee { get; set; }
+
     public bool IsActive { get; set; }
 
     public DateTime CreatedAt { get; set; }
