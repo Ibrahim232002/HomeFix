@@ -357,6 +357,51 @@ namespace HomeFix.DAL.Migrations
                     b.ToTable("Governorates");
                 });
 
+            modelBuilder.Entity("HomeFix.DAL.Entities.Inspection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Fee")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Findings")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ScheduledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ServiceRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("TechnicianId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "TechnicianId" }, "IX_Inspections_Technician");
+
+                    b.HasIndex(new[] { "ServiceRequestId" }, "UX_Inspections_ServiceRequest")
+                        .IsUnique();
+
+                    b.ToTable("Inspection");
+                });
+
             modelBuilder.Entity("HomeFix.DAL.Entities.Message", b =>
                 {
                     b.Property<int>("Id")
@@ -1772,6 +1817,25 @@ namespace HomeFix.DAL.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("HomeFix.DAL.Entities.Inspection", b =>
+                {
+                    b.HasOne("HomeFix.DAL.Entities.ServiceRequest", "ServiceRequest")
+                        .WithOne("Inspection")
+                        .HasForeignKey("HomeFix.DAL.Entities.Inspection", "ServiceRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HomeFix.DAL.Entities.TechnicianProfile", "Technician")
+                        .WithMany("Inspections")
+                        .HasForeignKey("TechnicianId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ServiceRequest");
+
+                    b.Navigation("Technician");
+                });
+
             modelBuilder.Entity("HomeFix.DAL.Entities.Message", b =>
                 {
                     b.HasOne("HomeFix.DAL.Entities.Conversation", "Conversation")
@@ -2273,6 +2337,8 @@ namespace HomeFix.DAL.Migrations
 
                     b.Navigation("Conversation");
 
+                    b.Navigation("Inspection");
+
                     b.Navigation("Payments");
 
                     b.Navigation("Review");
@@ -2300,6 +2366,8 @@ namespace HomeFix.DAL.Migrations
                     b.Navigation("Bookings");
 
                     b.Navigation("Conversations");
+
+                    b.Navigation("Inspections");
 
                     b.Navigation("Payouts");
 
