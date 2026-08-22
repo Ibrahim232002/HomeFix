@@ -31,12 +31,10 @@ public class ServicePricingRepository
     public async Task AddAsync(ServicePricing pricing)
     {
         await _context.ServicePricings.AddAsync(pricing);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(ServicePricing pricing)
     {
         _context.ServicePricings.Update(pricing);
-        await _context.SaveChangesAsync();
     }
 }

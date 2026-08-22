@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -19,9 +19,15 @@ public partial class Payment
 
     public string? TransactionReference { get; set; }
 
+    public string? Provider { get; set; }
+
+    public string? ProviderTransactionId { get; set; }
+
     public DateTime? PaidAt { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
     public virtual ServiceRequest ServiceRequest { get; set; } = null!;
+
+    public virtual ICollection<PaymentAttempt> PaymentAttempts { get; set; } = new List<PaymentAttempt>();
 }

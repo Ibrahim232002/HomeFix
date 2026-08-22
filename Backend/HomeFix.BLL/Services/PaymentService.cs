@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class PaymentService : IPaymentService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly PaymentRepository _repository;
 
-    public PaymentService(PaymentRepository repository)
+    public PaymentService(PaymentRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -19,9 +24,15 @@ public class PaymentService : IPaymentService
     public Task<List<Payment>> GetByRequestIdAsync(int serviceRequestId)
         => _repository.GetByRequestIdAsync(serviceRequestId);
 
-    public Task AddAsync(Payment payment)
-        => _repository.AddAsync(payment);
+    public async Task AddAsync(Payment payment)
+        {
+        await _repository.AddAsync(payment);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(Payment payment)
-        => _repository.UpdateAsync(payment);
+    public async Task UpdateAsync(Payment payment)
+        {
+        await _repository.UpdateAsync(payment);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

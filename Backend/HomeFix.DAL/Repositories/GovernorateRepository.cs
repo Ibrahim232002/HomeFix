@@ -29,12 +29,10 @@ public class GovernorateRepository
     public async Task AddAsync(Governorate governorate)
     {
         await _context.Governorates.AddAsync(governorate);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(Governorate governorate)
     {
         _context.Governorates.Update(governorate);
-        await _context.SaveChangesAsync();
     }
 }

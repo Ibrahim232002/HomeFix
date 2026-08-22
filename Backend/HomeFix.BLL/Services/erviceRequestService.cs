@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,11 +7,15 @@ namespace HomeFix.BLL.Services;
 
 public class ServiceRequestService : IServiceRequestService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly ServiceRequestRepository _serviceRequestRepository;
 
     public ServiceRequestService(
-        ServiceRequestRepository serviceRequestRepository)
+        ServiceRequestRepository serviceRequestRepository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _serviceRequestRepository = serviceRequestRepository;
     }
 
@@ -41,5 +46,6 @@ public class ServiceRequestService : IServiceRequestService
     public async Task UpdateAsync(ServiceRequest request)
     {
         await _serviceRequestRepository.UpdateAsync(request);
+        await _unitOfWork.SaveChangesAsync();
     }
 }

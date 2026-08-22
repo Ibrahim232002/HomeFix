@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class CityService : ICityService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly CityRepository _repository;
 
-    public CityService(CityRepository repository)
+    public CityService(CityRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -22,9 +27,15 @@ public class CityService : ICityService
     public Task<City?> GetByIdAsync(int id)
         => _repository.GetByIdAsync(id);
 
-    public Task AddAsync(City city)
-        => _repository.AddAsync(city);
+    public async Task AddAsync(City city)
+        {
+        await _repository.AddAsync(city);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(City city)
-        => _repository.UpdateAsync(city);
+    public async Task UpdateAsync(City city)
+        {
+        await _repository.UpdateAsync(city);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

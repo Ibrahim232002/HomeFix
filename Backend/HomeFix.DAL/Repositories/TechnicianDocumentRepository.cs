@@ -38,12 +38,10 @@ public class TechnicianDocumentRepository
     public async Task AddAsync(TechnicianDocument document)
     {
         await _context.TechnicianDocuments.AddAsync(document);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(TechnicianDocument document)
     {
         _context.TechnicianDocuments.Update(document);
-        await _context.SaveChangesAsync();
     }
 }

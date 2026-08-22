@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -10,6 +10,10 @@ public partial class Booking
     public int ServiceRequestId { get; set; }
 
     public int TechnicianId { get; set; }
+
+    public string Status { get; set; } = null!;
+
+    public decimal? AgreedPrice { get; set; }
 
     public DateTime? AcceptedAt { get; set; }
 

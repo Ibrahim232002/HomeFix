@@ -29,12 +29,10 @@ public class TechnicianAvailabilityRepository
     public async Task AddAsync(TechnicianAvailability availability)
     {
         await _context.TechnicianAvailabilities.AddAsync(availability);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(TechnicianAvailability availability)
     {
         _context.TechnicianAvailabilities.Update(availability);
-        await _context.SaveChangesAsync();
     }
 }

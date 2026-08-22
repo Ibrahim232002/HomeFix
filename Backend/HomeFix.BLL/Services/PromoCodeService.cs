@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class PromoCodeService : IPromoCodeService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly PromoCodeRepository _repository;
 
-    public PromoCodeService(PromoCodeRepository repository)
+    public PromoCodeService(PromoCodeRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -22,9 +27,15 @@ public class PromoCodeService : IPromoCodeService
     public Task<List<PromoCode>> GetActiveAsync()
         => _repository.GetActiveAsync();
 
-    public Task AddAsync(PromoCode promoCode)
-        => _repository.AddAsync(promoCode);
+    public async Task AddAsync(PromoCode promoCode)
+        {
+        await _repository.AddAsync(promoCode);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(PromoCode promoCode)
-        => _repository.UpdateAsync(promoCode);
+    public async Task UpdateAsync(PromoCode promoCode)
+        {
+        await _repository.UpdateAsync(promoCode);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

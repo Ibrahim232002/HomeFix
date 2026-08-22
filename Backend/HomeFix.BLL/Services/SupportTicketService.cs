@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class SupportTicketService : ISupportTicketService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly SupportTicketRepository _repository;
 
-    public SupportTicketService(SupportTicketRepository repository)
+    public SupportTicketService(SupportTicketRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -22,9 +27,15 @@ public class SupportTicketService : ISupportTicketService
     public Task<List<SupportTicket>> GetByStatusAsync(string status)
         => _repository.GetByStatusAsync(status);
 
-    public Task AddAsync(SupportTicket ticket)
-        => _repository.AddAsync(ticket);
+    public async Task AddAsync(SupportTicket ticket)
+        {
+        await _repository.AddAsync(ticket);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(SupportTicket ticket)
-        => _repository.UpdateAsync(ticket);
+    public async Task UpdateAsync(SupportTicket ticket)
+        {
+        await _repository.UpdateAsync(ticket);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

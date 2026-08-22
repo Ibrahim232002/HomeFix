@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class GovernorateService : IGovernorateService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly GovernorateRepository _repository;
 
-    public GovernorateService(GovernorateRepository repository)
+    public GovernorateService(GovernorateRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -19,9 +24,15 @@ public class GovernorateService : IGovernorateService
     public Task<Governorate?> GetByIdAsync(int id)
         => _repository.GetByIdAsync(id);
 
-    public Task AddAsync(Governorate governorate)
-        => _repository.AddAsync(governorate);
+    public async Task AddAsync(Governorate governorate)
+        {
+        await _repository.AddAsync(governorate);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(Governorate governorate)
-        => _repository.UpdateAsync(governorate);
+    public async Task UpdateAsync(Governorate governorate)
+        {
+        await _repository.UpdateAsync(governorate);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

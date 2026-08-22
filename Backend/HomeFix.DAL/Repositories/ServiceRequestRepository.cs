@@ -43,12 +43,10 @@ public class ServiceRequestRepository
     public async Task AddAsync(ServiceRequest request)
     {
         await _context.ServiceRequests.AddAsync(request);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(ServiceRequest request)
     {
         _context.ServiceRequests.Update(request);
-        await _context.SaveChangesAsync();
     }
 }

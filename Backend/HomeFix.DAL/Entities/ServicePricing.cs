@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -14,6 +14,8 @@ public partial class ServicePricing
     public decimal VisitFee { get; set; }
 
     public decimal? MinimumPrice { get; set; }
+
+    public decimal? MaximumPrice { get; set; }
 
     public bool IsActive { get; set; }
 

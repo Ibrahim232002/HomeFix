@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class AddressService : IAddressService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly AddressRepository _repository;
 
-    public AddressService(AddressRepository repository)
+    public AddressService(AddressRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -19,12 +24,21 @@ public class AddressService : IAddressService
     public Task<List<Address>> GetByCustomerIdAsync(int customerId)
         => _repository.GetByCustomerIdAsync(customerId);
 
-    public Task AddAsync(Address address)
-        => _repository.AddAsync(address);
+    public async Task AddAsync(Address address)
+        {
+        await _repository.AddAsync(address);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(Address address)
-        => _repository.UpdateAsync(address);
+    public async Task UpdateAsync(Address address)
+        {
+        await _repository.UpdateAsync(address);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task DeleteAsync(Address address)
-        => _repository.DeleteAsync(address);
+    public async Task DeleteAsync(Address address)
+        {
+        await _repository.DeleteAsync(address);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

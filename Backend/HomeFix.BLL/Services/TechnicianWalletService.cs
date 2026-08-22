@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class TechnicianWalletService : ITechnicianWalletService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly TechnicianWalletRepository _repository;
 
-    public TechnicianWalletService(TechnicianWalletRepository repository)
+    public TechnicianWalletService(TechnicianWalletRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -19,9 +24,15 @@ public class TechnicianWalletService : ITechnicianWalletService
     public Task<TechnicianWallet?> GetByTechnicianIdAsync(int technicianId)
         => _repository.GetByTechnicianIdAsync(technicianId);
 
-    public Task AddAsync(TechnicianWallet wallet)
-        => _repository.AddAsync(wallet);
+    public async Task AddAsync(TechnicianWallet wallet)
+        {
+        await _repository.AddAsync(wallet);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(TechnicianWallet wallet)
-        => _repository.UpdateAsync(wallet);
+    public async Task UpdateAsync(TechnicianWallet wallet)
+        {
+        await _repository.UpdateAsync(wallet);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

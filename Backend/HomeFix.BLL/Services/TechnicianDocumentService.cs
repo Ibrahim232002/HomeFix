@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class TechnicianDocumentService : ITechnicianDocumentService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly TechnicianDocumentRepository _repository;
 
-    public TechnicianDocumentService(TechnicianDocumentRepository repository)
+    public TechnicianDocumentService(TechnicianDocumentRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -22,9 +27,15 @@ public class TechnicianDocumentService : ITechnicianDocumentService
     public Task<List<TechnicianDocument>> GetPendingAsync()
         => _repository.GetPendingAsync();
 
-    public Task AddAsync(TechnicianDocument document)
-        => _repository.AddAsync(document);
+    public async Task AddAsync(TechnicianDocument document)
+        {
+        await _repository.AddAsync(document);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(TechnicianDocument document)
-        => _repository.UpdateAsync(document);
+    public async Task UpdateAsync(TechnicianDocument document)
+        {
+        await _repository.UpdateAsync(document);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

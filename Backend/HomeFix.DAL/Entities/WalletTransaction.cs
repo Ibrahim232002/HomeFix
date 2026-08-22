@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -12,6 +12,10 @@ public partial class WalletTransaction
     public int? ServiceRequestId { get; set; }
 
     public decimal Amount { get; set; }
+
+    public decimal? BalanceBefore { get; set; }
+
+    public decimal? BalanceAfter { get; set; }
 
     public string TransactionType { get; set; } = null!;
 

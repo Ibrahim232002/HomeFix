@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class RefreshTokenService : IRefreshTokenService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly RefreshTokenRepository _repository;
 
-    public RefreshTokenService(RefreshTokenRepository repository)
+    public RefreshTokenService(RefreshTokenRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -19,9 +24,15 @@ public class RefreshTokenService : IRefreshTokenService
     public Task<List<RefreshToken>> GetByUserIdAsync(int userId)
         => _repository.GetByUserIdAsync(userId);
 
-    public Task AddAsync(RefreshToken refreshToken)
-        => _repository.AddAsync(refreshToken);
+    public async Task AddAsync(RefreshToken refreshToken)
+        {
+        await _repository.AddAsync(refreshToken);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(RefreshToken refreshToken)
-        => _repository.UpdateAsync(refreshToken);
+    public async Task UpdateAsync(RefreshToken refreshToken)
+        {
+        await _repository.UpdateAsync(refreshToken);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

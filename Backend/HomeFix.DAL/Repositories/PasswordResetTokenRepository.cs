@@ -31,6 +31,5 @@ public class PasswordResetTokenRepository
     public async Task AddAsync(PasswordResetToken token)
     {
         await _context.PasswordResetTokens.AddAsync(token);
-        await _context.SaveChangesAsync();
     }
 }

@@ -16,6 +16,8 @@ public static class DependencyInjection
             options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection")));
 
+        services.AddScoped<UnitOfWork>();
+
         services.AddScoped<UserRepository>();
         services.AddScoped<CustomerProfileRepository>();
         services.AddScoped<TechnicianProfileRepository>();

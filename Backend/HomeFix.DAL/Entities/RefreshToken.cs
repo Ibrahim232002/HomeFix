@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -10,6 +10,8 @@ public partial class RefreshToken
     public int UserId { get; set; }
 
     public string Token { get; set; } = null!;
+
+    public string? TokenHash { get; set; }
 
     public DateTime ExpiresAt { get; set; }
 

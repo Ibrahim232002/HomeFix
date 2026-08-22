@@ -47,6 +47,5 @@ public class ConversationRepository
     public async Task AddAsync(Conversation conversation)
     {
         await _context.Conversations.AddAsync(conversation);
-        await _context.SaveChangesAsync();
     }
 }

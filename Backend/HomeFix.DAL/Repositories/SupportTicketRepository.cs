@@ -40,12 +40,10 @@ public class SupportTicketRepository
     public async Task AddAsync(SupportTicket ticket)
     {
         await _context.SupportTickets.AddAsync(ticket);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(SupportTicket ticket)
     {
         _context.SupportTickets.Update(ticket);
-        await _context.SaveChangesAsync();
     }
 }

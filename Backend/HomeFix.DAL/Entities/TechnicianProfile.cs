@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -34,6 +34,8 @@ public partial class TechnicianProfile
     public virtual ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
 
     public virtual ICollection<Payout> Payouts { get; set; } = new List<Payout>();
+
+    public virtual ICollection<ServiceRequestOffer> ServiceRequestOffers { get; set; } = new List<ServiceRequestOffer>();
 
     public virtual ICollection<Review> Reviews { get; set; } = new List<Review>();
 

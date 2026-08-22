@@ -1,4 +1,5 @@
-﻿using HomeFix.BLL.Interfaces;
+﻿using HomeFix.DAL;
+using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
 
@@ -6,10 +7,14 @@ namespace HomeFix.BLL.Services;
 
 public class ServicePricingService : IServicePricingService
 {
+    private readonly UnitOfWork _unitOfWork;
+
     private readonly ServicePricingRepository _repository;
 
-    public ServicePricingService(ServicePricingRepository repository)
+    public ServicePricingService(ServicePricingRepository repository,
+        UnitOfWork unitOfWork)
     {
+        _unitOfWork = unitOfWork;
         _repository = repository;
     }
 
@@ -19,9 +24,15 @@ public class ServicePricingService : IServicePricingService
     public Task<List<ServicePricing>> GetByServiceIdAsync(int serviceId)
         => _repository.GetByServiceIdAsync(serviceId);
 
-    public Task AddAsync(ServicePricing pricing)
-        => _repository.AddAsync(pricing);
+    public async Task AddAsync(ServicePricing pricing)
+        {
+        await _repository.AddAsync(pricing);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
-    public Task UpdateAsync(ServicePricing pricing)
-        => _repository.UpdateAsync(pricing);
+    public async Task UpdateAsync(ServicePricing pricing)
+        {
+        await _repository.UpdateAsync(pricing);
+        await _unitOfWork.SaveChangesAsync();
+    }
 }

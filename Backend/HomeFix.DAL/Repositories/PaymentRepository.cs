@@ -30,12 +30,10 @@ public class PaymentRepository
     public async Task AddAsync(Payment payment)
     {
         await _context.Payments.AddAsync(payment);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(Payment payment)
     {
         _context.Payments.Update(payment);
-        await _context.SaveChangesAsync();
     }
 }

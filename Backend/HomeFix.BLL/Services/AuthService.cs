@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using HomeFix.BLL.Interfaces;
+using HomeFix.DAL;
 using HomeFix.BLL.Models;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
@@ -12,18 +13,21 @@ public class AuthService : IAuthService
     private readonly UserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly RefreshTokenRepository _refreshTokenRepository;
+    private readonly UnitOfWork _unitOfWork;
     private readonly JwtSettings _jwtSettings;
 
     public AuthService(
         UserRepository userRepository,
         IPasswordHasher passwordHasher,
         RefreshTokenRepository refreshTokenRepository,
-        IOptions<JwtSettings> jwtSettings)
+        IOptions<JwtSettings> jwtSettings,
+        UnitOfWork unitOfWork)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _refreshTokenRepository = refreshTokenRepository;
         _jwtSettings = jwtSettings.Value;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<(bool Success, string? Error, User? User)> RegisterAsync(
@@ -62,6 +66,7 @@ public class AuthService : IAuthService
         };
 
         await _userRepository.AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
 
         return (true, null, user);
     }
@@ -101,6 +106,7 @@ public class AuthService : IAuthService
         };
 
         await _refreshTokenRepository.AddAsync(refreshToken);
+        await _unitOfWork.SaveChangesAsync();
 
         return token;
     }
@@ -138,6 +144,7 @@ public class AuthService : IAuthService
         token.IsRevoked = true;
 
         await _refreshTokenRepository.UpdateAsync(token);
+        await _unitOfWork.SaveChangesAsync();
 
         return true;
     }

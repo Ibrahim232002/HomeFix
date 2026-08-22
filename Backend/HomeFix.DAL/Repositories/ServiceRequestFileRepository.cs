@@ -31,12 +31,10 @@ public class ServiceRequestFileRepository
     public async Task AddAsync(ServiceRequestFile file)
     {
         await _context.ServiceRequestFiles.AddAsync(file);
-        await _context.SaveChangesAsync();
     }
 
     public async Task DeleteAsync(ServiceRequestFile file)
     {
         _context.ServiceRequestFiles.Remove(file);
-        await _context.SaveChangesAsync();
     }
 }

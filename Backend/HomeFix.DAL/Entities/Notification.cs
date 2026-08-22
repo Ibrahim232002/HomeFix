@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HomeFix.DAL.Entities;
@@ -18,6 +18,8 @@ public partial class Notification
     public DateTime CreatedAt { get; set; }
 
     public string? Type { get; set; }
+
+    public int? ReferenceId { get; set; }
 
     public virtual User User { get; set; } = null!;
 }

@@ -30,6 +30,5 @@ public class UserPromoCodeRepository
     public async Task AddAsync(UserPromoCode userPromoCode)
     {
         await _context.UserPromoCodes.AddAsync(userPromoCode);
-        await _context.SaveChangesAsync();
     }
 }

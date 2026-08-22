@@ -28,12 +28,10 @@ public class CustomerProfileRepository
     public async Task AddAsync(CustomerProfile profile)
     {
         await _context.CustomerProfiles.AddAsync(profile);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(CustomerProfile profile)
     {
         _context.CustomerProfiles.Update(profile);
-        await _context.SaveChangesAsync();
     }
 }
