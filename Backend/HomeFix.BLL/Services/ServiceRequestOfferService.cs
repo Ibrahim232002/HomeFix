@@ -1,6 +1,7 @@
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL;
 using HomeFix.DAL.Entities;
+using HomeFix.DAL.Enums;
 using HomeFix.DAL.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
@@ -98,7 +99,10 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
         await using var tx = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
         try
         {
-            var existingBooking = await _bookingRepository.GetByRequestIdAsync(offer.ServiceRequestId);
+            var request = offer.ServiceRequest;
+            var pricingMode = request.Service.PricingMode;
+
+            var existingBooking = await _bookingRepository.GetByRequestIdAsync(request.Id);
             if (existingBooking != null)
             {
                 await tx.RollbackAsync();
@@ -119,6 +123,19 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
                 return (false, "Offer has expired.");
             }
 
+            // Inspection requests select a technician at offer acceptance time but do not
+            // create a Booking until the completed inspection quote is accepted.
+            if (pricingMode == PricingMode.Inspection)
+            {
+                var acceptedOffer = (await _offerRepository.GetByRequestIdAsync(currentOffer.ServiceRequestId))
+                    .FirstOrDefault(x => x.Status == "Accepted" && x.Id != currentOffer.Id);
+                if (acceptedOffer != null)
+                {
+                    await tx.RollbackAsync();
+                    return (false, "This request already has an accepted technician offer.");
+                }
+            }
+
             currentOffer.Status = "Accepted";
             currentOffer.RespondedAt = DateTime.UtcNow;
             var otherOffers = await _offerRepository.GetByRequestIdAsync(currentOffer.ServiceRequestId);
@@ -130,15 +147,19 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
 
             currentOffer.ServiceRequest.Status = "Accepted";
             currentOffer.ServiceRequest.UpdatedAt = DateTime.UtcNow;
-            await _bookingRepository.AddAsync(new Booking
+
+            if (pricingMode != PricingMode.Inspection)
             {
-                ServiceRequestId = currentOffer.ServiceRequestId,
-                TechnicianId = currentOffer.TechnicianId,
-                Status = "Confirmed",
-                AgreedPrice = currentOffer.ProposedPrice,
-                FinalPrice = null,
-                AcceptedAt = DateTime.UtcNow
-            });
+                await _bookingRepository.AddAsync(new Booking
+                {
+                    ServiceRequestId = currentOffer.ServiceRequestId,
+                    TechnicianId = currentOffer.TechnicianId,
+                    Status = "Confirmed",
+                    AgreedPrice = currentOffer.ProposedPrice,
+                    FinalPrice = null,
+                    AcceptedAt = DateTime.UtcNow
+                });
+            }
 
             await _unitOfWork.SaveChangesAsync();
             await tx.CommitAsync();

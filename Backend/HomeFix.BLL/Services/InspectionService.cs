@@ -16,17 +16,20 @@ public class InspectionService : IInspectionService
 
     private readonly InspectionRepository _inspectionRepository;
     private readonly ServiceRequestRepository _requestRepository;
+    private readonly ServiceRequestOfferRepository _offerRepository;
     private readonly ServicePricingService _pricingService;
     private readonly UnitOfWork _unitOfWork;
 
     public InspectionService(
         InspectionRepository inspectionRepository,
         ServiceRequestRepository requestRepository,
+        ServiceRequestOfferRepository offerRepository,
         ServicePricingService pricingService,
         UnitOfWork unitOfWork)
     {
         _inspectionRepository = inspectionRepository;
         _requestRepository = requestRepository;
+        _offerRepository = offerRepository;
         _pricingService = pricingService;
         _unitOfWork = unitOfWork;
     }
@@ -52,10 +55,13 @@ public class InspectionService : IInspectionService
         if (request == null) return (false, "Service request not found.", null);
         if (request.Inspection != null) return (false, "An inspection already exists for this service request.", null);
         if (request.Status != "Accepted") return (false, "The service request is not ready for inspection.", null);
-        if (request.Booking == null) return (false, "A selected technician is required before creating an inspection.", null);
-        if (request.Booking.TechnicianId != technicianId) return (false, "Technician is not the selected technician for this request.", null);
         if (!Enum.IsDefined(request.Service.PricingMode)) return (false, "Service pricing mode is invalid.", null);
         if (request.Service.PricingMode != PricingMode.Inspection) return (false, "This service does not use inspection pricing.", null);
+
+        var acceptedOffer = (await _offerRepository.GetByRequestIdAsync(serviceRequestId))
+            .FirstOrDefault(x => x.Status == "Accepted");
+        if (acceptedOffer == null) return (false, "An accepted technician offer is required before creating an inspection.", null);
+        if (acceptedOffer.TechnicianId != technicianId) return (false, "Technician is not the selected technician for this request.", null);
 
         var pricing = await _pricingService.GetForServiceAsync(request.ServiceId, request.Address.CityId);
         if (pricing == null) return (false, "No active pricing is configured for this service and location.", null);
@@ -64,7 +70,7 @@ public class InspectionService : IInspectionService
         var inspection = new Inspection
         {
             ServiceRequestId = request.Id,
-            TechnicianId = technicianId,
+            TechnicianId = acceptedOffer.TechnicianId,
             Fee = pricing.InspectionFee.Value,
             ScheduledAt = scheduledAt,
             Status = Scheduled,
