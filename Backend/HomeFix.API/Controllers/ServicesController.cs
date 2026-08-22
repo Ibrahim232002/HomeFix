@@ -52,6 +52,7 @@ public class ServicesController : ControllerBase
             Name = service.Name,
             Description = service.Description,
             CategoryId = service.CategoryId,
+            PricingMode = service.PricingMode,
             IsActive = service.IsActive
         };
 }

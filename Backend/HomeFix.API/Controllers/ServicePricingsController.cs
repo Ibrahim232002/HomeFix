@@ -35,6 +35,7 @@ public class ServicePricingsController : ControllerBase
             VisitFee = pricing.VisitFee,
             MinimumPrice = pricing.MinimumPrice,
             MaximumPrice = pricing.MaximumPrice,
+            InspectionFee = pricing.InspectionFee,
             IsActive = pricing.IsActive,
             CreatedAt = pricing.CreatedAt
         });
@@ -55,6 +56,7 @@ public class ServicePricingsController : ControllerBase
             VisitFee = p.VisitFee,
             MinimumPrice = p.MinimumPrice,
             MaximumPrice = p.MaximumPrice,
+            InspectionFee = p.InspectionFee,
             IsActive = p.IsActive,
             CreatedAt = p.CreatedAt
         }).ToList();
