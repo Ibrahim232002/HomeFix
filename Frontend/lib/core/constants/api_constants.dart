@@ -73,6 +73,23 @@ class ApiConstants {
   static String bookingVerificationCode(int id, String purpose) => '/api/Bookings/$id/verification-code?purpose=$purpose';
   static String bookingVerifyCode(int id, String purpose) => '/api/Bookings/$id/verify-code?purpose=$purpose';
 
+  static const String inspections = '/api/Inspections';
+  static String inspectionById(int id) => '/api/Inspections/$id';
+  static String inspectionByRequest(int serviceRequestId) => '/api/Inspections/request/$serviceRequestId';
+  static const String myInspections = '/api/Inspections/mine';
+  static String scheduleInspection(int id) => '/api/Inspections/$id/schedule';
+  static String startInspection(int id) => '/api/Inspections/$id/start';
+  static String completeInspection(int id) => '/api/Inspections/$id/complete';
+  static String cancelInspection(int id) => '/api/Inspections/$id/cancel';
+  static String noShowInspection(int id) => '/api/Inspections/$id/no-show';
+
+  static const String serviceQuotes = '/api/ServiceQuotes';
+  static String serviceQuoteById(int id) => '/api/ServiceQuotes/$id';
+  static String serviceQuotesByInspection(int inspectionId) => '/api/ServiceQuotes/inspection/$inspectionId';
+  static String serviceQuoteRevision(int quoteId) => '/api/ServiceQuotes/$quoteId/revision';
+  static String acceptServiceQuote(int quoteId) => '/api/ServiceQuotes/$quoteId/accept';
+  static String rejectServiceQuote(int quoteId) => '/api/ServiceQuotes/$quoteId/reject';
+
   static const String payments = '/api/Payments';
   static String paymentById(int id) => '/api/Payments/$id';
   static String paymentsByRequest(int serviceRequestId) => '/api/Payments/request/$serviceRequestId';
