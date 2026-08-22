@@ -77,6 +77,8 @@ class AppStateProvider extends ChangeNotifier {
   TechnicianProfileModel? _currentTechProfile;
   List<TechnicianServiceAreaModel> _serviceAreas = [];
   List<GovernorateDto> _governorates = [];
+  bool _governoratesLoaded = false;
+  Future<List<GovernorateDto>>? _governoratesFuture;
 
   UserModel? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
@@ -126,7 +128,7 @@ class AppStateProvider extends ChangeNotifier {
   Future<void> register({required String fullName, required String email, required String phoneNumber, required String password, required UserRole role}) async { _isLoading = true; _errorMessage = null; notifyListeners(); try { _currentUser = await _userRepo.register(RegisterRequest(fullName: fullName, email: email, phoneNumber: phoneNumber, password: password, role: role == UserRole.technician ? 'Technician' : 'Customer')); if (_currentUser?.role == UserRole.technician) _technicianNavIndex = 0; else _customerNavIndex = 0; await _loadInitialData(); } catch (e) { _errorMessage = e.toString().replaceAll('Exception: ', ''); } finally { _isLoading = false; notifyListeners(); } }
   Future<void> loginWithPhone(String phone, String otp, UserRole role) async { _isLoading = true; notifyListeners(); try { _currentUser = await _userRepo.loginWithPhone(phone, otp, role); if (role == UserRole.technician) _technicianNavIndex = 0; else _customerNavIndex = 0; await _loadInitialData(); } catch (e) { _errorMessage = e.toString(); } finally { _isLoading = false; notifyListeners(); } }
 
-  void logout() { _currentUser = null; _errorMessage = null; _apiError = null; _categoryError = null; _customerNavIndex = 0; _technicianNavIndex = 0; _selectedCategoryId = 'all'; _searchQuery = ''; _appliedPromo = null; _currentTechProfile = null; _customerRequests = []; _availableTechRequests = []; _bookings = []; _conversations = []; _notifications = []; _savedAddresses = []; _technicianDocuments = []; _payments = []; _customerOffers = []; _technicianOffers = []; _serviceAreas = []; _governorates = []; _activePayment = null; _wallet = null; notifyListeners(); }
+  void logout() { _currentUser = null; _errorMessage = null; _apiError = null; _categoryError = null; _customerNavIndex = 0; _technicianNavIndex = 0; _selectedCategoryId = 'all'; _searchQuery = ''; _appliedPromo = null; _currentTechProfile = null; _customerRequests = []; _availableTechRequests = []; _bookings = []; _conversations = []; _notifications = []; _savedAddresses = []; _technicianDocuments = []; _payments = []; _customerOffers = []; _technicianOffers = []; _serviceAreas = []; _governorates = []; _governoratesLoaded = false; _governoratesFuture = null; _activePayment = null; _wallet = null; notifyListeners(); }
   void setCustomerNavIndex(int index) { _customerNavIndex = index; notifyListeners(); }
   void setTechnicianNavIndex(int index) { _technicianNavIndex = index; notifyListeners(); }
 
@@ -189,7 +191,34 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<List<GovernorateDto>> loadGovernoratesForTechnician() async { if (_governorates.isNotEmpty) return _governorates; final client = ApiClient(); final response = await client.get(ApiConstants.governorates); if (response is List) _governorates = response.map((e) => GovernorateDto.fromJson(e as Map<String, dynamic>)).toList(); return _governorates; }
+  Future<List<GovernorateDto>> loadGovernoratesForTechnician() async {
+    if (_governoratesLoaded) return _governorates;
+    final inFlight = _governoratesFuture;
+    if (inFlight != null) return inFlight;
+
+    final future = _fetchGovernoratesForTechnician();
+    _governoratesFuture = future;
+    try {
+      final result = await future;
+      _governorates = result;
+      _governoratesLoaded = true;
+      return result;
+    } finally {
+      if (identical(_governoratesFuture, future)) {
+        _governoratesFuture = null;
+      }
+    }
+  }
+
+  Future<List<GovernorateDto>> _fetchGovernoratesForTechnician() async {
+    final client = ApiClient();
+    final response = await client.get(ApiConstants.governorates);
+    if (response is List) {
+      return response.map((e) => GovernorateDto.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
   Future<List<CityDto>> loadCitiesForTechnician(int governorateId) async { final client = ApiClient(); final response = await client.get(ApiConstants.citiesByGovernorate(governorateId)); if (response is List) return response.map((e) => CityDto.fromJson(e as Map<String, dynamic>)).toList(); return []; }
   Future<String> getCityName(int cityId) async { final client = ApiClient(); try { final response = await client.get(ApiConstants.cityById(cityId)); return CityDto.fromJson(response as Map<String, dynamic>).name ?? 'مدينة $cityId'; } catch (_) { return 'مدينة $cityId'; } }
   Future<void> selectCategory(String categoryId) async { _selectedCategoryId = categoryId; _categoryError = null; _isLoadingCategoryServices = true; notifyListeners(); try { if (categoryId == 'all') _services = await _serviceRepo.getServices(); else { final categoryName = _categories.firstWhere((c) => c.id == categoryId, orElse: () => _categories.first).nameAr; _services = await _serviceRepo.getServicesByCategory(categoryId, categoryNameAr: categoryName); } } catch (e) { _services = []; _categoryError = e.toString(); } finally { _isLoadingCategoryServices = false; notifyListeners(); } }
