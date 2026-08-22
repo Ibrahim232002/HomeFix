@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
@@ -34,4 +36,6 @@ public partial class Inspection
 
     [ForeignKey(nameof(TechnicianId))]
     public virtual TechnicianProfile Technician { get; set; } = null!;
+
+    public virtual ICollection<ServiceQuote> ServiceQuotes { get; set; } = new List<ServiceQuote>();
 }
