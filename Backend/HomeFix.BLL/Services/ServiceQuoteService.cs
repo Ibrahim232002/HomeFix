@@ -146,9 +146,21 @@ public class ServiceQuoteService : IServiceQuoteService
                 return (false, "You are not allowed to revise this quote.", null);
             }
 
-            var allQuotes = await _quoteRepository.GetByInspectionIdAsync(inspection.Id);
-            var now = DateTime.UtcNow;
+            var existingBooking = await _bookingRepository.GetByRequestIdAsync(inspection.ServiceRequestId);
+            if (existingBooking != null)
+            {
+                await tx.RollbackAsync();
+                return (false, "A booking already exists for this service request; quote revisions are no longer allowed.", null);
+            }
 
+            var allQuotes = await _quoteRepository.GetByInspectionIdAsync(inspection.Id);
+            if (allQuotes.Any(q => q.Status == Accepted))
+            {
+                await tx.RollbackAsync();
+                return (false, "An accepted quote already exists for this inspection; quote revisions are no longer allowed.", null);
+            }
+
+            var now = DateTime.UtcNow;
             var activePending = allQuotes.FirstOrDefault(q => q.Status == PendingCustomer);
             if (activePending != null)
             {

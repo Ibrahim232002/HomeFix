@@ -50,6 +50,7 @@ public class InspectionService : IInspectionService
     {
         if (technicianId <= 0) return (false, "A valid technician is required.", null);
         if (serviceRequestId <= 0) return (false, "A valid service request is required.", null);
+        if (scheduledAt <= DateTime.UtcNow) return (false, "Inspection must be scheduled for a future time.", null);
 
         var request = await _requestRepository.GetByIdAsync(serviceRequestId);
         if (request == null) return (false, "Service request not found.", null);
@@ -86,7 +87,12 @@ public class InspectionService : IInspectionService
     }
 
     public Task<(bool Success, string? Error, Inspection? Inspection)> ScheduleAsync(int technicianId, int inspectionId, DateTime scheduledAt)
-        => TransitionAsync(technicianId, inspectionId, Scheduled, inspection => inspection.ScheduledAt = scheduledAt);
+    {
+        if (scheduledAt <= DateTime.UtcNow)
+            return Task.FromResult<(bool Success, string? Error, Inspection? Inspection)>((false, "Inspection must be scheduled for a future time.", null));
+
+        return TransitionAsync(technicianId, inspectionId, Scheduled, inspection => inspection.ScheduledAt = scheduledAt);
+    }
 
     public Task<(bool Success, string? Error, Inspection? Inspection)> StartAsync(int technicianId, int inspectionId)
         => TransitionAsync(technicianId, inspectionId, InProgress, null);
