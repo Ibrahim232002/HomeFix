@@ -13,15 +13,18 @@ namespace HomeFix.API.Controllers;
 public class ServiceQuotesController : ControllerBase
 {
     private readonly IServiceQuoteService _service;
+    private readonly IInspectionService _inspections;
     private readonly ITechnicianProfileService _technicians;
     private readonly ICustomerProfileService _customers;
 
     public ServiceQuotesController(
         IServiceQuoteService service,
+        IInspectionService inspections,
         ITechnicianProfileService technicians,
         ICustomerProfileService customers)
     {
         _service = service;
+        _inspections = inspections;
         _technicians = technicians;
         _customers = customers;
     }
@@ -38,13 +41,11 @@ public class ServiceQuotesController : ControllerBase
     [HttpGet("inspection/{inspectionId:int}")]
     public async Task<ActionResult<List<ServiceQuoteDto>>> GetByInspection(int inspectionId)
     {
-        var quotes = await _service.GetByInspectionIdAsync(inspectionId);
-        if (quotes.Count == 0)
-        {
-            return Ok(new List<ServiceQuoteDto>());
-        }
+        var inspection = await _inspections.GetByIdAsync(inspectionId);
+        if (inspection == null) return NotFound();
+        if (!await CanReadInspectionAsync(inspection)) return Forbid();
 
-        if (!await CanReadAsync(quotes[0])) return Forbid();
+        var quotes = await _service.GetByInspectionIdAsync(inspectionId);
         return Ok(quotes.Select(Map).ToList());
     }
 
@@ -121,6 +122,26 @@ public class ServiceQuotesController : ControllerBase
         {
             var customer = await _customers.GetByUserIdAsync(userId);
             return customer != null && quote.Inspection.ServiceRequest.CustomerId == customer.Id;
+        }
+
+        return false;
+    }
+
+    private async Task<bool> CanReadInspectionAsync(Inspection inspection)
+    {
+        if (User.IsInRole("Admin")) return true;
+        if (!TryGetUserId(out var userId)) return false;
+
+        if (User.IsInRole("Technician"))
+        {
+            var technician = await _technicians.GetByUserIdAsync(userId);
+            return technician != null && inspection.TechnicianId == technician.Id;
+        }
+
+        if (User.IsInRole("Customer"))
+        {
+            var customer = await _customers.GetByUserIdAsync(userId);
+            return customer != null && inspection.ServiceRequest.CustomerId == customer.Id;
         }
 
         return false;

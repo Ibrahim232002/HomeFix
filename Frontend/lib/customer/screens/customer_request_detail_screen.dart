@@ -34,6 +34,8 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   bool _completionActionLoading = false;
   String? _requestError;
   String? _offersError;
+  String? _pricingError;
+  String? _inspectionError;
   ServiceRequestModel? _request;
   BookingModel? _booking;
   ServicePricingDto? _pricing;
@@ -89,6 +91,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   Future<void> _loadPricing(ServiceRequestModel request) async {
     final serviceId = int.tryParse(request.serviceId);
     if (serviceId == null || serviceId <= 0) return;
+    if (mounted) setState(() => _pricingError = null);
     try {
       ServicePricingDto? pricing;
       final cityId = request.address.cityId;
@@ -104,19 +107,22 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
         }
       }
       if (mounted) setState(() => _pricing = pricing);
-    } catch (_) {
-      // Request.VisitFee remains authoritative if supplemental pricing lookup fails.
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _pricingError = _errorMessage(error));
     }
   }
 
   Future<void> _loadInspection(ServiceRequestModel request) async {
     final id = int.tryParse(request.id);
     if (id == null || id <= 0) return;
+    if (mounted) setState(() => _inspectionError = null);
     try {
       final inspection = await _inspectionRepository.getInspectionByRequest(id);
       if (mounted) setState(() => _inspection = inspection);
-    } catch (_) {
-      // Inspection is optional until an inspection workflow is present for this request.
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _inspectionError = _errorMessage(error));
     }
   }
 
@@ -233,14 +239,16 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
 
     final currentStep = _getStatusStepIndex(request.status);
     final offers = appState.customerOffers;
-    final visitFee = request.visitFee ?? _pricing?.visitFee;
+    final visitFee = _pricing?.visitFee ?? request.visitFee;
+    final minimumPrice = _pricing?.minimumPrice ?? request.estimatedPriceMin;
+    final maximumPrice = _pricing?.maximumPrice ?? request.estimatedPriceMax;
     final inspectionFee = _inspection?.fee ?? _pricing?.inspectionFee;
     final agreedPrice = _booking?.finalPrice ?? _booking?.agreedPrice;
-    final hasRange = request.estimatedPriceMin != null || request.estimatedPriceMax != null;
+    final hasRange = minimumPrice != null || maximumPrice != null;
     final totalLabel = agreedPrice != null
         ? '${agreedPrice.toInt()} ج.م'
         : hasRange
-            ? '${request.estimatedPriceMin != null ? request.estimatedPriceMin!.toInt() : '—'} - ${request.estimatedPriceMax != null ? request.estimatedPriceMax!.toInt() : '—'} ج.م'
+            ? '${minimumPrice != null ? minimumPrice!.toInt() : '—'} - ${maximumPrice != null ? maximumPrice!.toInt() : '—'} ج.م'
             : 'السعر حسب المعاينة';
 
     return Scaffold(
@@ -386,9 +394,14 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('تفاصيل الفاتورة والحساب', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
               const SizedBox(height: 12),
+              if (_pricingError != null) Text(_pricingError!, style: const TextStyle(fontSize: 11, color: AppColors.error, fontFamily: 'Cairo')),
               if (visitFee != null) _buildPriceRow(label: 'رسوم الزيارة', value: '${visitFee.toInt()} ج.م'),
               if (inspectionFee != null) ...[const SizedBox(height: 6), _buildPriceRow(label: 'رسوم المعاينة', value: '${inspectionFee.toInt()} ج.م')],
               if (agreedPrice != null) ...[const SizedBox(height: 6), _buildPriceRow(label: 'السعر المتفق عليه', value: '${agreedPrice.toInt()} ج.م')],
+              if (_inspectionError != null) ...[
+                const SizedBox(height: 6),
+                Text(_inspectionError!, style: const TextStyle(fontSize: 11, color: AppColors.error, fontFamily: 'Cairo')),
+              ],
               if (visitFee == null && inspectionFee == null && agreedPrice == null && !hasRange) const Text('لا يوجد سعر نهائي أو نطاق سعر متاح بعد.', style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontFamily: 'Cairo')),
               const Divider(height: 20),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('المبلغ الإجمالي المتوقع', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')), Text(totalLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primaryDark, fontFamily: 'Cairo'))]),
