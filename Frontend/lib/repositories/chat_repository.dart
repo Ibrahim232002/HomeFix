@@ -66,22 +66,19 @@ class ChatRepository implements IChatRepository {
 
     for (final item in response.whereType<Map<String, dynamic>>()) {
       final dto = ConversationDto.fromJson(item);
-      List<MessageModel> messages = [];
-      try {
-        final msgDtos = await getApiMessagesByConversation(dto.id);
-        messages = msgDtos
-            .map((m) => MessageModel(
-                  id: m.id.toString(),
-                  conversationId: dto.id.toString(),
-                  senderId: m.senderId.toString(),
-                  senderName: m.senderId == dto.customerId ? 'العميل' : 'الفني',
-                  senderRole: m.senderId == dto.customerId ? UserRole.customer : UserRole.technician,
-                  text: m.messageText ?? '',
-                  createdAt: m.sentAt.isNotEmpty ? m.sentAt : 'الآن',
-                  isRead: m.isRead,
-                ))
-            .toList();
-      } catch (_) {}
+      final msgDtos = await getApiMessagesByConversation(dto.id);
+      final messages = msgDtos
+          .map((m) => MessageModel(
+                id: m.id.toString(),
+                conversationId: dto.id.toString(),
+                senderId: m.senderId.toString(),
+                senderName: m.senderId == dto.customerId ? 'العميل' : 'الفني',
+                senderRole: m.senderId == dto.customerId ? UserRole.customer : UserRole.technician,
+                text: m.messageText ?? '',
+                createdAt: m.sentAt.isNotEmpty ? m.sentAt : 'الآن',
+                isRead: m.isRead,
+              ))
+          .toList();
 
       result.add(ConversationModel(
         id: dto.id.toString(),
