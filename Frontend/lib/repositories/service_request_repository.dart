@@ -96,6 +96,8 @@ class ServiceRequestRepository implements IServiceRequestRepository {
 
   @override
   Future<ServiceRequestModel> createRequest(ServiceRequestModel request) async {
+    final visitFee = request.visitFee;
+    if (visitFee == null) throw Exception('رسوم الزيارة غير متاحة لتسعير الخدمة المحدد.');
     final dto = await createApiServiceRequest(CreateServiceRequestRequest(
       customerId: int.tryParse(request.customerId) ?? 1,
       serviceId: int.tryParse(request.serviceId) ?? 1,
@@ -104,7 +106,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       preferredDate: _serializePreferredDate(request.preferredDate),
       preferredTime: _serializePreferredTime(request.preferredTime),
       status: 'Pending',
-      visitFee: request.estimatedPriceMin,
+      visitFee: visitFee,
     ));
     return _mapDtoToModel(dto, fallbackModel: request);
   }
@@ -147,8 +149,10 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       preferredTime: dto.preferredTime ?? '',
       files: [],
       status: ServiceRequestStatus.fromString(dto.status ?? 'Pending'),
-      estimatedPriceMin: dto.visitFee,
-      estimatedPriceMax: dto.visitFee,
+      estimatedPriceMin: fallbackModel?.estimatedPriceMin,
+      estimatedPriceMax: fallbackModel?.estimatedPriceMax,
+      visitFee: dto.visitFee,
+      finalPrice: fallbackModel?.finalPrice,
       createdAt: dto.createdAt,
       statusHistory: [
         ServiceRequestStatusHistoryModel(

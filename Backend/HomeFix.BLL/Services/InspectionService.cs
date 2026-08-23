@@ -3,6 +3,9 @@ using HomeFix.DAL;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Enums;
 using HomeFix.DAL.Repositories;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace HomeFix.BLL.Services;
 
@@ -50,6 +53,7 @@ public class InspectionService : IInspectionService
     {
         if (technicianId <= 0) return (false, "A valid technician is required.", null);
         if (serviceRequestId <= 0) return (false, "A valid service request is required.", null);
+        if (scheduledAt <= DateTime.UtcNow) return (false, "Inspection must be scheduled for a future time.", null);
 
         var request = await _requestRepository.GetByIdAsync(serviceRequestId);
         if (request == null) return (false, "Service request not found.", null);
@@ -79,14 +83,26 @@ public class InspectionService : IInspectionService
             CompletedAt = null
         };
 
-        await _inspectionRepository.AddAsync(inspection);
-        await _unitOfWork.SaveChangesAsync();
+        try
+        {
+            await _inspectionRepository.AddAsync(inspection);
+            await _unitOfWork.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsDuplicateInspectionException(ex))
+        {
+            return (false, "An inspection already exists for this service request.", null);
+        }
 
         return (true, null, await _inspectionRepository.GetByIdAsync(inspection.Id));
     }
 
     public Task<(bool Success, string? Error, Inspection? Inspection)> ScheduleAsync(int technicianId, int inspectionId, DateTime scheduledAt)
-        => TransitionAsync(technicianId, inspectionId, Scheduled, inspection => inspection.ScheduledAt = scheduledAt);
+    {
+        if (scheduledAt <= DateTime.UtcNow)
+            return Task.FromResult<(bool Success, string? Error, Inspection? Inspection)>((false, "Inspection must be scheduled for a future time.", null));
+
+        return TransitionAsync(technicianId, inspectionId, Scheduled, inspection => inspection.ScheduledAt = scheduledAt);
+    }
 
     public Task<(bool Success, string? Error, Inspection? Inspection)> StartAsync(int technicianId, int inspectionId)
         => TransitionAsync(technicianId, inspectionId, InProgress, null);
@@ -118,28 +134,46 @@ public class InspectionService : IInspectionService
         string targetStatus,
         Action<Inspection>? apply)
     {
-        var inspection = await _inspectionRepository.GetByIdAsync(inspectionId);
-        if (inspection == null) return (false, "Inspection not found.", null);
-        if (inspection.TechnicianId != technicianId) return (false, "You are not allowed to modify this inspection.", null);
-
-        var allowed = targetStatus switch
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
         {
-            Scheduled => inspection.Status == Scheduled,
-            InProgress => inspection.Status == Scheduled,
-            Completed => inspection.Status == InProgress,
-            Cancelled => inspection.Status is Scheduled or InProgress,
-            NoShow => inspection.Status == Scheduled,
-            _ => false
-        };
+            var inspection = await _inspectionRepository.GetByIdAsync(inspectionId);
+            if (inspection == null) return (false, "Inspection not found.", null);
+            if (inspection.TechnicianId != technicianId) return (false, "You are not allowed to modify this inspection.", null);
 
-        if (!allowed)
-            return (false, $"Invalid inspection status transition from {inspection.Status} to {targetStatus}.", null);
+            var allowed = targetStatus switch
+            {
+                Scheduled => inspection.Status == Scheduled,
+                InProgress => inspection.Status == Scheduled,
+                Completed => inspection.Status == InProgress,
+                Cancelled => inspection.Status is Scheduled or InProgress,
+                NoShow => inspection.Status == Scheduled,
+                _ => false
+            };
 
-        apply?.Invoke(inspection);
-        inspection.Status = targetStatus;
-        _inspectionRepository.Update(inspection);
-        await _unitOfWork.SaveChangesAsync();
+            if (!allowed)
+                return (false, $"Invalid inspection status transition from {inspection.Status} to {targetStatus}.", null);
 
-        return (true, null, await _inspectionRepository.GetByIdAsync(inspection.Id));
+            apply?.Invoke(inspection);
+            inspection.Status = targetStatus;
+            _inspectionRepository.Update(inspection);
+            await _unitOfWork.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return (true, null, await _inspectionRepository.GetByIdAsync(inspection.Id));
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    private static bool IsDuplicateInspectionException(DbUpdateException exception)
+    {
+        if (exception.GetBaseException() is not SqlException sqlException)
+            return false;
+
+        return sqlException.Number is 2601 or 2627;
     }
 }
