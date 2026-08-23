@@ -4,6 +4,8 @@ public class ServiceRequestOfferDto
 {
     public int Id { get; set; }
     public int ServiceRequestId { get; set; }
+    public int ServiceId { get; set; }
+    public int PricingMode { get; set; }
     public int TechnicianId { get; set; }
     public string? TechnicianName { get; set; }
     public decimal ProposedPrice { get; set; }

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/empty_state.dart';
-import '../../models/booking_model.dart';
 import '../../models/inspection_model.dart';
+import '../../models/offer_model.dart';
 import '../../models/service_quote_model.dart';
+import '../../repositories/service_request_offer_repository.dart';
 import '../../services/app_state_provider.dart';
 
 class TechnicianInspectionsScreen extends StatefulWidget {
@@ -18,6 +19,9 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
   bool _loading = true;
   String? _error;
   final Set<String> _busy = {};
+  List<ServiceRequestOfferModel> _acceptedInspectionOffers = [];
+
+  final ServiceRequestOfferRepository _offerRepository = ServiceRequestOfferRepository();
 
   @override
   void initState() {
@@ -28,7 +32,14 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
   Future<void> _load() async {
     if (mounted) setState(() { _loading = true; _error = null; });
     try {
-      await Provider.of<AppStateProvider>(context, listen: false).loadTechnicianInspections();
+      final provider = Provider.of<AppStateProvider>(context, listen: false);
+      await provider.loadTechnicianInspections();
+      final offers = await _offerRepository.getMyOffers();
+      final existingRequestIds = provider.technicianInspections.map((item) => item.serviceRequestId.toString()).toSet();
+      _acceptedInspectionOffers = offers.where((offer) =>
+          offer.status.toLowerCase() == 'accepted' &&
+          offer.pricingMode == 2 &&
+          !existingRequestIds.contains(offer.serviceRequestId)).toList();
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = _errorText(error));
@@ -39,22 +50,30 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
 
   String _errorText(Object error) => error.toString().replaceFirst('Exception: ', '');
 
-  Future<void> _createFromBooking(BookingModel booking) async {
+  Future<void> _createFromOffer(ServiceRequestOfferModel offer) async {
     final scheduled = await _pickDateTime(context, initial: DateTime.now().add(const Duration(hours: 1)));
     if (scheduled == null || !mounted) return;
+    final requestId = int.tryParse(offer.serviceRequestId);
+    if (requestId == null || requestId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('معرف طلب الخدمة غير صالح.')));
+      return;
+    }
+
     try {
-      setState(() => _busy.add('create-${booking.id}'));
+      setState(() => _busy.add('create-${offer.id}'));
       await Provider.of<AppStateProvider>(context, listen: false).createInspection(
-        serviceRequestId: int.parse(booking.requestId),
+        serviceRequestId: requestId,
         scheduledAt: scheduled,
       );
+      _acceptedInspectionOffers.removeWhere((item) => item.id == offer.id);
       if (!mounted) return;
+      setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء المعاينة.')));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorText(error))));
     } finally {
-      if (mounted) setState(() => _busy.remove('create-${booking.id}'));
+      if (mounted) setState(() => _busy.remove('create-${offer.id}'));
     }
   }
 
@@ -206,7 +225,6 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
     final inspections = provider.technicianInspections;
-    final bookings = provider.bookings;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -222,17 +240,19 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
                     child: ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        if (bookings.isNotEmpty) ...[
-                          const Text('إنشاء معاينة من حجز مؤكد', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800, fontSize: 15)),
+                        if (_acceptedInspectionOffers.isNotEmpty) ...[
+                          const Text('طلبات المعاينة المقبولة', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800, fontSize: 15)),
                           const SizedBox(height: 10),
-                          ...bookings.where((b) => b.status != BookingStatus.cancelled && b.status != BookingStatus.completed).map((booking) {
-                            final busy = _busy.contains('create-${booking.id}');
+                          ..._acceptedInspectionOffers.map((offer) {
+                            final service = provider.services.cast<dynamic>().where((item) => item.id == offer.serviceId).cast<dynamic>().fold<dynamic>(null, (current, item) => current ?? item);
+                            final serviceName = service?.nameAr?.toString() ?? 'طلب خدمة #${offer.serviceRequestId}';
+                            final busy = _busy.contains('create-${offer.id}');
                             return Card(
                               child: ListTile(
-                                title: Text(booking.serviceNameAr, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
-                                subtitle: Text('حجز #${booking.id} • ${booking.status.displayNameAr}', style: const TextStyle(fontFamily: 'Cairo', fontSize: 11)),
+                                title: Text(serviceName, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
+                                subtitle: Text('طلب #${offer.serviceRequestId} • العرض المقبول ${offer.proposedPrice.toStringAsFixed(2)} ج.م', style: const TextStyle(fontFamily: 'Cairo', fontSize: 11)),
                                 trailing: FilledButton(
-                                  onPressed: busy ? null : () => _createFromBooking(booking),
+                                  onPressed: busy ? null : () => _createFromOffer(offer),
                                   child: Text(busy ? '...' : 'إنشاء معاينة', style: const TextStyle(fontFamily: 'Cairo', fontSize: 11)),
                                 ),
                               ),
@@ -243,7 +263,7 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
                         const Text('معايناتك', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800, fontSize: 15)),
                         const SizedBox(height: 10),
                         if (inspections.isEmpty)
-                          const EmptyStateWidget(icon: Icons.assignment_outlined, title: 'لا توجد معاينات', description: 'ستظهر هنا المعاينات المرتبطة بحجوزاتك.')
+                          const EmptyStateWidget(icon: Icons.assignment_outlined, title: 'لا توجد معاينات', description: 'بعد قبول عرض المعاينة، يمكنك إنشاء الموعد هنا.')
                         else
                           ...inspections.map(_buildInspectionCard),
                       ],
