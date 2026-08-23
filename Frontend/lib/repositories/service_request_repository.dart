@@ -147,6 +147,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       preferredTime: dto.preferredTime ?? '',
       files: [],
       status: ServiceRequestStatus.fromString(dto.status ?? 'Pending'),
+      visitFee: dto.visitFee,
       estimatedPriceMin: dto.visitFee,
       estimatedPriceMax: dto.visitFee,
       createdAt: dto.createdAt,

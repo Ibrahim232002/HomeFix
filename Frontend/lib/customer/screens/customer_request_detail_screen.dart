@@ -9,6 +9,7 @@ import '../../models/inspection_model.dart';
 import '../../services/app_state_provider.dart';
 import '../../repositories/booking_repository.dart';
 import '../../repositories/service_repository.dart';
+import '../../repositories/service_request_repository.dart';
 import '../../repositories/inspection_repository.dart';
 import '../../common/screens/chat_detail_screen.dart';
 import '../../common/widgets/review_dialog.dart';
@@ -26,6 +27,7 @@ class CustomerRequestDetailScreen extends StatefulWidget {
 
 class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScreen> {
   final ServiceRepository _serviceRepository = ServiceRepository();
+  final ServiceRequestRepository _requestRepository = ServiceRequestRepository();
   final InspectionRepository _inspectionRepository = InspectionRepository();
 
   bool _requestLoading = true;
@@ -72,7 +74,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   Future<void> _loadRequest() async {
     if (mounted) setState(() { _requestLoading = true; _requestError = null; });
     try {
-      final request = await Provider.of<AppStateProvider>(context, listen: false).loadCustomerRequestById(widget.requestId);
+      final request = await _requestRepository.getRequestById(widget.requestId);
       if (!mounted) return;
       if (request == null) {
         setState(() { _request = null; _requestLoading = false; });
