@@ -81,7 +81,7 @@ class ServiceRequestFileModel {
   final String id;
   final String fileName;
   final String url;
-  final String type; // 'image' | 'document'
+  final String type;
   final String uploadedAt;
 
   ServiceRequestFileModel({
@@ -157,8 +157,9 @@ class ServiceRequestModel {
   final String preferredTime;
   final List<ServiceRequestFileModel> files;
   final ServiceRequestStatus status;
-  final double estimatedPriceMin;
-  final double estimatedPriceMax;
+  final double? estimatedPriceMin;
+  final double? estimatedPriceMax;
+  final double? visitFee;
   final double? finalPrice;
   final String createdAt;
   final List<ServiceRequestStatusHistoryModel> statusHistory;
@@ -183,8 +184,9 @@ class ServiceRequestModel {
     required this.preferredTime,
     required this.files,
     required this.status,
-    required this.estimatedPriceMin,
-    required this.estimatedPriceMax,
+    this.estimatedPriceMin,
+    this.estimatedPriceMax,
+    this.visitFee,
     this.finalPrice,
     required this.createdAt,
     required this.statusHistory,
@@ -212,6 +214,7 @@ class ServiceRequestModel {
     ServiceRequestStatus? status,
     double? estimatedPriceMin,
     double? estimatedPriceMax,
+    double? visitFee,
     double? finalPrice,
     String? createdAt,
     List<ServiceRequestStatusHistoryModel>? statusHistory,
@@ -238,6 +241,7 @@ class ServiceRequestModel {
       status: status ?? this.status,
       estimatedPriceMin: estimatedPriceMin ?? this.estimatedPriceMin,
       estimatedPriceMax: estimatedPriceMax ?? this.estimatedPriceMax,
+      visitFee: visitFee ?? this.visitFee,
       finalPrice: finalPrice ?? this.finalPrice,
       createdAt: createdAt ?? this.createdAt,
       statusHistory: statusHistory ?? this.statusHistory,
@@ -266,6 +270,7 @@ class ServiceRequestModel {
         'status': status.nameStr,
         'estimatedPriceMin': estimatedPriceMin,
         'estimatedPriceMax': estimatedPriceMax,
+        'visitFee': visitFee,
         'finalPrice': finalPrice,
         'createdAt': createdAt,
         'statusHistory': statusHistory.map((s) => s.toJson()).toList(),
@@ -294,8 +299,9 @@ class ServiceRequestModel {
             .map((f) => ServiceRequestFileModel.fromJson(f))
             .toList(),
         status: ServiceRequestStatus.fromString(json['status'] ?? 'Pending'),
-        estimatedPriceMin: (json['estimatedPriceMin'] as num?)?.toDouble() ?? 0.0,
-        estimatedPriceMax: (json['estimatedPriceMax'] as num?)?.toDouble() ?? 0.0,
+        estimatedPriceMin: (json['estimatedPriceMin'] as num?)?.toDouble(),
+        estimatedPriceMax: (json['estimatedPriceMax'] as num?)?.toDouble(),
+        visitFee: (json['visitFee'] as num?)?.toDouble(),
         finalPrice: (json['finalPrice'] as num?)?.toDouble(),
         createdAt: json['createdAt'] ?? '',
         statusHistory: (json['statusHistory'] as List<dynamic>? ?? [])

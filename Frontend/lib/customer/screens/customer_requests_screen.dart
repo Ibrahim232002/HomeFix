@@ -224,7 +224,7 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                         children: [
                           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             const Text('رسوم الزيارة', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
-                            Text('${req.estimatedPriceMin.toInt()} ج.م', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Cairo')),
+                            Text(req.visitFee != null ? '${req.visitFee!.toInt()} ج.م' : 'غير محددة', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Cairo')),
                           ]),
                           Row(children: [
                             if (req.status == ServiceRequestStatus.open)
