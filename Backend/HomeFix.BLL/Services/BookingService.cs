@@ -58,8 +58,14 @@ public class BookingService : IBookingService
         int bookingId,
         string newStatus,
         decimal? finalPrice,
-        string? technicianNotes)
+        string? technicianNotes,
+        bool verificationConfirmed = false)
     {
+        if (!verificationConfirmed && newStatus == "InProgress")
+            return (false, "Job Start verification is required before starting the booking.");
+        if (!verificationConfirmed && newStatus == "Completed")
+            return (false, "Job Completion verification is required before completing the booking.");
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
         try
         {

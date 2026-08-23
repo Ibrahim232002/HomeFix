@@ -14,15 +14,18 @@ public class ReviewsController : ControllerBase
 {
     private readonly IReviewService _service;
     private readonly ICustomerProfileService _customers;
+    private readonly ITechnicianProfileService _technicians;
     private readonly IBookingService _bookings;
 
     public ReviewsController(
         IReviewService service,
         ICustomerProfileService customers,
+        ITechnicianProfileService technicians,
         IBookingService bookings)
     {
         _service = service;
         _customers = customers;
+        _technicians = technicians;
         _bookings = bookings;
     }
 
@@ -35,10 +38,14 @@ public class ReviewsController : ControllerBase
         return Ok(MapToDto(review));
     }
 
-    [AllowAnonymous]
     [HttpGet("request/{serviceRequestId:int}")]
     public async Task<ActionResult<ReviewDto>> GetByRequestId(int serviceRequestId)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var booking = await _bookings.GetByRequestIdAsync(serviceRequestId);
+        if (booking == null) return NotFound();
+        if (!await CanReadRequestAsync(booking, userId)) return Forbid();
+
         var review = await _service.GetByRequestIdAsync(serviceRequestId);
         if (review == null) return NotFound();
         return Ok(MapToDto(review));
@@ -91,6 +98,25 @@ public class ReviewsController : ControllerBase
             nameof(GetById),
             new { id = review.Id },
             MapToDto(review));
+    }
+
+    private async Task<bool> CanReadRequestAsync(Booking booking, int userId)
+    {
+        if (User.IsInRole("Admin")) return true;
+
+        if (User.IsInRole("Customer"))
+        {
+            var customer = await _customers.GetByUserIdAsync(userId);
+            return customer != null && booking.ServiceRequest.CustomerId == customer.Id;
+        }
+
+        if (User.IsInRole("Technician"))
+        {
+            var technician = await _technicians.GetByUserIdAsync(userId);
+            return technician != null && booking.TechnicianId == technician.Id;
+        }
+
+        return false;
     }
 
     private bool TryGetUserId(out int userId)

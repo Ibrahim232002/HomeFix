@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/network/api_exception.dart';
+import '../../models/booking_model.dart';
 import '../../models/service_request_model.dart';
 import '../../services/app_state_provider.dart';
 import '../../repositories/booking_repository.dart';
@@ -24,7 +26,7 @@ class CustomerPaymentScreen extends StatefulWidget {
 class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
   bool _isProcessing = false;
   bool _checkingBooking = true;
-  bool _hasConfirmedBooking = false;
+  BookingModel? _booking;
   String? _errorMessage;
 
   @override
@@ -39,41 +41,66 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
       if (mounted) {
         setState(() {
           _checkingBooking = false;
-          _hasConfirmedBooking = false;
+          _booking = null;
+          _errorMessage = 'معرف طلب الخدمة غير صالح.';
         });
       }
       return;
     }
 
     try {
-      final booking = await BookingRepository().getApiBookingByRequest(requestId);
-      final confirmed = booking.acceptedAt != null && booking.acceptedAt!.isNotEmpty && booking.completedAt == null;
-      if (mounted) {
+      final booking = await BookingRepository().getBookingByRequest(widget.request.id);
+      if (!mounted) return;
+      setState(() {
+        _checkingBooking = false;
+        _booking = booking;
+        _errorMessage = null;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      if (error.statusCode == 404) {
         setState(() {
           _checkingBooking = false;
-          _hasConfirmedBooking = confirmed;
+          _booking = null;
+          _errorMessage = null;
         });
-      }
-    } catch (_) {
-      if (mounted) {
+      } else {
         setState(() {
           _checkingBooking = false;
-          _hasConfirmedBooking = false;
+          _booking = null;
+          _errorMessage = error.message;
         });
       }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _checkingBooking = false;
+        _booking = null;
+        _errorMessage = error.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
-  double _getCalculatedTotal() {
-    if (widget.amountToPay != null && widget.amountToPay! > 0) return widget.amountToPay!;
-    if (widget.request.finalPrice != null && widget.request.finalPrice! > 0) return widget.request.finalPrice!;
-    return widget.request.estimatedPriceMin;
+  double? _getPaymentTotal() {
+    if (widget.amountToPay != null && widget.amountToPay! > 0) return widget.amountToPay;
+    final bookingAmount = _booking?.finalPrice ?? _booking?.agreedPrice;
+    if (bookingAmount != null && bookingAmount > 0) return bookingAmount;
+    if (widget.request.finalPrice != null && widget.request.finalPrice! > 0) return widget.request.finalPrice;
+    return null;
+  }
+
+  bool get _hasConfirmedBookingForPayment {
+    final booking = _booking;
+    if (booking == null || !booking.status.isActive) return false;
+    final agreedOrFinal = booking.finalPrice ?? booking.agreedPrice;
+    return agreedOrFinal != null && agreedOrFinal > 0;
   }
 
   Future<void> _selectCash() async {
     if (_checkingBooking) return;
-    if (!_hasConfirmedBooking) {
-      setState(() => _errorMessage = 'السداد متاح بعد تأكيد الحجز مع الفني.');
+    if (_errorMessage != null) return;
+    if (!_hasConfirmedBookingForPayment) {
+      setState(() => _errorMessage = 'السداد متاح بعد تأكيد الحجز وتحديد السعر المتفق عليه.');
       return;
     }
 
@@ -118,9 +145,11 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final calculatedTotal = _getCalculatedTotal();
-    const visitFee = 80.0;
-    final serviceFee = (calculatedTotal - visitFee).clamp(0, 99999).toDouble();
+    final paymentTotal = _getPaymentTotal();
+    final visitFee = widget.request.visitFee;
+    final serviceFee = paymentTotal != null && visitFee != null && paymentTotal >= visitFee
+        ? paymentTotal - visitFee
+        : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -149,22 +178,35 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
                   const Divider(height: 24),
                   const Text('تفاصيل الفاتورة الرسمية', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Cairo')),
                   const SizedBox(height: 8),
-                  _buildPriceItem('رسوم الكشف والمعاينة المعتمدة', '${visitFee.toInt()}.00 ج.م'),
-                  const SizedBox(height: 4),
-                  _buildPriceItem('أجور صيانة وفحص الخدمة', '${serviceFee.toInt()}.00 ج.م'),
+                  if (visitFee != null) _buildPriceItem('رسوم الزيارة المعتمدة', '${visitFee.toStringAsFixed(2)} ج.م'),
+                  if (visitFee != null && serviceFee != null) const SizedBox(height: 4),
+                  if (serviceFee != null) _buildPriceItem('أجور الصيانة والفحص', '${serviceFee.toStringAsFixed(2)} ج.م'),
+                  if (visitFee == null && serviceFee == null) const Text('لا توجد بيانات تفصيلية كافية للسعر حالياً.', style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontFamily: 'Cairo')),
                   const Divider(height: 20),
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('إجمالي المبلغ المطلوب', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textPrimary, fontFamily: 'Cairo')), Text('${calculatedTotal.toInt()}.00 ج.م', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.primaryDark, fontFamily: 'Cairo'))]),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Expanded(child: Text('إجمالي المبلغ المطلوب', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textPrimary, fontFamily: 'Cairo'))),
+                      Text(paymentTotal == null ? 'غير متاح' : '${paymentTotal.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.primaryDark, fontFamily: 'Cairo')),
+                    ],
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
             if (_checkingBooking)
               const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
-            else if (!_hasConfirmedBooking)
+            else if (_errorMessage != null)
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(color: AppColors.errorLight, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.error)),
-                child: const Row(children: [Icon(Icons.lock_outline_rounded, color: AppColors.errorDark, size: 22), SizedBox(width: 10), Expanded(child: Text('السداد غير متاح حالياً. يصبح الدفع متاحاً بعد تأكيد الحجز مع الفني.', style: TextStyle(fontSize: 12, color: AppColors.errorDark, fontFamily: 'Cairo', height: 1.5)))]),
+                child: Row(children: const [Icon(Icons.error_outline_rounded, color: AppColors.errorDark, size: 22), SizedBox(width: 10), Expanded(child: Text('تعذر التحقق من حالة الحجز حالياً. راجع رسالة الخطأ الظاهرة أدناه ثم أعد المحاولة.', style: TextStyle(fontSize: 12, color: AppColors.errorDark, fontFamily: 'Cairo', height: 1.5)))]),
+              )
+            else if (!_hasConfirmedBookingForPayment)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: AppColors.errorLight, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.error)),
+                child: const Row(children: [Icon(Icons.lock_outline_rounded, color: AppColors.errorDark, size: 22), SizedBox(width: 10), Expanded(child: Text('السداد غير متاح حالياً. يصبح الدفع متاحاً بعد تأكيد الحجز مع الفني وتحديد السعر المتفق عليه.', style: TextStyle(fontSize: 12, color: AppColors.errorDark, fontFamily: 'Cairo', height: 1.5)))]),
               ),
             const SizedBox(height: 16),
             Container(
@@ -196,12 +238,16 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
             ),
             const SizedBox(height: 16),
             if (_errorMessage != null) ...[
-              Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppColors.errorLight, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.error)), child: Row(children: [const Icon(Icons.error_outline_rounded, color: AppColors.errorDark, size: 20), const SizedBox(width: 8), Expanded(child: Text(_errorMessage!, style: const TextStyle(fontSize: 12, color: AppColors.errorDark, fontFamily: 'Cairo')))])),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.errorLight, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.error)),
+                child: Row(children: [const Icon(Icons.error_outline_rounded, color: AppColors.errorDark, size: 20), const SizedBox(width: 8), Expanded(child: Text(_errorMessage!, style: const TextStyle(fontSize: 12, color: AppColors.errorDark, fontFamily: 'Cairo')))]),
+              ),
               const SizedBox(height: 16),
             ],
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-              onPressed: _isProcessing || _checkingBooking || !_hasConfirmedBooking ? null : _selectCash,
+              onPressed: _isProcessing || _checkingBooking || !_hasConfirmedBookingForPayment || _errorMessage != null ? null : _selectCash,
               child: _isProcessing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('تأكيد اختيار الدفع نقداً', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, fontFamily: 'Cairo')),
             ),
             const SizedBox(height: 24),
@@ -219,5 +265,5 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
     );
   }
 
-  Widget _buildPriceItem(String label, String amount) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo')), Text(amount, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Cairo'))]);
+  Widget _buildPriceItem(String label, String amount) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'))), const SizedBox(width: 8), Text(amount, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Cairo'))]);
 }

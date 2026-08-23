@@ -1,8 +1,11 @@
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
+import '../core/network/api_exception.dart';
 import '../models/api_dtos.dart';
 import '../models/chat_model.dart';
 import '../models/user_model.dart';
+import 'customer_profile_repository.dart';
+import 'technician_repository.dart';
 
 abstract class IChatRepository {
   Future<List<ConversationModel>> getConversations(String userId);
@@ -24,8 +27,7 @@ abstract class IChatRepository {
     String? requestId,
   });
 
-  // OpenAPI DTO methods
-  Future<List<ConversationDto>> getApiConversationsByUser(int userId);
+  Future<List<ConversationDto>> getApiConversationsByUser(int profileId);
   Future<ConversationDto> getApiConversationById(int id);
   Future<ConversationDto> createApiConversation(CreateConversationRequest request);
   Future<List<MessageDto>> getApiMessagesByConversation(int conversationId);
@@ -34,49 +36,44 @@ abstract class IChatRepository {
 
 class ChatRepository implements IChatRepository {
   final ApiClient _client = ApiClient();
+  final CustomerProfileRepository _customerProfiles = CustomerProfileRepository();
+  final TechnicianRepository _technicians = TechnicianRepository();
 
   @override
   Future<List<ConversationModel>> getConversations(String userId) async {
     final intUserId = int.tryParse(userId);
-    if (intUserId != null) {
-      try {
-        final dtos = await getApiConversationsByUser(intUserId);
-        final List<ConversationModel> result = [];
-        for (final dto in dtos) {
-          List<MessageModel> messages = [];
-          try {
-            final msgDtos = await getApiMessagesByConversation(dto.id);
-            messages = msgDtos
-                .map((m) => MessageModel(
-                      id: m.id.toString(),
-                      conversationId: dto.id.toString(),
-                      senderId: m.senderId.toString(),
-                      senderName: m.senderId == dto.customerId ? 'العميل' : 'الفني',
-                      senderRole: m.senderId == dto.customerId ? UserRole.customer : UserRole.technician,
-                      text: m.messageText ?? '',
-                      createdAt: m.sentAt.isNotEmpty ? m.sentAt : 'الآن',
-                      isRead: m.isRead,
-                    ))
-                .toList();
-          } catch (_) {}
+    if (intUserId == null || intUserId <= 0) throw Exception('معرف المستخدم غير صالح');
 
-          result.add(ConversationModel(
-            id: dto.id.toString(),
-            requestId: dto.serviceRequestId.toString(),
-            serviceNameAr: 'خدمة صيانة منزلية',
-            customerId: dto.customerId.toString(),
-            customerName: '',
-            technicianId: dto.technicianId.toString(),
-            technicianName: '',
-            lastMessage: messages.isNotEmpty ? messages.last.text : 'مرحباً بك',
-            lastMessageTime: dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن',
-            messages: messages,
-          ));
-        }
-        return result;
-      } catch (_) {}
+    try {
+      final customer = await _customerProfiles.getProfileByUserId(intUserId);
+      final response = await _client.get(ApiConstants.conversationsByCustomer(customer.id));
+      return _mapConversationsResponse(response);
+    } on ApiException catch (error) {
+      if (error.statusCode != 404) rethrow;
     }
-    return [];
+
+    final technician = await _technicians.getTechnicianByUserId(userId);
+    if (technician == null) throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
+    final technicianId = int.tryParse(technician.id);
+    if (technicianId == null || technicianId <= 0) throw Exception('معرف ملف الفني غير صالح');
+    final response = await _client.get(ApiConstants.conversationsByTechnician(technicianId));
+    return _mapConversationsResponse(response);
+  }
+
+  List<ConversationModel> _mapConversationsResponse(dynamic response) {
+    if (response is! List) return [];
+    return response.whereType<Map<String, dynamic>>().map((item) => ConversationDto.fromJson(item)).map((dto) => ConversationModel(
+          id: dto.id.toString(),
+          requestId: dto.serviceRequestId.toString(),
+          serviceNameAr: 'خدمة صيانة منزلية',
+          customerId: dto.customerId.toString(),
+          customerName: '',
+          technicianId: dto.technicianId.toString(),
+          technicianName: '',
+          lastMessage: 'مرحباً بك',
+          lastMessageTime: dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن',
+          messages: const [],
+        )).toList();
   }
 
   @override
@@ -186,21 +183,12 @@ class ChatRepository implements IChatRepository {
     );
   }
 
-  // --- Direct OpenAPI Implementations ---
   @override
-  Future<List<ConversationDto>> getApiConversationsByUser(int userId) async {
-    try {
-      final response = await _client.get(ApiConstants.conversationsByCustomer(userId));
-      if (response is List && response.isNotEmpty) {
-        return response.map((item) => ConversationDto.fromJson(item as Map<String, dynamic>)).toList();
-      }
-    } catch (_) {}
-    try {
-      final response = await _client.get(ApiConstants.conversationsByTechnician(userId));
-      if (response is List) {
-        return response.map((item) => ConversationDto.fromJson(item as Map<String, dynamic>)).toList();
-      }
-    } catch (_) {}
+  Future<List<ConversationDto>> getApiConversationsByUser(int profileId) async {
+    final response = await _client.get(ApiConstants.conversationsByCustomer(profileId));
+    if (response is List) {
+      return response.map((item) => ConversationDto.fromJson(item as Map<String, dynamic>)).toList();
+    }
     return [];
   }
 

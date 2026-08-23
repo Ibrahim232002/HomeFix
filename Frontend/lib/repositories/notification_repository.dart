@@ -8,9 +8,8 @@ abstract class INotificationRepository {
   Future<List<NotificationModel>> getUserNotifications(String userId);
   Future<void> markAsRead(String notificationId);
 
-  // OpenAPI DTO methods
   Future<NotificationDto> getApiNotificationById(int id);
-  Future<List<NotificationDto>> getApiNotificationsByUser(int userId);
+  Future<List<NotificationDto>> getApiNotificationsMe();
   Future<NotificationDto> createApiNotification(CreateNotificationRequest request);
   Future<void> markApiNotificationAsRead(int id);
 }
@@ -21,11 +20,9 @@ class NotificationRepository implements INotificationRepository {
   @override
   Future<List<NotificationModel>> getUserNotifications(String userId) async {
     final intUserId = int.tryParse(userId);
-    if (intUserId == null || intUserId <= 0) {
-      throw Exception('معرف المستخدم غير صالح');
-    }
+    if (intUserId == null || intUserId <= 0) throw Exception('معرف المستخدم غير صالح');
 
-    final dtos = await getApiNotificationsByUser(intUserId);
+    final dtos = await getApiNotificationsMe();
     return dtos
         .map((d) => NotificationModel(
               id: d.id.toString(),
@@ -43,13 +40,10 @@ class NotificationRepository implements INotificationRepository {
   @override
   Future<void> markAsRead(String notificationId) async {
     final intId = int.tryParse(notificationId);
-    if (intId == null || intId <= 0) {
-      throw Exception('معرف الإشعار غير صالح');
-    }
+    if (intId == null || intId <= 0) throw Exception('معرف الإشعار غير صالح');
     await markApiNotificationAsRead(intId);
   }
 
-  // --- Direct OpenAPI Implementations ---
   @override
   Future<NotificationDto> getApiNotificationById(int id) async {
     final response = await _client.get(ApiConstants.notificationById(id));
@@ -57,8 +51,8 @@ class NotificationRepository implements INotificationRepository {
   }
 
   @override
-  Future<List<NotificationDto>> getApiNotificationsByUser(int userId) async {
-    final response = await _client.get(ApiConstants.notificationsByUser(userId));
+  Future<List<NotificationDto>> getApiNotificationsMe() async {
+    final response = await _client.get(ApiConstants.notificationsMe);
     if (response is List) {
       return response.map((item) => NotificationDto.fromJson(item as Map<String, dynamic>)).toList();
     }

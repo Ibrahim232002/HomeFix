@@ -87,7 +87,12 @@ public class BookingsController : ControllerBase
         if (request.FinalPrice.HasValue && request.FinalPrice.Value <= 0)
             return BadRequest(new { message = "Final price must be greater than zero." });
 
-        var result = await _service.TransitionStatusAsync(id, request.Status, request.FinalPrice, request.TechnicianNotes);
+        var result = await _service.TransitionStatusAsync(
+            id,
+            request.Status,
+            request.FinalPrice,
+            request.TechnicianNotes,
+            verificationConfirmed: User.IsInRole("Admin"));
         if (!result.Success) return BadRequest(new { message = result.Error });
         return Ok(MapToDto((await _service.GetByIdAsync(id))!));
     }
@@ -151,19 +156,17 @@ public class BookingsController : ControllerBase
                 return BadRequest(new { message = "Customer completion confirmation is required." });
         }
 
-        // Validate role and state before consuming the code. Otherwise an authorized
-        // participant could waste a valid code with the wrong operation/state.
         var result = await _verificationCodes.VerifyBookingAsync(userId, id, purpose, "Email", code);
         if (!result.Success) return BadRequest(new { message = result.Error });
 
         if (purpose == "JobStart")
         {
-            var transition = await _service.TransitionStatusAsync(id, "InProgress", null, null);
+            var transition = await _service.TransitionStatusAsync(id, "InProgress", null, null, verificationConfirmed: true);
             if (!transition.Success) return BadRequest(new { message = transition.Error });
         }
         else
         {
-            var transition = await _service.TransitionStatusAsync(id, "Completed", null, null);
+            var transition = await _service.TransitionStatusAsync(id, "Completed", null, null, verificationConfirmed: true);
             if (!transition.Success) return BadRequest(new { message = transition.Error });
         }
 
