@@ -13,5 +13,5 @@ public interface IBookingService
     Task CreateAsync(Booking booking);
 
     Task UpdateAsync(Booking booking);
-    Task<(bool Success, string? Error)> TransitionStatusAsync(int bookingId, string newStatus, decimal? finalPrice, string? technicianNotes);
+    Task<(bool Success, string? Error)> TransitionStatusAsync(int bookingId, string newStatus, decimal? finalPrice, string? technicianNotes, bool verificationConfirmed = false);
 }

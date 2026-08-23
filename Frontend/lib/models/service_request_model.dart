@@ -81,7 +81,7 @@ class ServiceRequestFileModel {
   final String id;
   final String fileName;
   final String url;
-  final String type; // 'image' | 'document'
+  final String type;
   final String uploadedAt;
 
   ServiceRequestFileModel({
@@ -157,6 +157,7 @@ class ServiceRequestModel {
   final String preferredTime;
   final List<ServiceRequestFileModel> files;
   final ServiceRequestStatus status;
+  final double? visitFee;
   final double estimatedPriceMin;
   final double estimatedPriceMax;
   final double? finalPrice;
@@ -183,6 +184,7 @@ class ServiceRequestModel {
     required this.preferredTime,
     required this.files,
     required this.status,
+    this.visitFee,
     required this.estimatedPriceMin,
     required this.estimatedPriceMax,
     this.finalPrice,
@@ -210,6 +212,7 @@ class ServiceRequestModel {
     String? preferredTime,
     List<ServiceRequestFileModel>? files,
     ServiceRequestStatus? status,
+    double? visitFee,
     double? estimatedPriceMin,
     double? estimatedPriceMax,
     double? finalPrice,
@@ -236,6 +239,7 @@ class ServiceRequestModel {
       preferredTime: preferredTime ?? this.preferredTime,
       files: files ?? this.files,
       status: status ?? this.status,
+      visitFee: visitFee ?? this.visitFee,
       estimatedPriceMin: estimatedPriceMin ?? this.estimatedPriceMin,
       estimatedPriceMax: estimatedPriceMax ?? this.estimatedPriceMax,
       finalPrice: finalPrice ?? this.finalPrice,
@@ -264,6 +268,7 @@ class ServiceRequestModel {
         'preferredTime': preferredTime,
         'files': files.map((f) => f.toJson()).toList(),
         'status': status.nameStr,
+        'visitFee': visitFee,
         'estimatedPriceMin': estimatedPriceMin,
         'estimatedPriceMax': estimatedPriceMax,
         'finalPrice': finalPrice,
@@ -294,6 +299,7 @@ class ServiceRequestModel {
             .map((f) => ServiceRequestFileModel.fromJson(f))
             .toList(),
         status: ServiceRequestStatus.fromString(json['status'] ?? 'Pending'),
+        visitFee: (json['visitFee'] as num?)?.toDouble(),
         estimatedPriceMin: (json['estimatedPriceMin'] as num?)?.toDouble() ?? 0.0,
         estimatedPriceMax: (json['estimatedPriceMax'] as num?)?.toDouble() ?? 0.0,
         finalPrice: (json['finalPrice'] as num?)?.toDouble(),

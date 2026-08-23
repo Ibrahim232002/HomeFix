@@ -134,7 +134,7 @@ class ApiConstants {
 
   static const String notifications = '/api/Notifications';
   static String notificationById(int id) => '/api/Notifications/$id';
-  static String notificationsByUser(int id) => '/api/Notifications/user/$id';
+  static const String notificationsMe = '/api/Notifications/me';
 
   static const String supportTickets = '/api/SupportTickets';
   static String supportTicketById(int id) => '/api/SupportTickets/$id';
