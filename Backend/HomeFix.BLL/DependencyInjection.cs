@@ -23,6 +23,8 @@ public static class DependencyInjection
         services.AddScoped<UserDeviceRepository>();
         services.AddScoped<ServiceRequestOfferRepository>();
         services.AddScoped<PaymentAttemptRepository>();
+        services.AddScoped<InspectionRepository>();
+        services.AddScoped<ServiceQuoteRepository>();
 
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICustomerProfileService, CustomerProfileService>();
@@ -35,11 +37,14 @@ public static class DependencyInjection
         services.AddScoped<IServiceService, ServiceService>();
         services.AddScoped<IServiceCategoryService, ServiceCategoryService>();
         services.AddScoped<IServicePricingService, ServicePricingService>();
+        services.AddScoped<ServicePricingService>();
 
         services.AddScoped<IServiceRequestService, ServiceRequestService>();
         services.AddScoped<IServiceRequestOfferService, ServiceRequestOfferService>();
         services.AddScoped<IServiceRequestFileService, ServiceRequestFileService>();
         services.AddScoped<IServiceRequestStatusHistoryService, ServiceRequestStatusHistoryService>();
+        services.AddScoped<IInspectionService, InspectionService>();
+        services.AddScoped<IServiceQuoteService, ServiceQuoteService>();
 
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IReviewService, ReviewService>();

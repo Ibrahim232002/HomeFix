@@ -2,6 +2,7 @@ class ServicePricingModel {
   final double? minPrice;
   final double? maxPrice;
   final double? visitFee;
+  final double? inspectionFee;
   final String currency;
   final String unit;
 
@@ -9,6 +10,7 @@ class ServicePricingModel {
     this.minPrice,
     this.maxPrice,
     this.visitFee,
+    this.inspectionFee,
     this.currency = 'ج.م',
     required this.unit,
   });
@@ -17,6 +19,7 @@ class ServicePricingModel {
         'minPrice': minPrice,
         'maxPrice': maxPrice,
         'visitFee': visitFee,
+        'inspectionFee': inspectionFee,
         'currency': currency,
         'unit': unit,
       };
@@ -26,6 +29,7 @@ class ServicePricingModel {
         minPrice: (json['minPrice'] as num?)?.toDouble(),
         maxPrice: (json['maxPrice'] as num?)?.toDouble(),
         visitFee: (json['visitFee'] as num?)?.toDouble(),
+        inspectionFee: (json['inspectionFee'] as num?)?.toDouble(),
         currency: json['currency'] ?? 'ج.م',
         unit: json['unit'] ?? 'لكل زيارة',
       );
@@ -40,6 +44,7 @@ class ServiceModel {
   final String descriptionAr;
   final String descriptionEn;
   final ServicePricingModel pricing;
+  final int pricingMode;
   final double rating;
   final int reviewCount;
   final String estimatedDuration;
@@ -57,6 +62,7 @@ class ServiceModel {
     required this.descriptionAr,
     required this.descriptionEn,
     required this.pricing,
+    this.pricingMode = 0,
     required this.rating,
     required this.reviewCount,
     required this.estimatedDuration,
@@ -68,6 +74,7 @@ class ServiceModel {
 
   ServiceModel copyWith({
     ServicePricingModel? pricing,
+    int? pricingMode,
   }) {
     return ServiceModel(
       id: id,
@@ -78,6 +85,7 @@ class ServiceModel {
       descriptionAr: descriptionAr,
       descriptionEn: descriptionEn,
       pricing: pricing ?? this.pricing,
+      pricingMode: pricingMode ?? this.pricingMode,
       rating: rating,
       reviewCount: reviewCount,
       estimatedDuration: estimatedDuration,
@@ -97,6 +105,7 @@ class ServiceModel {
         'descriptionAr': descriptionAr,
         'descriptionEn': descriptionEn,
         'pricing': pricing.toJson(),
+        'pricingMode': pricingMode,
         'rating': rating,
         'reviewCount': reviewCount,
         'estimatedDuration': estimatedDuration,
@@ -115,6 +124,7 @@ class ServiceModel {
         descriptionAr: json['descriptionAr'] ?? '',
         descriptionEn: json['descriptionEn'] ?? '',
         pricing: ServicePricingModel.fromJson(json['pricing'] ?? {}),
+        pricingMode: json['pricingMode'] is num ? (json['pricingMode'] as num).toInt() : int.tryParse(json['pricingMode']?.toString() ?? '') ?? 0,
         rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
         reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
         estimatedDuration: json['estimatedDuration'] ?? '1 ساعة',

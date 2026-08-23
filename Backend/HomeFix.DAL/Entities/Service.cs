@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using HomeFix.DAL.Enums;
 
 namespace HomeFix.DAL.Entities;
 
@@ -14,6 +15,8 @@ public partial class Service
     public string? ImageUrl { get; set; }
 
     public int? EstimatedDurationMinutes { get; set; }
+
+    public PricingMode PricingMode { get; set; }
 
     public bool IsActive { get; set; }
 

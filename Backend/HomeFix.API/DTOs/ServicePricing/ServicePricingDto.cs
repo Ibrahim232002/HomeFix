@@ -14,6 +14,8 @@ public class ServicePricingDto
 
     public decimal? MaximumPrice { get; set; }
 
+    public decimal? InspectionFee { get; set; }
+
     public bool IsActive { get; set; }
 
     public DateTime CreatedAt { get; set; }

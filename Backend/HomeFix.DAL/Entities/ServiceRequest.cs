@@ -31,6 +31,8 @@ public partial class ServiceRequest
 
     public virtual Booking? Booking { get; set; }
 
+    public virtual Inspection? Inspection { get; set; }
+
     public virtual Conversation? Conversation { get; set; }
 
     public virtual CustomerProfile Customer { get; set; } = null!;
