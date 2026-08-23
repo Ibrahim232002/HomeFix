@@ -60,20 +60,44 @@ class ChatRepository implements IChatRepository {
     return _mapConversationsResponse(response);
   }
 
-  List<ConversationModel> _mapConversationsResponse(dynamic response) {
+  Future<List<ConversationModel>> _mapConversationsResponse(dynamic response) async {
     if (response is! List) return [];
-    return response.whereType<Map<String, dynamic>>().map((item) => ConversationDto.fromJson(item)).map((dto) => ConversationModel(
-          id: dto.id.toString(),
-          requestId: dto.serviceRequestId.toString(),
-          serviceNameAr: 'خدمة صيانة منزلية',
-          customerId: dto.customerId.toString(),
-          customerName: '',
-          technicianId: dto.technicianId.toString(),
-          technicianName: '',
-          lastMessage: 'مرحباً بك',
-          lastMessageTime: dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن',
-          messages: const [],
-        )).toList();
+    final result = <ConversationModel>[];
+
+    for (final item in response.whereType<Map<String, dynamic>>()) {
+      final dto = ConversationDto.fromJson(item);
+      List<MessageModel> messages = [];
+      try {
+        final msgDtos = await getApiMessagesByConversation(dto.id);
+        messages = msgDtos
+            .map((m) => MessageModel(
+                  id: m.id.toString(),
+                  conversationId: dto.id.toString(),
+                  senderId: m.senderId.toString(),
+                  senderName: m.senderId == dto.customerId ? 'العميل' : 'الفني',
+                  senderRole: m.senderId == dto.customerId ? UserRole.customer : UserRole.technician,
+                  text: m.messageText ?? '',
+                  createdAt: m.sentAt.isNotEmpty ? m.sentAt : 'الآن',
+                  isRead: m.isRead,
+                ))
+            .toList();
+      } catch (_) {}
+
+      result.add(ConversationModel(
+        id: dto.id.toString(),
+        requestId: dto.serviceRequestId.toString(),
+        serviceNameAr: 'خدمة صيانة منزلية',
+        customerId: dto.customerId.toString(),
+        customerName: '',
+        technicianId: dto.technicianId.toString(),
+        technicianName: '',
+        lastMessage: messages.isNotEmpty ? messages.last.text : '',
+        lastMessageTime: messages.isNotEmpty ? messages.last.createdAt : (dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن'),
+        messages: messages,
+      ));
+    }
+
+    return result;
   }
 
   @override
@@ -104,8 +128,8 @@ class ChatRepository implements IChatRepository {
           customerName: '',
           technicianId: dto.technicianId.toString(),
           technicianName: '',
-          lastMessage: messages.isNotEmpty ? messages.last.text : 'مرحباً بك',
-          lastMessageTime: dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن',
+          lastMessage: messages.isNotEmpty ? messages.last.text : '',
+          lastMessageTime: messages.isNotEmpty ? messages.last.createdAt : (dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن'),
           messages: messages,
         );
       } catch (_) {}

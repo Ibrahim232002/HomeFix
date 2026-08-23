@@ -82,10 +82,10 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
   }
 
   double? _getPaymentTotal() {
-    if (widget.amountToPay != null && widget.amountToPay! > 0) return widget.amountToPay;
     final bookingAmount = _booking?.finalPrice ?? _booking?.agreedPrice;
     if (bookingAmount != null && bookingAmount > 0) return bookingAmount;
-    if (widget.request.finalPrice != null && widget.request.finalPrice! > 0) return widget.request.finalPrice;
+    final requestAmount = widget.request.finalPrice;
+    if (requestAmount != null && requestAmount > 0) return requestAmount;
     return null;
   }
 
