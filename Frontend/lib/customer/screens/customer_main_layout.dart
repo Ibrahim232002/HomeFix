@@ -6,7 +6,6 @@ import 'customer_home_screen.dart';
 import 'customer_requests_screen.dart';
 import '../../common/screens/chat_list_screen.dart';
 import 'customer_profile_screen.dart';
-import 'customer_inspections_screen.dart';
 
 class CustomerMainLayout extends StatelessWidget {
   const CustomerMainLayout({Key? key}) : super(key: key);
@@ -28,14 +27,6 @@ class CustomerMainLayout extends StatelessWidget {
         body: IndexedStack(
           index: appState.customerNavIndex,
           children: _screens,
-        ),
-        floatingActionButton: FloatingActionButton.small(
-          tooltip: 'المعاينات والتسعير',
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CustomerInspectionsScreen()),
-          ),
-          child: const Icon(Icons.assignment_rounded),
         ),
         bottomNavigationBar: CustomerBottomNav(
           currentIndex: appState.customerNavIndex,
