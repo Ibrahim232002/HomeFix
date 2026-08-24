@@ -32,7 +32,8 @@ enum ServiceRequestStatus {
   }
 
   static ServiceRequestStatus fromString(String val) {
-    switch (val.toLowerCase().replaceAll('_', '')) {
+    final normalized = val.trim().toLowerCase().replaceAll('_', '');
+    switch (normalized) {
       case 'pending':
         return ServiceRequestStatus.pending;
       case 'open':
@@ -51,7 +52,7 @@ enum ServiceRequestStatus {
       case 'canceled':
         return ServiceRequestStatus.cancelled;
       default:
-        return ServiceRequestStatus.pending;
+        throw FormatException('حالة طلب الخدمة غير معروفة: $val');
     }
   }
 
@@ -100,8 +101,7 @@ class ServiceRequestFileModel {
         'uploadedAt': uploadedAt,
       };
 
-  factory ServiceRequestFileModel.fromJson(Map<String, dynamic> json) =>
-      ServiceRequestFileModel(
+  factory ServiceRequestFileModel.fromJson(Map<String, dynamic> json) => ServiceRequestFileModel(
         id: json['id'] ?? '',
         fileName: json['fileName'] ?? '',
         url: json['url'] ?? '',
@@ -130,8 +130,7 @@ class ServiceRequestStatusHistoryModel {
         'updatedBy': updatedBy,
       };
 
-  factory ServiceRequestStatusHistoryModel.fromJson(Map<String, dynamic> json) =>
-      ServiceRequestStatusHistoryModel(
+  factory ServiceRequestStatusHistoryModel.fromJson(Map<String, dynamic> json) => ServiceRequestStatusHistoryModel(
         status: ServiceRequestStatus.fromString(json['status'] ?? 'Pending'),
         timestamp: json['timestamp'] ?? '',
         notes: json['notes'],
@@ -278,8 +277,7 @@ class ServiceRequestModel {
         'notes': notes,
       };
 
-  factory ServiceRequestModel.fromJson(Map<String, dynamic> json) =>
-      ServiceRequestModel(
+  factory ServiceRequestModel.fromJson(Map<String, dynamic> json) => ServiceRequestModel(
         id: json['id'] ?? '',
         serviceId: json['serviceId'] ?? '',
         serviceNameAr: json['serviceNameAr'] ?? '',
@@ -295,18 +293,14 @@ class ServiceRequestModel {
         problemDescription: json['problemDescription'] ?? '',
         preferredDate: json['preferredDate'] ?? '',
         preferredTime: json['preferredTime'] ?? '',
-        files: (json['files'] as List<dynamic>? ?? [])
-            .map((f) => ServiceRequestFileModel.fromJson(f))
-            .toList(),
-        status: ServiceRequestStatus.fromString(json['status'] ?? 'Pending'),
+        files: (json['files'] as List<dynamic>? ?? []).map((f) => ServiceRequestFileModel.fromJson(f)).toList(),
+        status: ServiceRequestStatus.fromString((json['status'] ?? '').toString()),
         visitFee: (json['visitFee'] as num?)?.toDouble(),
         estimatedPriceMin: (json['estimatedPriceMin'] as num?)?.toDouble() ?? 0.0,
         estimatedPriceMax: (json['estimatedPriceMax'] as num?)?.toDouble() ?? 0.0,
         finalPrice: (json['finalPrice'] as num?)?.toDouble(),
         createdAt: json['createdAt'] ?? '',
-        statusHistory: (json['statusHistory'] as List<dynamic>? ?? [])
-            .map((s) => ServiceRequestStatusHistoryModel.fromJson(s))
-            .toList(),
+        statusHistory: (json['statusHistory'] as List<dynamic>? ?? []).map((s) => ServiceRequestStatusHistoryModel.fromJson(s)).toList(),
         cancellationReason: json['cancellationReason'],
         notes: json['notes'],
       );

@@ -1,5 +1,5 @@
-import '../core/network/api_client.dart';
 import '../core/constants/api_constants.dart';
+import '../core/network/api_client.dart';
 import '../models/api_dtos.dart';
 import '../models/service_request_model.dart';
 import '../models/address_model.dart';
@@ -60,8 +60,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}:00';
   }
 
-  String _formatDate(DateTime value) =>
-      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+  String _formatDate(DateTime value) => '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
   @override
   Future<List<ServiceRequestModel>> getRequestsByCustomer(String customerUserId) async {
@@ -87,7 +86,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   @override
   Future<ServiceRequestModel?> getRequestById(String id) async {
     final intId = int.tryParse(id);
-    if (intId != null) {
+    if (intId != null && intId > 0) {
       final dto = await getApiServiceRequestById(intId);
       return _mapDtoToModel(dto);
     }
@@ -96,15 +95,22 @@ class ServiceRequestRepository implements IServiceRequestRepository {
 
   @override
   Future<ServiceRequestModel> createRequest(ServiceRequestModel request) async {
+    final customerId = int.tryParse(request.customerId);
+    final serviceId = int.tryParse(request.serviceId);
+    final addressId = int.tryParse(request.address.id);
+    if (customerId == null || customerId <= 0) throw FormatException('معرف العميل غير صالح');
+    if (serviceId == null || serviceId <= 0) throw FormatException('معرف الخدمة غير صالح');
+    if (addressId == null || addressId <= 0) throw FormatException('معرف العنوان غير صالح');
+
     final dto = await createApiServiceRequest(CreateServiceRequestRequest(
-      customerId: int.tryParse(request.customerId) ?? 1,
-      serviceId: int.tryParse(request.serviceId) ?? 1,
-      addressId: int.tryParse(request.address.id) ?? 1,
+      customerId: customerId,
+      serviceId: serviceId,
+      addressId: addressId,
       description: request.problemDescription,
       preferredDate: _serializePreferredDate(request.preferredDate),
       preferredTime: _serializePreferredTime(request.preferredTime),
       status: 'Pending',
-      visitFee: request.estimatedPriceMin,
+      visitFee: request.visitFee,
     ));
     return _mapDtoToModel(dto, fallbackModel: request);
   }
@@ -112,7 +118,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   @override
   Future<void> updateStatus(String requestId, ServiceRequestStatus newStatus, {String? notes, String? updatedBy}) async {
     final intId = int.tryParse(requestId);
-    if (intId != null) {
+    if (intId != null && intId > 0) {
       await addStatusHistory(CreateServiceRequestStatusHistoryRequest(
         serviceRequestId: intId,
         oldStatus: 'Current',
@@ -131,6 +137,9 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   }
 
   ServiceRequestModel _mapDtoToModel(ServiceRequestDto dto, {ServiceRequestModel? fallbackModel}) {
+    final statusValue = dto.status;
+    if (statusValue == null || statusValue.trim().isEmpty) throw FormatException('حالة طلب الخدمة غير موجودة.');
+    final status = ServiceRequestStatus.fromString(statusValue);
     return ServiceRequestModel(
       id: dto.id.toString(),
       serviceId: dto.serviceId.toString(),
@@ -146,14 +155,15 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       preferredDate: dto.preferredDate ?? '',
       preferredTime: dto.preferredTime ?? '',
       files: [],
-      status: ServiceRequestStatus.fromString(dto.status ?? 'Pending'),
+      status: status,
       visitFee: dto.visitFee,
-      estimatedPriceMin: dto.visitFee,
-      estimatedPriceMax: dto.visitFee,
+      estimatedPriceMin: fallbackModel?.estimatedPriceMin ?? dto.visitFee ?? 0.0,
+      estimatedPriceMax: fallbackModel?.estimatedPriceMax ?? dto.visitFee ?? 0.0,
+      finalPrice: fallbackModel?.finalPrice,
       createdAt: dto.createdAt,
       statusHistory: [
         ServiceRequestStatusHistoryModel(
-          status: ServiceRequestStatus.fromString(dto.status ?? 'Pending'),
+          status: status,
           timestamp: dto.createdAt,
           updatedBy: 'العميل',
         ),

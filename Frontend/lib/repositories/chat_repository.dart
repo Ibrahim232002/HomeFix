@@ -1,6 +1,7 @@
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
+import '../core/storage/token_storage.dart';
 import '../models/api_dtos.dart';
 import '../models/chat_model.dart';
 import '../models/user_model.dart';
@@ -38,26 +39,29 @@ class ChatRepository implements IChatRepository {
   final ApiClient _client = ApiClient();
   final CustomerProfileRepository _customerProfiles = CustomerProfileRepository();
   final TechnicianRepository _technicians = TechnicianRepository();
+  final TokenStorage _tokenStorage = TokenStorage();
 
   @override
   Future<List<ConversationModel>> getConversations(String userId) async {
     final intUserId = int.tryParse(userId);
     if (intUserId == null || intUserId <= 0) throw Exception('معرف المستخدم غير صالح');
 
-    try {
-      final customer = await _customerProfiles.getProfileByUserId(intUserId);
-      final response = await _client.get(ApiConstants.conversationsByCustomer(customer.id));
-      return _mapConversationsResponse(response);
-    } on ApiException catch (error) {
-      if (error.statusCode != 404) rethrow;
+    final role = _tokenStorage.userRole?.trim().toLowerCase();
+    switch (role) {
+      case 'customer':
+        final customerProfile = await _customerProfiles.getProfileByUserId(intUserId);
+        final response = await _client.get(ApiConstants.conversationsByCustomer(customerProfile.id));
+        return _mapConversationsResponse(response);
+      case 'technician':
+        final technician = await _technicians.getTechnicianByUserId(userId);
+        if (technician == null) throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
+        final technicianId = int.tryParse(technician.id);
+        if (technicianId == null || technicianId <= 0) throw Exception('معرف ملف الفني غير صالح');
+        final response = await _client.get(ApiConstants.conversationsByTechnician(technicianId));
+        return _mapConversationsResponse(response);
+      default:
+        throw Exception('دور المستخدم المصادق عليه غير صالح للمحادثات.');
     }
-
-    final technician = await _technicians.getTechnicianByUserId(userId);
-    if (technician == null) throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
-    final technicianId = int.tryParse(technician.id);
-    if (technicianId == null || technicianId <= 0) throw Exception('معرف ملف الفني غير صالح');
-    final response = await _client.get(ApiConstants.conversationsByTechnician(technicianId));
-    return _mapConversationsResponse(response);
   }
 
   Future<List<ConversationModel>> _mapConversationsResponse(dynamic response) async {
@@ -100,38 +104,42 @@ class ChatRepository implements IChatRepository {
   @override
   Future<ConversationModel?> getConversationById(String id) async {
     final intId = int.tryParse(id);
-    if (intId != null) {
-      try {
-        final dto = await getApiConversationById(intId);
-        final msgDtos = await getApiMessagesByConversation(dto.id);
-        final messages = msgDtos
-            .map((m) => MessageModel(
-                  id: m.id.toString(),
-                  conversationId: dto.id.toString(),
-                  senderId: m.senderId.toString(),
-                  senderName: m.senderId == dto.customerId ? 'العميل' : 'الفني',
-                  senderRole: m.senderId == dto.customerId ? UserRole.customer : UserRole.technician,
-                  text: m.messageText ?? '',
-                  createdAt: m.sentAt.isNotEmpty ? m.sentAt : 'الآن',
-                  isRead: m.isRead,
-                ))
-            .toList();
+    if (intId == null || intId <= 0) return null;
 
-        return ConversationModel(
-          id: dto.id.toString(),
-          requestId: dto.serviceRequestId.toString(),
-          serviceNameAr: 'خدمة صيانة منزلية',
-          customerId: dto.customerId.toString(),
-          customerName: '',
-          technicianId: dto.technicianId.toString(),
-          technicianName: '',
-          lastMessage: messages.isNotEmpty ? messages.last.text : '',
-          lastMessageTime: messages.isNotEmpty ? messages.last.createdAt : (dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن'),
-          messages: messages,
-        );
-      } catch (_) {}
+    ConversationDto dto;
+    try {
+      dto = await getApiConversationById(intId);
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) return null;
+      rethrow;
     }
-    return null;
+
+    final msgDtos = await getApiMessagesByConversation(dto.id);
+    final messages = msgDtos
+        .map((m) => MessageModel(
+              id: m.id.toString(),
+              conversationId: dto.id.toString(),
+              senderId: m.senderId.toString(),
+              senderName: m.senderId == dto.customerId ? 'العميل' : 'الفني',
+              senderRole: m.senderId == dto.customerId ? UserRole.customer : UserRole.technician,
+              text: m.messageText ?? '',
+              createdAt: m.sentAt.isNotEmpty ? m.sentAt : 'الآن',
+              isRead: m.isRead,
+            ))
+        .toList();
+
+    return ConversationModel(
+      id: dto.id.toString(),
+      requestId: dto.serviceRequestId.toString(),
+      serviceNameAr: 'خدمة صيانة منزلية',
+      customerId: dto.customerId.toString(),
+      customerName: '',
+      technicianId: dto.technicianId.toString(),
+      technicianName: '',
+      lastMessage: messages.isNotEmpty ? messages.last.text : '',
+      lastMessageTime: messages.isNotEmpty ? messages.last.createdAt : (dto.createdAt.isNotEmpty ? dto.createdAt : 'الآن'),
+      messages: messages,
+    );
   }
 
   @override
