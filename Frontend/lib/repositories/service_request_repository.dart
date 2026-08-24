@@ -101,6 +101,8 @@ class ServiceRequestRepository implements IServiceRequestRepository {
     if (customerId == null || customerId <= 0) throw FormatException('معرف العميل غير صالح');
     if (serviceId == null || serviceId <= 0) throw FormatException('معرف الخدمة غير صالح');
     if (addressId == null || addressId <= 0) throw FormatException('معرف العنوان غير صالح');
+    final visitFee = request.visitFee;
+    if (visitFee == null) throw FormatException('رسوم الزيارة غير محددة لطلب الخدمة');
 
     final dto = await createApiServiceRequest(CreateServiceRequestRequest(
       customerId: customerId,
@@ -110,7 +112,7 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       preferredDate: _serializePreferredDate(request.preferredDate),
       preferredTime: _serializePreferredTime(request.preferredTime),
       status: 'Pending',
-      visitFee: request.visitFee,
+      visitFee: visitFee,
     ));
     return _mapDtoToModel(dto, fallbackModel: request);
   }
