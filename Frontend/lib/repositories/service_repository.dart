@@ -41,13 +41,15 @@ class ServiceRepository implements IServiceRepository {
     final intId = int.tryParse(id);
     if (intId == null) return null;
 
+    ServiceDto dto;
     try {
-      final dto = await getApiServiceById(intId);
-      final pricings = await getServicePricingsByService(dto.id);
-      return _mapService(dto, pricings);
-    } catch (_) {
+      dto = await getApiServiceById(intId);
+    } on NotFoundException {
       return null;
     }
+
+    final pricings = await getServicePricingsByService(dto.id);
+    return _mapService(dto, pricings);
   }
 
   @override
