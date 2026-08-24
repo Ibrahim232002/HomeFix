@@ -10,15 +10,11 @@ import 'customer_profile_repository.dart';
 class BookingVerificationIssueResult {
   final String message;
   final String? developmentCode;
-
   const BookingVerificationIssueResult({required this.message, this.developmentCode});
-
-  factory BookingVerificationIssueResult.fromJson(Map<String, dynamic> json) {
-    return BookingVerificationIssueResult(
-      message: json['message']?.toString() ?? 'تم إرسال رمز التحقق.',
-      developmentCode: json['developmentCode']?.toString(),
-    );
-  }
+  factory BookingVerificationIssueResult.fromJson(Map<String, dynamic> json) => BookingVerificationIssueResult(
+        message: json['message']?.toString() ?? 'تم إرسال رمز التحقق.',
+        developmentCode: json['developmentCode']?.toString(),
+      );
 }
 
 abstract class IBookingRepository {
@@ -31,11 +27,12 @@ abstract class IBookingRepository {
   Future<BookingVerificationIssueResult> issueBookingVerificationCode(String bookingId, String purpose);
   Future<BookingModel> verifyBookingCode(String bookingId, String purpose, String code);
 
-  Future<BookingDto> getApiBookingById(int id);
-  Future<BookingDto> getApiBookingByRequest(int serviceRequestId);
-  Future<List<BookingDto>> getApiBookingsByTechnician(int technicianId);
-  Future<BookingDto> createApiBooking(CreateBookingRequest request);
-  Future<BookingDto> updateApiBooking(int id, UpdateBookingRequest request);
+  // BookingContractDto is the single authoritative API response contract.
+  Future<BookingContractDto> getApiBookingById(int id);
+  Future<BookingContractDto> getApiBookingByRequest(int serviceRequestId);
+  Future<List<BookingContractDto>> getApiBookingsByTechnician(int technicianId);
+  Future<BookingContractDto> createApiBooking(CreateBookingRequest request);
+  Future<BookingContractDto> updateApiBooking(int id, UpdateBookingRequest request);
 }
 
 class BookingRepository implements IBookingRepository {
@@ -59,7 +56,7 @@ class BookingRepository implements IBookingRepository {
     final reqResponse = await _client.get(ApiConstants.serviceRequestsByCustomer(profile.id));
     if (reqResponse is! List) return [];
 
-    final List<BookingModel> customerBookings = [];
+    final customerBookings = <BookingModel>[];
     for (final reqJson in reqResponse.whereType<Map<String, dynamic>>()) {
       final requestId = reqJson['id'] is int ? reqJson['id'] as int : int.tryParse(reqJson['id']?.toString() ?? '0') ?? 0;
       if (requestId <= 0) continue;
@@ -134,11 +131,12 @@ class BookingRepository implements IBookingRepository {
     final technicianId = int.tryParse(booking.technicianId);
     if (requestId == null || technicianId == null) throw Exception('بيانات الحجز غير صالحة');
     final dto = await createApiBooking(CreateBookingRequest(serviceRequestId: requestId, technicianId: technicianId));
-    return _mapDtoToModel(dto, fallback: booking);
+    return _mapContractToModel(dto, fallback: booking);
   }
 
-  BookingModel _mapRawJsonToModel(Map<String, dynamic> json, {BookingModel? fallback}) {
-    final contract = BookingContractDto.fromJson(json);
+  BookingModel _mapRawJsonToModel(Map<String, dynamic> json, {BookingModel? fallback}) => _mapContractToModel(BookingContractDto.fromJson(json), fallback: fallback);
+
+  BookingModel _mapContractToModel(BookingContractDto contract, {BookingModel? fallback}) {
     return BookingModel(
       id: contract.id.toString(),
       requestId: contract.serviceRequestId.toString(),
@@ -163,66 +161,34 @@ class BookingRepository implements IBookingRepository {
     );
   }
 
-  BookingModel _mapDtoToModel(BookingDto dto, {BookingModel? fallback}) {
-    final legacyStatus = dto.completedAt != null
-        ? BookingStatus.completed
-        : dto.startedAt != null
-            ? BookingStatus.inProgress
-            : dto.arrivedAt != null
-                ? BookingStatus.arrived
-                : BookingStatus.upcoming;
-    return BookingModel(
-      id: dto.id.toString(),
-      requestId: dto.serviceRequestId.toString(),
-      serviceNameAr: fallback?.serviceNameAr ?? '',
-      customerName: fallback?.customerName ?? '',
-      customerPhone: fallback?.customerPhone ?? '',
-      technicianId: dto.technicianId.toString(),
-      technicianName: fallback?.technicianName ?? '',
-      address: fallback?.address ?? AddressModel(id: '', userId: '', title: 'العنوان', governorate: '', city: '', street: '', building: '', floor: '', apartment: ''),
-      scheduledDate: dto.acceptedAt ?? fallback?.scheduledDate ?? '',
-      scheduledTime: fallback?.scheduledTime ?? '',
-      price: dto.finalPrice ?? fallback?.price ?? 0.0,
-      status: legacyStatus,
-      createdAt: dto.acceptedAt ?? fallback?.createdAt ?? '',
-      acceptedAt: dto.acceptedAt,
-      arrivedAt: dto.arrivedAt,
-      startedAt: dto.startedAt,
-      completedAt: dto.completedAt,
-      agreedPrice: fallback?.agreedPrice,
-      finalPrice: dto.finalPrice,
-      notes: dto.technicianNotes,
-    );
-  }
-
   @override
-  Future<BookingDto> getApiBookingById(int id) async {
+  Future<BookingContractDto> getApiBookingById(int id) async {
     final response = await _client.get(ApiConstants.bookingById(id));
-    return BookingDto.fromJson(response as Map<String, dynamic>);
+    return BookingContractDto.fromJson(response as Map<String, dynamic>);
   }
 
   @override
-  Future<BookingDto> getApiBookingByRequest(int serviceRequestId) async {
+  Future<BookingContractDto> getApiBookingByRequest(int serviceRequestId) async {
     final response = await _client.get(ApiConstants.bookingByRequest(serviceRequestId));
-    return BookingDto.fromJson(response as Map<String, dynamic>);
+    return BookingContractDto.fromJson(response as Map<String, dynamic>);
   }
 
   @override
-  Future<List<BookingDto>> getApiBookingsByTechnician(int technicianId) async {
+  Future<List<BookingContractDto>> getApiBookingsByTechnician(int technicianId) async {
     final response = await _client.get(ApiConstants.bookingsByTechnician(technicianId));
-    if (response is List) return response.map((item) => BookingDto.fromJson(item as Map<String, dynamic>)).toList();
+    if (response is List) return response.map((item) => BookingContractDto.fromJson(item as Map<String, dynamic>)).toList();
     return [];
   }
 
   @override
-  Future<BookingDto> createApiBooking(CreateBookingRequest request) async {
+  Future<BookingContractDto> createApiBooking(CreateBookingRequest request) async {
     final response = await _client.post(ApiConstants.bookings, body: request.toJson());
-    return BookingDto.fromJson(response as Map<String, dynamic>);
+    return BookingContractDto.fromJson(response as Map<String, dynamic>);
   }
 
   @override
-  Future<BookingDto> updateApiBooking(int id, UpdateBookingRequest request) async {
+  Future<BookingContractDto> updateApiBooking(int id, UpdateBookingRequest request) async {
     final response = await _client.put(ApiConstants.bookingById(id), body: request.toJson());
-    return BookingDto.fromJson(response as Map<String, dynamic>);
+    return BookingContractDto.fromJson(response as Map<String, dynamic>);
   }
 }

@@ -7,7 +7,6 @@ import '../models/user_model.dart';
 abstract class INotificationRepository {
   Future<List<NotificationModel>> getUserNotifications(String userId);
   Future<void> markAsRead(String notificationId);
-
   Future<NotificationDto> getApiNotificationById(int id);
   Future<List<NotificationDto>> getApiNotificationsMe();
   Future<NotificationDto> createApiNotification(CreateNotificationRequest request);
