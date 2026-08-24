@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../services/app_state_provider.dart';
 import 'technician_request_detail_screen.dart';
+import 'technician_inspections_screen.dart';
 
 class TechnicianRequestsScreen extends StatelessWidget {
   const TechnicianRequestsScreen({Key? key}) : super(key: key);
@@ -27,6 +28,9 @@ class TechnicianRequestsScreen extends StatelessWidget {
               itemCount: available.length,
               itemBuilder: (context, index) {
                 final req = available[index];
+                final matchingServices = appState.services.where((item) => item.id == req.serviceId);
+                final service = matchingServices.isEmpty ? null : matchingServices.first;
+                final inspectionEnabled = service?.pricingMode == 2;
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
@@ -75,25 +79,42 @@ class TechnicianRequestsScreen extends StatelessWidget {
                             Row(children: [
                               const Icon(Icons.schedule_rounded, size: 16, color: AppColors.technicianPrimary),
                               const SizedBox(width: 6),
-                              Text('${req.preferredDate} (${req.preferredTime})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo')),
+                              Expanded(child: Text('${req.preferredDate} (${req.preferredTime})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'))),
                             ]),
                           ]),
                         ),
                         const SizedBox(height: 14),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               const Text('النطاق السعري للطلب', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
                               Text('${req.estimatedPriceMin.toInt()} - ${req.estimatedPriceMax.toInt()} ج.م', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.technicianDark, fontFamily: 'Cairo')),
                             ]),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.technicianPrimary, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
-                              icon: const Icon(Icons.local_offer_outlined, size: 18),
-                              label: const Text('فتح وتقديم عرض', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-                              onPressed: () async {
-                                await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianRequestDetailScreen(request: req)));
-                              },
+                            Flexible(
+                              child: Wrap(
+                                alignment: WrapAlignment.end,
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  if (inspectionEnabled)
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.technicianPrimary)),
+                                      icon: const Icon(Icons.fact_check_outlined, size: 16),
+                                      label: const Text('المعاينة', style: TextStyle(fontFamily: 'Cairo', fontSize: 11)),
+                                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TechnicianInspectionsScreen())),
+                                    ),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.technicianPrimary, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
+                                    icon: const Icon(Icons.local_offer_outlined, size: 18),
+                                    label: const Text('فتح وتقديم عرض', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
+                                    onPressed: () async {
+                                      await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianRequestDetailScreen(request: req)));
+                                    },
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),

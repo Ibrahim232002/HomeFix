@@ -51,8 +51,8 @@ class TechnicianBottomNav extends StatelessWidget {
             label: AppStrings.navDashboard,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.near_me_outlined),
-            activeIcon: Icon(Icons.near_me_rounded),
+            icon: Icon(Icons.assignment_outlined),
+            activeIcon: Icon(Icons.assignment_rounded),
             label: AppStrings.navAvailableRequests,
           ),
           BottomNavigationBarItem(

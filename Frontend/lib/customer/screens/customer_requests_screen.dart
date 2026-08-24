@@ -10,6 +10,7 @@ import 'customer_request_detail_screen.dart';
 import 'create_request_screen.dart';
 import '../../common/screens/chat_detail_screen.dart';
 import '../../common/widgets/review_dialog.dart';
+import 'customer_inspection_quote_screen.dart';
 
 class CustomerRequestsScreen extends StatefulWidget {
   const CustomerRequestsScreen({Key? key}) : super(key: key);
@@ -39,6 +40,13 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
       if (booking.requestId == request.id) return booking;
     }
     return null;
+  }
+
+  bool _inspectionEnabled(AppStateProvider appState, ServiceRequestModel request) {
+    for (final service in appState.services) {
+      if (service.id == request.serviceId) return service.pricingMode == 2;
+    }
+    return false;
   }
 
   List<ServiceRequestModel> _filterRequests(List<ServiceRequestModel> all, AppStateProvider appState, int tabIndex) {
@@ -143,6 +151,7 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
               final req = requests[index];
               final booking = _bookingForRequest(appState, req);
               final requestCompleted = req.status == ServiceRequestStatus.completed || booking?.status == BookingStatus.completed;
+              final inspectionEnabled = _inspectionEnabled(appState, req);
               final effectiveStatusBadge = booking != null
                   ? StatusBadge.fromBookingStatus(booking.status)
                   : StatusBadge.fromRequestStatus(req.status);
@@ -190,8 +199,8 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                         child: Row(children: [
                           const Icon(Icons.calendar_month_rounded, size: 16, color: AppColors.textMuted),
                           const SizedBox(width: 6),
-                          Text('${req.preferredDate} (${req.preferredTime})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo')),
-                          const Spacer(),
+                          Expanded(child: Text('${req.preferredDate} (${req.preferredTime})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'))),
+                          const SizedBox(width: 8),
                           const Icon(Icons.location_on_rounded, size: 16, color: AppColors.textMuted),
                           const SizedBox(width: 4),
                           Flexible(child: Text(req.address.title.isNotEmpty ? req.address.title : 'العنوان المحدد', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Cairo'))),
@@ -210,8 +219,12 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                             IconButton(
                               icon: const Icon(Icons.chat_outlined, color: AppColors.primary, size: 20),
                               onPressed: () async {
-                                final tech = appState.technicians.firstWhere((t) => t.userId == req.technicianId, orElse: () => appState.technicians.first);
-                                final conv = await appState.startConversationWithTechnician(technician: tech, serviceNameAr: req.serviceNameAr, requestId: req.id);
+                                final candidates = appState.technicians.where((t) => t.userId == req.technicianId).toList();
+                                if (candidates.isEmpty) {
+                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بيانات الفني غير متاحة حالياً.')));
+                                  return;
+                                }
+                                final conv = await appState.startConversationWithTechnician(technician: candidates.first, serviceNameAr: req.serviceNameAr, requestId: req.id);
                                 if (!context.mounted) return;
                                 Navigator.push(context, MaterialPageRoute(builder: (_) => ChatDetailScreen(conversation: conv)));
                               },
@@ -221,31 +234,45 @@ class _CustomerRequestsScreenState extends State<CustomerRequestsScreen>
                       const Divider(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             const Text('رسوم الزيارة', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
                             Text('${req.estimatedPriceMin.toInt()} ج.م', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Cairo')),
                           ]),
-                          Row(children: [
-                            if (req.status == ServiceRequestStatus.open)
-                              TextButton(
-                                onPressed: () => _showCancelDialog(context, req),
-                                child: const Text('إلغاء الطلب', style: TextStyle(color: AppColors.error, fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-                              ),
-                            if (requestCompleted)
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                                icon: const Icon(Icons.star_rounded, size: 16, color: Colors.white),
-                                label: const Text('تقييم الفني', style: TextStyle(fontSize: 12, fontFamily: 'Cairo')),
-                                onPressed: () => showDialog(context: context, builder: (_) => ReviewDialog(requestId: req.id, technicianId: req.technicianId ?? '', technicianName: req.technicianName ?? 'فني الصيانة', serviceNameAr: req.serviceNameAr)),
-                              ),
-                            const SizedBox(width: 8),
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.primary), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerRequestDetailScreen(requestId: req.id))),
-                              child: const Text('تفاصيل الطلب', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
+                          Flexible(
+                            child: Wrap(
+                              alignment: WrapAlignment.end,
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                if (req.status == ServiceRequestStatus.open)
+                                  TextButton(
+                                    onPressed: () => _showCancelDialog(context, req),
+                                    child: const Text('إلغاء الطلب', style: TextStyle(color: AppColors.error, fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+                                  ),
+                                if (inspectionEnabled)
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.primary)),
+                                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerInspectionQuoteScreen(requestId: req.id))),
+                                    icon: const Icon(Icons.fact_check_outlined, size: 16),
+                                    label: const Text('المعاينة', style: TextStyle(fontSize: 12, fontFamily: 'Cairo')),
+                                  ),
+                                if (requestCompleted)
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                                    icon: const Icon(Icons.star_rounded, size: 16, color: Colors.white),
+                                    label: const Text('تقييم الفني', style: TextStyle(fontSize: 12, fontFamily: 'Cairo')),
+                                    onPressed: () => showDialog(context: context, builder: (_) => ReviewDialog(requestId: req.id, technicianId: req.technicianId ?? '', technicianName: req.technicianName ?? 'فني الصيانة', serviceNameAr: req.serviceNameAr)),
+                                  ),
+                                OutlinedButton(
+                                  style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.primary), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerRequestDetailScreen(requestId: req.id))),
+                                  child: const Text('تفاصيل الطلب', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Cairo')),
+                                ),
+                              ],
                             ),
-                          ]),
+                          ),
                         ],
                       ),
                     ],
