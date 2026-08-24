@@ -113,27 +113,10 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
   }
 
   Future<void> _complete(InspectionModel inspection) async {
-    final controller = TextEditingController();
     final findings = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('إكمال المعاينة', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-          content: TextField(
-            controller: controller,
-            maxLines: 5,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'نتائج المعاينة', hintText: 'اكتب الملاحظات والنتائج...', border: OutlineInputBorder()),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo'))),
-            ElevatedButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('حفظ وإكمال', style: TextStyle(fontFamily: 'Cairo'))),
-          ],
-        ),
-      ),
+      builder: (dialogContext) => const _InspectionCompletionDialog(),
     );
-    controller.dispose();
     if (findings == null || findings.isEmpty || !mounted) return;
     await _runInspectionAction(
       inspection,
@@ -158,38 +141,19 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
   }
 
   Future<void> _quoteDialog({required InspectionModel inspection, ServiceQuoteModel? previous}) async {
-    final amountController = TextEditingController(text: previous?.amount.toStringAsFixed(2) ?? '');
-    final notesController = TextEditingController(text: previous?.notes ?? '');
-    final amount = await showDialog<double>(
+    final result = await showDialog<_QuoteDialogResult>(
       context: context,
-      builder: (dialogContext) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: Text(previous == null ? 'عرض سعر جديد' : 'مراجعة عرض السعر', style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'ج.م', border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            TextField(controller: notesController, maxLines: 3, decoration: const InputDecoration(labelText: 'ملاحظات', border: OutlineInputBorder())),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo'))),
-            ElevatedButton(onPressed: () { final value = double.tryParse(amountController.text.trim()); if (value != null && value > 0) Navigator.pop(dialogContext, value); }, child: const Text('إرسال', style: TextStyle(fontFamily: 'Cairo'))),
-          ],
-        ),
-      ),
+      builder: (dialogContext) => _ServiceQuoteDialog(previous: previous),
     );
-    final notes = notesController.text.trim();
-    amountController.dispose();
-    notesController.dispose();
-    if (amount == null || !mounted) return;
+    if (result == null || !mounted) return;
 
     try {
       setState(() => _busy.add('quote-${inspection.id}'));
       final provider = Provider.of<AppStateProvider>(context, listen: false);
       if (previous == null) {
-        await provider.createServiceQuote(inspectionId: int.parse(inspection.id), amount: amount, notes: notes.isEmpty ? null : notes);
+        await provider.createServiceQuote(inspectionId: int.parse(inspection.id), amount: result.amount, notes: result.notes.isEmpty ? null : result.notes);
       } else {
-        await provider.createQuoteRevision(quoteId: int.parse(previous.id), amount: amount, notes: notes.isEmpty ? null : notes);
+        await provider.createQuoteRevision(quoteId: int.parse(previous.id), amount: result.amount, notes: result.notes.isEmpty ? null : result.notes);
       }
       await provider.loadServiceQuotes(int.parse(inspection.id));
       if (!mounted) return;
@@ -323,6 +287,134 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
     final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(initial), builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!));
     if (time == null) return null;
     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+}
+
+class _InspectionCompletionDialog extends StatefulWidget {
+  const _InspectionCompletionDialog();
+
+  @override
+  State<_InspectionCompletionDialog> createState() => _InspectionCompletionDialogState();
+}
+
+class _InspectionCompletionDialogState extends State<_InspectionCompletionDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('إكمال المعاينة', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: _controller,
+          maxLines: 5,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'نتائج المعاينة', hintText: 'اكتب الملاحظات والنتائج...', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, _controller.text.trim()),
+            child: const Text('حفظ وإكمال', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuoteDialogResult {
+  final double amount;
+  final String notes;
+
+  const _QuoteDialogResult({required this.amount, required this.notes});
+}
+
+class _ServiceQuoteDialog extends StatefulWidget {
+  final ServiceQuoteModel? previous;
+
+  const _ServiceQuoteDialog({this.previous});
+
+  @override
+  State<_ServiceQuoteDialog> createState() => _ServiceQuoteDialogState();
+}
+
+class _ServiceQuoteDialogState extends State<_ServiceQuoteDialog> {
+  late final TextEditingController _amountController;
+  late final TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(text: widget.previous?.amount.toStringAsFixed(2) ?? '');
+    _notesController = TextEditingController(text: widget.previous?.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: Text(widget.previous == null ? 'عرض سعر جديد' : 'مراجعة عرض السعر', style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'ج.م', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesController,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'ملاحظات', border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final value = double.tryParse(_amountController.text.trim());
+              if (value != null && value > 0) {
+                Navigator.pop(
+                  context,
+                  _QuoteDialogResult(amount: value, notes: _notesController.text.trim()),
+                );
+              }
+            },
+            child: const Text('إرسال', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+        ],
+      ),
+    );
   }
 }
 
