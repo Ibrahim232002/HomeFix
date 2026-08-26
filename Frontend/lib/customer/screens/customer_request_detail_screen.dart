@@ -319,7 +319,9 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
               child: Row(children: [
                 CircleAvatar(radius: 26, backgroundImage: NetworkImage(request.technicianAvatar ?? '')),
                 const SizedBox(width: 12),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(request.technicianName!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')), Text(request.technicianPhone ?? '+20 10 9876 5432', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'))])),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(request.technicianName!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')), Text(request.technicianPhone?.trim().isNotEmpty == true
+                    ? request.technicianPhone!.trim()
+                    : 'رقم الهاتف غير متاح', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'))])),
                 if (request.status != ServiceRequestStatus.cancelled)
                   ElevatedButton.icon(
                     onPressed: () async {
