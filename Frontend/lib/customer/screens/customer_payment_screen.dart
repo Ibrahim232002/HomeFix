@@ -244,6 +244,10 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
                 child: Row(children: [const Icon(Icons.error_outline_rounded, color: AppColors.errorDark, size: 20), const SizedBox(width: 8), Expanded(child: Text(_errorMessage!, style: const TextStyle(fontSize: 12, color: AppColors.errorDark, fontFamily: 'Cairo')))]),
               ),
               const SizedBox(height: 16),
+              TextButton(
+                onPressed: _checkingBooking ? null : _checkBooking,
+                child: const Text('إعادة المحاولة'),
+              ),
             ],
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
@@ -260,10 +264,27 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
   Widget _buildUnsupportedMethod(IconData icon, String title, String subtitle) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
-      child: Row(children: [Icon(icon, color: AppColors.textMuted, size: 24), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontFamily: 'Cairo')), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo'))])), const Chip(label: Text('غير متاح', style: TextStyle(fontSize: 10, fontFamily: 'Cairo')))]),
+      decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.textMuted, size: 24),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontFamily: 'Cairo')), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo', height: 1.4))])),
+          const SizedBox(width: 8),
+          const Icon(Icons.lock_outline, color: AppColors.textMuted, size: 20),
+        ],
+      ),
     );
   }
 
-  Widget _buildPriceItem(String label, String amount) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'))), const SizedBox(width: 8), Text(amount, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Cairo'))]);
+  Widget _buildPriceItem(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'))),
+        const SizedBox(width: 12),
+        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontFamily: 'Cairo')),
+      ],
+    );
+  }
 }
