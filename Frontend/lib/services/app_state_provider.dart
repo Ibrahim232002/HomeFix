@@ -166,11 +166,11 @@ class AppStateProvider extends ChangeNotifier {
     }).toList();
   }
 
-  Future<void> _refreshAvailableTechnicianRequests() async {
+  Future<void> _refreshAvailableTechnicianRequests({bool notify = true}) async {
     if (!isTechnician) return;
     _isLoadingAvailableTechRequests = true;
     _availableTechRequestsError = null;
-    notifyListeners();
+    if (notify) notifyListeners();
     try {
       final requests = await _requestRepo.getAvailableRequestsForTechnicians();
       _availableTechRequests = _enrichRequests(requests);
@@ -180,44 +180,154 @@ class AppStateProvider extends ChangeNotifier {
       _availableTechRequestsError = e.toString();
     } finally {
       _isLoadingAvailableTechRequests = false;
-      notifyListeners();
+      if (notify) notifyListeners();
     }
   }
 
   Future<void> refreshAvailableTechnicianRequests() => _refreshAvailableTechnicianRequests();
 
+  void _appendInitializationError(List<String> errors, Object error) {
+    final message = error.toString().trim();
+    if (message.isEmpty || errors.contains(message)) return;
+    errors.add(message);
+  }
+
+  Future<void> _initializeCustomerState(List<String> errors) async {
+    try {
+      _savedAddresses = await _userRepo.getUserAddresses(_currentUser!.id);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+
+    try {
+      final requests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
+      _customerRequests = _enrichRequests(requests, addresses: _savedAddresses);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+
+    try {
+      _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+  }
+
+  Future<void> _initializeTechnicianState(List<String> errors) async {
+    try {
+      await _refreshAvailableTechnicianRequests(notify: false);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+
+    try {
+      _technicianOffers = await _offerRepo.getMyOffers();
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+
+    TechnicianProfileModel? profile;
+    try {
+      final userId = _currentUser!.id;
+      profile = await _techRepo.getTechnicianByUserId(userId);
+      if (profile == null || profile.id.isEmpty) {
+        throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
+      }
+      debugPrint('[TECH_PROFILE_RESOLUTION]');
+      debugPrint('userId: $userId');
+      debugPrint('technicianProfileId: ${profile.id}');
+      debugPrint('profile.userId: ${profile.userId}');
+      if (profile.userId != userId) {
+        throw Exception('عدم تطابق هوية ملف الفني مع حساب المستخدم.');
+      }
+      final technicianProfileId = int.tryParse(profile.id);
+      if (technicianProfileId == null || technicianProfileId <= 0) {
+        throw Exception('معرف ملف الفني غير صالح.');
+      }
+      _currentTechProfile = profile;
+    } catch (e) {
+      _appendInitializationError(errors, e);
+      return;
+    }
+
+    final technicianProfileId = int.parse(profile.id);
+
+    try {
+      _bookings = await _bookingRepo.getBookingsByTechnician(profile.id);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+
+    try {
+      _wallet = await _walletRepo.getWalletByTechnician(profile.id);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+
+    try {
+      _serviceAreas = await _techRepo.getServiceAreas(technicianProfileId);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+  }
+
+  Future<void> _initializeSharedUserState(List<String> errors) async {
+    try {
+      _conversations = await _chatRepo.getConversations(_currentUser!.id);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+
+    try {
+      _notifications = await _userRepo.getUserNotifications(_currentUser!.id);
+    } catch (e) {
+      _appendInitializationError(errors, e);
+    }
+  }
+
   Future<void> _loadInitialData() async {
+    final initializationErrors = <String>[];
+
     try {
       final publicDataFuture = _publicDataFuture;
-      if (publicDataFuture != null) await publicDataFuture;
-      if (!_publicDataLoadSucceeded) { _publicDataFuture = _loadPublicData(); await _publicDataFuture!; }
+      if (publicDataFuture != null) {
+        try {
+          await publicDataFuture;
+        } catch (e) {
+          _appendInitializationError(initializationErrors, e);
+        }
+      }
+
+      if (!_publicDataLoadSucceeded) {
+        try {
+          _publicDataFuture = _loadPublicData();
+          await _publicDataFuture!;
+        } catch (e) {
+          _appendInitializationError(initializationErrors, e);
+        }
+      }
+
+      if (_apiError != null && _apiError!.trim().isNotEmpty && !_publicDataLoadSucceeded) {
+        _appendInitializationError(initializationErrors, _apiError!);
+      }
+
       if (_currentUser != null) {
         if (isCustomer) {
-          _savedAddresses = await _userRepo.getUserAddresses(_currentUser!.id);
-          _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses);
-          _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id);
-        } else {
-          await _refreshAvailableTechnicianRequests();
-          final userId = _currentUser!.id;
-          final profile = await _techRepo.getTechnicianByUserId(userId);
-          if (profile == null || profile.id.isEmpty) throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
-          debugPrint('[TECH_PROFILE_RESOLUTION]');
-          debugPrint('userId: $userId');
-          debugPrint('technicianProfileId: ${profile.id}');
-          debugPrint('profile.userId: ${profile.userId}');
-          if (profile.userId != userId) throw Exception('عدم تطابق هوية ملف الفني مع حساب المستخدم.');
-          _currentTechProfile = profile;
-          final technicianProfileId = int.tryParse(profile.id);
-          if (technicianProfileId == null || technicianProfileId <= 0) throw Exception('معرف ملف الفني غير صالح.');
-          _bookings = await _bookingRepo.getBookingsByTechnician(profile.id);
-          _wallet = await _walletRepo.getWalletByTechnician(profile.id);
-          _serviceAreas = await _techRepo.getServiceAreas(technicianProfileId);
-          _technicianOffers = await _offerRepo.getMyOffers();
+          await _initializeCustomerState(initializationErrors);
+        } else if (isTechnician) {
+          await _initializeTechnicianState(initializationErrors);
         }
-        _conversations = await _chatRepo.getConversations(_currentUser!.id);
-        _notifications = await _userRepo.getUserNotifications(_currentUser!.id);
+
+        await _initializeSharedUserState(initializationErrors);
       }
-    } catch (e) { _apiError = e.toString(); }
+    } catch (e) {
+      _appendInitializationError(initializationErrors, e);
+    }
+
+    if (initializationErrors.isNotEmpty) {
+      _apiError = initializationErrors.join('\n');
+    }
+
     notifyListeners();
   }
 
