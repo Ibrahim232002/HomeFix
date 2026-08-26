@@ -52,8 +52,10 @@ class _TechnicianRequestDetailScreenState extends State<TechnicianRequestDetailS
 
   @override
   Widget build(BuildContext context) {
-    final inspectionEnabled = widget.request.estimatedPriceMin == null &&
-        widget.request.estimatedPriceMax == null;
+    final provider = Provider.of<AppStateProvider>(context);
+    final inspectionEnabled = provider.services.any(
+      (service) => service.id == widget.request.serviceId && service.pricingMode == 2,
+    );
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
