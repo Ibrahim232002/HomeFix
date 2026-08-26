@@ -77,9 +77,13 @@ class AuthRepository implements IAuthRepository {
       );
 
       if (response is Map<String, dynamic>) {
-        final newToken = response['token'] ?? response['accessToken'];
-        if (newToken != null) {
-          _tokenStorage.updateAccessToken(newToken.toString());
+        final accessToken = response['accessToken'] ?? response['token'];
+        final newRefreshToken = response['refreshToken'];
+        if (accessToken != null && newRefreshToken != null) {
+          _tokenStorage.updateTokens(
+            accessToken: accessToken.toString(),
+            refreshToken: newRefreshToken.toString(),
+          );
           return true;
         }
       }
