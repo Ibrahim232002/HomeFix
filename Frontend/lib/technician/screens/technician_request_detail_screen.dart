@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/app_state_provider.dart';
 import '../../models/service_request_model.dart';
+import 'technician_inspections_screen.dart';
 
 class TechnicianRequestDetailScreen extends StatefulWidget {
   final ServiceRequestModel request;
@@ -51,6 +52,10 @@ class _TechnicianRequestDetailScreenState extends State<TechnicianRequestDetailS
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<AppStateProvider>(context);
+    final inspectionEnabled = provider.services.any(
+      (service) => service.id == widget.request.serviceId && service.pricingMode == 2,
+    );
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -91,6 +96,24 @@ class _TechnicianRequestDetailScreenState extends State<TechnicianRequestDetailS
                   ],
                 ),
               ),
+              if (inspectionEnabled) ...[
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TechnicianInspectionsScreen(
+                        requestId: widget.request.id,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.fact_check_rounded, size: 18),
+                  label: const Text(
+                    'متابعة المعاينة',
+                    style: TextStyle(fontFamily: 'Cairo'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
