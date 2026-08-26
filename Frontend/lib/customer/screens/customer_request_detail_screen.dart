@@ -245,11 +245,15 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
     final agreedPrice = _booking?.finalPrice ?? _booking?.agreedPrice;
     final inspectionEnabled = appState.services.any((service) => service.id == request.serviceId && service.pricingMode == 2);
     final hasRange = request.estimatedPriceMin != null || request.estimatedPriceMax != null;
-    final totalLabel = agreedPrice != null
-        ? '${agreedPrice.toInt()} ج.م'
-        : hasRange
-            ? '${request.estimatedPriceMin != null ? request.estimatedPriceMin!.toInt() : '—'} - ${request.estimatedPriceMax != null ? request.estimatedPriceMax!.toInt() : '—'} ج.م'
-            : 'السعر حسب المعاينة';
+    final totalLabel = _booking?.finalPrice != null
+        ? '${_booking!.finalPrice!.toInt()} ج.م'
+        : _booking?.agreedPrice != null
+            ? '${_booking!.agreedPrice!.toInt()} ج.م'
+            : inspectionEnabled
+                ? 'السعر حسب المعاينة'
+                : visitFee != null
+                    ? '${visitFee!.toInt()} ج.م'
+                    : 'غير متاحة';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -401,7 +405,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
               if (agreedPrice != null) ...[const SizedBox(height: 6), _buildPriceRow(label: 'السعر المتفق عليه', value: '${agreedPrice.toInt()} ج.م')],
               if (visitFee == null && inspectionFee == null && agreedPrice == null && !hasRange) const Text('لا يوجد سعر نهائي أو نطاق سعر متاح بعد.', style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontFamily: 'Cairo')),
               const Divider(height: 20),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('المبلغ الإجمالي المتوقع', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')), Text(totalLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primaryDark, fontFamily: 'Cairo'))]),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('التسعير الحالي', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'Cairo')), Text(totalLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primaryDark, fontFamily: 'Cairo'))]),
             ]),
           ),
           const SizedBox(height: 20),

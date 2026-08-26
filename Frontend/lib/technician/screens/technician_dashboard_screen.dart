@@ -170,7 +170,7 @@ class TechnicianDashboardScreen extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('نطاق السعر: ${req.estimatedPriceMin?.toInt() ?? '—'} - ${req.estimatedPriceMax?.toInt() ?? '—'} ج.م', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.technicianDark, fontFamily: 'Cairo')),
+                                Text('رسوم الزيارة: ${req.visitFee?.toInt() ?? 'غير متاحة'} ج.م', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.technicianDark, fontFamily: 'Cairo')),
                                 ElevatedButton(
                                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.technicianPrimary, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                                   onPressed: () {
