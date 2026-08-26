@@ -94,6 +94,24 @@ class _TechnicianRequestDetailScreenState extends State<TechnicianRequestDetailS
                   ],
                 ),
               ),
+              if (inspectionEnabled) ...[
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TechnicianInspectionsScreen(
+                        requestId: widget.request.id,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.fact_check_rounded, size: 18),
+                  label: const Text(
+                    'متابعة المعاينة',
+                    style: TextStyle(fontFamily: 'Cairo'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
