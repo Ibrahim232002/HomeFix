@@ -9,7 +9,9 @@ import '../../repositories/service_request_offer_repository.dart';
 import '../../services/app_state_provider.dart';
 
 class TechnicianInspectionsScreen extends StatefulWidget {
-  const TechnicianInspectionsScreen({super.key});
+  final String? requestId;
+
+  const TechnicianInspectionsScreen({super.key, this.requestId});
 
   @override
   State<TechnicianInspectionsScreen> createState() => _TechnicianInspectionsScreenState();
@@ -37,6 +39,7 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
       final offers = await _offerRepository.getMyOffers();
       final existingRequestIds = provider.technicianInspections.map((item) => item.serviceRequestId.toString()).toSet();
       _acceptedInspectionOffers = offers.where((offer) =>
+          (widget.requestId == null || offer.serviceRequestId == widget.requestId) &&
           offer.status.toLowerCase() == 'accepted' &&
           offer.pricingMode == 2 &&
           !existingRequestIds.contains(offer.serviceRequestId)).toList();
@@ -188,13 +191,21 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
-    final inspections = provider.technicianInspections;
+    final inspections = widget.requestId == null
+        ? provider.technicianInspections
+        : provider.technicianInspections
+            .where((item) => item.serviceRequestId == widget.requestId)
+            .toList();
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: const Text('المعاينات والتسعير')),
+        appBar: AppBar(
+          title: Text(widget.requestId == null
+              ? 'المعاينات والتسعير'
+              : 'معاينة الطلب #'),
+        ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
@@ -227,7 +238,7 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
                         const Text('معايناتك', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800, fontSize: 15)),
                         const SizedBox(height: 10),
                         if (inspections.isEmpty)
-                          const EmptyStateWidget(icon: Icons.assignment_outlined, title: 'لا توجد معاينات', description: 'بعد قبول عرض المعاينة، يمكنك إنشاء الموعد هنا.')
+                          const EmptyStateWidget(icon: Icons.fact_check_outlined, title: 'لا توجد معاينات', description: 'بعد قبول عرض المعاينة، يمكنك إنشاء الموعد هنا.')
                         else
                           ...inspections.map(_buildInspectionCard),
                       ],

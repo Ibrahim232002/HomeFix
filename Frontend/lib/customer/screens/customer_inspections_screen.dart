@@ -51,7 +51,7 @@ class _CustomerInspectionsScreenState extends State<CustomerInspectionsScreen> {
             : _error != null
                 ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'Cairo', color: AppColors.errorDark)), const SizedBox(height: 12), ElevatedButton(onPressed: _load, child: const Text('إعادة المحاولة', style: TextStyle(fontFamily: 'Cairo')))])))
                 : inspections.isEmpty
-                    ? const EmptyStateWidget(icon: Icons.assignment_outlined, title: 'لا توجد معاينات', description: 'عند استخدام خدمة تعتمد على المعاينة ستظهر حالتها وعروض السعر هنا.')
+                    ? const EmptyStateWidget(icon: Icons.fact_check_outlined, title: 'لا توجد معاينات', description: 'عند استخدام خدمة تعتمد على المعاينة ستظهر حالتها وعروض السعر هنا.')
                     : RefreshIndicator(
                         onRefresh: _load,
                         child: ListView.separated(
@@ -64,7 +64,7 @@ class _CustomerInspectionsScreenState extends State<CustomerInspectionsScreen> {
                             final request = matchingRequests.isEmpty ? null : matchingRequests.first;
                             return Card(
                               child: ListTile(
-                                leading: CircleAvatar(child: Icon(inspection.isCompleted ? Icons.check_rounded : Icons.assignment_outlined)),
+                                leading: CircleAvatar(child: Icon(inspection.isCompleted ? Icons.check_rounded : Icons.fact_check_rounded)),
                                 title: Text(request?.serviceNameAr ?? 'طلب #${inspection.serviceRequestId}', style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w800)),
                                 subtitle: Text('المعاينة #${inspection.id} • ${inspection.status}\n${inspection.scheduledAt}', style: const TextStyle(fontFamily: 'Cairo', fontSize: 11)),
                                 isThreeLine: true,

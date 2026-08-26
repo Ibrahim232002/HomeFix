@@ -15,6 +15,7 @@ import '../../common/screens/chat_detail_screen.dart';
 import '../../common/widgets/review_dialog.dart';
 import '../../common/widgets/booking_verification_dialog.dart';
 import 'customer_payment_screen.dart';
+import 'customer_inspection_quote_screen.dart';
 
 class CustomerRequestDetailScreen extends StatefulWidget {
   final String requestId;
@@ -238,6 +239,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
     final visitFee = request.visitFee ?? _pricing?.visitFee;
     final inspectionFee = _inspection?.fee ?? _pricing?.inspectionFee;
     final agreedPrice = _booking?.finalPrice ?? _booking?.agreedPrice;
+    final inspectionEnabled = _inspection != null || (request.estimatedPriceMin == null && request.estimatedPriceMax == null);
     final hasRange = request.estimatedPriceMin != null || request.estimatedPriceMax != null;
     final totalLabel = agreedPrice != null
         ? '${agreedPrice.toInt()} ج.م'
@@ -397,6 +399,13 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
             ]),
           ),
           const SizedBox(height: 20),
+          if (inspectionEnabled)
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerInspectionQuoteScreen(requestId: request.id))),
+              icon: const Icon(Icons.fact_check_rounded, size: 18),
+              label: const Text('متابعة المعاينة والتسعير', style: TextStyle(fontFamily: 'Cairo')),
+            ),
+          if (inspectionEnabled) const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),

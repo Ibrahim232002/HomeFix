@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/app_state_provider.dart';
 import '../../models/service_request_model.dart';
+import 'technician_inspections_screen.dart';
 
 class TechnicianRequestDetailScreen extends StatefulWidget {
   final ServiceRequestModel request;
@@ -51,6 +52,8 @@ class _TechnicianRequestDetailScreenState extends State<TechnicianRequestDetailS
 
   @override
   Widget build(BuildContext context) {
+    final inspectionEnabled = widget.request.estimatedPriceMin == null &&
+        widget.request.estimatedPriceMax == null;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
