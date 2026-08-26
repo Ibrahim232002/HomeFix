@@ -204,7 +204,7 @@ class _TechnicianInspectionsScreenState extends State<TechnicianInspectionsScree
         appBar: AppBar(
           title: Text(widget.requestId == null
               ? 'المعاينات والتسعير'
-              : 'معاينة الطلب #'),
+              : 'معاينة الطلب #${widget.requestId}'),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
