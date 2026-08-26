@@ -35,6 +35,14 @@ class TokenStorage {
     if (userFullName != null) _userFullName = userFullName;
   }
 
+  void updateTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) {
+    _accessToken = accessToken;
+    _refreshToken = refreshToken;
+  }
+
   void updateAccessToken(String newAccessToken) {
     _accessToken = newAccessToken;
   }
