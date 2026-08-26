@@ -142,17 +142,23 @@ class ApiClient {
     try {
       final uri = _buildUri(ApiConstants.refresh);
       final headers = _buildHeaders(includeAuth: false);
-      final body = jsonEncode({'refreshToken': _tokenStorage.refreshToken});
+      final currentRefreshToken = _tokenStorage.refreshToken;
+      if (currentRefreshToken == null) return false;
+      final body = jsonEncode({'refreshToken': currentRefreshToken});
       
       final response = await _httpClient.post(uri, headers: headers, body: body);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data is Map<String, dynamic> && data.containsKey('token')) {
-          _tokenStorage.updateAccessToken(data['token']);
-          return true;
-        } else if (data is Map<String, dynamic> && data.containsKey('accessToken')) {
-          _tokenStorage.updateAccessToken(data['accessToken']);
-          return true;
+        if (data is Map<String, dynamic>) {
+          final accessToken = data['accessToken'] ?? data['token'];
+          final newRefreshToken = data['refreshToken'];
+          if (accessToken != null && newRefreshToken != null) {
+            _tokenStorage.updateTokens(
+              accessToken: accessToken.toString(),
+              refreshToken: newRefreshToken.toString(),
+            );
+            return true;
+          }
         }
       }
       return false;
