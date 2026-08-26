@@ -239,7 +239,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
     final visitFee = request.visitFee ?? _pricing?.visitFee;
     final inspectionFee = _inspection?.fee ?? _pricing?.inspectionFee;
     final agreedPrice = _booking?.finalPrice ?? _booking?.agreedPrice;
-    final inspectionEnabled = _inspection != null || (request.estimatedPriceMin == null && request.estimatedPriceMax == null);
+    final inspectionEnabled = appState.services.any((service) => service.id == request.serviceId && service.pricingMode == 2);
     final hasRange = request.estimatedPriceMin != null || request.estimatedPriceMax != null;
     final totalLabel = agreedPrice != null
         ? '${agreedPrice.toInt()} ج.م'
