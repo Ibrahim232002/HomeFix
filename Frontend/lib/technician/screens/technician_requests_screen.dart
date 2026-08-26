@@ -85,7 +85,7 @@ class TechnicianRequestsScreen extends StatelessWidget {
                           children: [
                             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               const Text('النطاق السعري للطلب', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Cairo')),
-                              Text('${req.estimatedPriceMin.toInt()} - ${req.estimatedPriceMax.toInt()} ج.م', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.technicianDark, fontFamily: 'Cairo')),
+                              Text('${req.estimatedPriceMin?.toInt() ?? '—'} - ${req.estimatedPriceMax?.toInt() ?? '—'} ج.م', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.technicianDark, fontFamily: 'Cairo')),
                             ]),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(backgroundColor: AppColors.technicianPrimary, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),

@@ -159,8 +159,8 @@ class ServiceRequestRepository implements IServiceRequestRepository {
       files: [],
       status: status,
       visitFee: dto.visitFee,
-      estimatedPriceMin: fallbackModel?.estimatedPriceMin ?? dto.visitFee ?? 0.0,
-      estimatedPriceMax: fallbackModel?.estimatedPriceMax ?? dto.visitFee ?? 0.0,
+      estimatedPriceMin: fallbackModel?.estimatedPriceMin,
+      estimatedPriceMax: fallbackModel?.estimatedPriceMax,
       finalPrice: fallbackModel?.finalPrice,
       createdAt: dto.createdAt,
       statusHistory: [

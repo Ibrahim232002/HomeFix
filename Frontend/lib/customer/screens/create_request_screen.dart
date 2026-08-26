@@ -150,7 +150,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     if (min != null && max != null) {
       return '${min.toInt()} - ${max.toInt()} $currency';
     }
-    if (min != null) return 'من ${min.toInt()} $currency';
+    if (min != null) return 'يبدأ من ${min.toInt()} $currency';
     return 'حتى ${max!.toInt()} $currency';
   }
 
@@ -724,8 +724,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
 
                       if (pricing == null ||
                           pricing.visitFee == null ||
-                          pricing.minPrice == null ||
-                          pricing.maxPrice == null) {
+                          pricing.minPrice == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(

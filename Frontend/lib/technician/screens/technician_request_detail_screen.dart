@@ -87,7 +87,7 @@ class _TechnicianRequestDetailScreenState extends State<TechnicianRequestDetailS
                       Text('${widget.request.preferredDate} (${widget.request.preferredTime})', style: const TextStyle(fontSize: 12, fontFamily: 'Cairo')),
                     ]),
                     const SizedBox(height: 12),
-                    Text('نطاق السعر الظاهر للطلب: ${widget.request.estimatedPriceMin.toInt()} - ${widget.request.estimatedPriceMax.toInt()} ج.م', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.technicianDark, fontFamily: 'Cairo')),
+                    Text('نطاق السعر الظاهر للطلب: ${widget.request.estimatedPriceMin?.toInt() ?? '—'} - ${widget.request.estimatedPriceMax?.toInt() ?? '—'} ج.م', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.technicianDark, fontFamily: 'Cairo')),
                   ],
                 ),
               ),

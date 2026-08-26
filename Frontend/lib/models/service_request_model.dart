@@ -157,8 +157,8 @@ class ServiceRequestModel {
   final List<ServiceRequestFileModel> files;
   final ServiceRequestStatus status;
   final double? visitFee;
-  final double estimatedPriceMin;
-  final double estimatedPriceMax;
+  final double? estimatedPriceMin;
+  final double? estimatedPriceMax;
   final double? finalPrice;
   final String createdAt;
   final List<ServiceRequestStatusHistoryModel> statusHistory;
@@ -296,8 +296,8 @@ class ServiceRequestModel {
         files: (json['files'] as List<dynamic>? ?? []).map((f) => ServiceRequestFileModel.fromJson(f)).toList(),
         status: ServiceRequestStatus.fromString((json['status'] ?? '').toString()),
         visitFee: (json['visitFee'] as num?)?.toDouble(),
-        estimatedPriceMin: (json['estimatedPriceMin'] as num?)?.toDouble() ?? 0.0,
-        estimatedPriceMax: (json['estimatedPriceMax'] as num?)?.toDouble() ?? 0.0,
+        estimatedPriceMin: (json['estimatedPriceMin'] as num?)?.toDouble(),
+        estimatedPriceMax: (json['estimatedPriceMax'] as num?)?.toDouble(),
         finalPrice: (json['finalPrice'] as num?)?.toDouble(),
         createdAt: json['createdAt'] ?? '',
         statusHistory: (json['statusHistory'] as List<dynamic>? ?? []).map((s) => ServiceRequestStatusHistoryModel.fromJson(s)).toList(),
