@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/status_badge.dart';
+import '../../core/network/api_exception.dart';
 import '../../models/service_request_model.dart';
 import '../../models/booking_model.dart';
 import '../../models/api_dtos.dart';
@@ -37,6 +38,7 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   bool _completionActionLoading = false;
   String? _requestError;
   String? _offersError;
+  String? _inspectionError;
   ServiceRequestModel? _request;
   BookingModel? _booking;
   ServicePricingDto? _pricing;
@@ -113,13 +115,15 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   }
 
   Future<void> _loadInspection(ServiceRequestModel request) async {
+    if (mounted) setState(() => _inspectionError = null);
     final id = int.tryParse(request.id);
     if (id == null || id <= 0) return;
     try {
       final inspection = await _inspectionRepository.getInspectionByRequest(id);
-      if (mounted) setState(() => _inspection = inspection);
-    } catch (_) {
-      // Inspection is optional until an inspection workflow is present for this request.
+      if (mounted) setState(() { _inspection = inspection; _inspectionError = null; });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() { _inspection = null; _inspectionError = error is ApiException ? error.message : _errorMessage(error); });
     }
   }
 
@@ -401,6 +405,16 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
             ]),
           ),
           const SizedBox(height: 20),
+          if (_inspectionError != null)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: AppColors.errorLight, borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                Expanded(child: Text(_inspectionError!, style: const TextStyle(fontSize: 12, color: AppColors.errorDark, fontFamily: 'Cairo'))),
+                TextButton.icon(onPressed: () => _loadInspection(request), icon: const Icon(Icons.refresh, size: 16), label: const Text('إعادة المحاولة', style: TextStyle(fontFamily: 'Cairo'))),
+              ]),
+            ),
+          if (_inspectionError != null) const SizedBox(height: 8),
           if (inspectionEnabled)
             OutlinedButton.icon(
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerInspectionQuoteScreen(requestId: request.id))),
