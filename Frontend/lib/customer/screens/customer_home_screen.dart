@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/widgets/rating_stars.dart';
+import '../../models/service_model.dart';
 import '../../services/app_state_provider.dart';
 import 'service_detail_screen.dart';
 import 'create_request_screen.dart';
@@ -11,6 +12,40 @@ import '../../common/screens/notifications_screen.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
   const CustomerHomeScreen({Key? key}) : super(key: key);
+
+  void _selectEmergencyService(BuildContext context, AppStateProvider appState) {
+    showModalBottomSheet<ServiceModel>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          itemCount: appState.services.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (_, index) {
+            final service = appState.services[index];
+            return ListTile(
+              leading: CircleAvatar(
+                backgroundColor: AppColors.primarySurface,
+                child: const Icon(Icons.build_rounded, color: AppColors.primary),
+              ),
+              title: Text(service.nameAr, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w700)),
+              subtitle: Text(service.categoryNameAr, style: const TextStyle(fontFamily: 'Cairo')),
+              onTap: () => Navigator.pop(context, service),
+            );
+          },
+        ),
+      ),
+    ).then((selectedService) {
+      if (!context.mounted || selectedService == null) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CreateRequestScreen(initialService: selectedService),
+        ),
+      );
+    });
+  }
 
   IconData _getCategoryIcon(String iconName) {
     switch (iconName) {
@@ -232,14 +267,7 @@ class CustomerHomeScreen extends StatelessWidget {
                             );
                             return;
                           }
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CreateRequestScreen(
-                                initialService: appState.services.first,
-                              ),
-                            ),
-                          );
+                          _selectEmergencyService(context, appState);
                         },
                         child: const Text(
                           'طلب طارئ',
