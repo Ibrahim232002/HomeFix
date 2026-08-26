@@ -244,6 +244,10 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
                 child: Row(children: [const Icon(Icons.error_outline_rounded, color: AppColors.errorDark, size: 20), const SizedBox(width: 8), Expanded(child: Text(_errorMessage!, style: const TextStyle(fontSize: 12, color: AppColors.errorDark, fontFamily: 'Cairo')))]),
               ),
               const SizedBox(height: 16),
+              TextButton(
+                onPressed: _checkingBooking ? null : _checkBooking,
+                child: const Text('إعادة المحاولة'),
+              ),
             ],
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
