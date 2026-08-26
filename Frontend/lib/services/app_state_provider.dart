@@ -66,6 +66,8 @@ class AppStateProvider extends ChangeNotifier {
   List<ServiceModel> _services = [];
   List<ServiceRequestModel> _customerRequests = [];
   List<ServiceRequestModel> _availableTechRequests = [];
+  bool _isLoadingAvailableTechRequests = false;
+  String? _availableTechRequestsError;
   List<BookingModel> _bookings = [];
   List<TechnicianProfileModel> _technicians = [];
   List<ConversationModel> _conversations = [];
@@ -104,6 +106,8 @@ class AppStateProvider extends ChangeNotifier {
   List<ServiceModel> get services => _services;
   List<ServiceRequestModel> get customerRequests => _customerRequests;
   List<ServiceRequestModel> get availableTechRequests => _availableTechRequests;
+  bool get isLoadingAvailableTechRequests => _isLoadingAvailableTechRequests;
+  String? get availableTechRequestsError => _availableTechRequestsError;
   List<BookingModel> get bookings => _bookings;
   List<TechnicianProfileModel> get technicians => _technicians;
   List<ConversationModel> get conversations => _conversations;
@@ -164,9 +168,23 @@ class AppStateProvider extends ChangeNotifier {
 
   Future<void> _refreshAvailableTechnicianRequests() async {
     if (!isTechnician) return;
-    final requests = await _requestRepo.getAvailableRequestsForTechnicians();
-    _availableTechRequests = _enrichRequests(requests);
+    _isLoadingAvailableTechRequests = true;
+    _availableTechRequestsError = null;
+    notifyListeners();
+    try {
+      final requests = await _requestRepo.getAvailableRequestsForTechnicians();
+      _availableTechRequests = _enrichRequests(requests);
+      _availableTechRequestsError = null;
+    } catch (e) {
+      _availableTechRequests = [];
+      _availableTechRequestsError = e.toString();
+    } finally {
+      _isLoadingAvailableTechRequests = false;
+      notifyListeners();
+    }
   }
+
+  Future<void> refreshAvailableTechnicianRequests() => _refreshAvailableTechnicianRequests();
 
   Future<void> _loadInitialData() async {
     try {
@@ -179,7 +197,7 @@ class AppStateProvider extends ChangeNotifier {
           _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses);
           _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id);
         } else {
-          _availableTechRequests = _enrichRequests(await _requestRepo.getAvailableRequestsForTechnicians());
+          await _refreshAvailableTechnicianRequests();
           final userId = _currentUser!.id;
           final profile = await _techRepo.getTechnicianByUserId(userId);
           if (profile == null || profile.id.isEmpty) throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
