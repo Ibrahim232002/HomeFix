@@ -183,7 +183,7 @@ class _TechnicianServiceAreaCardState extends State<TechnicianServiceAreaCard> {
 
 class _ServiceAreaChip extends StatelessWidget {
   final TechnicianServiceAreaModel area;
-  final Future<String> Function(int cityId) getCityName;
+  final Future<String?> Function(int cityId) getCityName;
   final bool removing;
   final VoidCallback onRemove;
 
@@ -195,7 +195,7 @@ class _ServiceAreaChip extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<String>(
+  Widget build(BuildContext context) => FutureBuilder<String?>(
         future: getCityName(area.cityId),
         builder: (context, snapshot) => Container(
           padding: const EdgeInsetsDirectional.only(start: 11, end: 5, top: 5, bottom: 5),
