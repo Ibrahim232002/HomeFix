@@ -25,7 +25,7 @@ public class TechnicianProfilesController : ControllerBase
     {
         var technician = await _service.GetByIdAsync(id);
         if (technician == null) return NotFound();
-        return Ok(MapToDto(technician));
+        return Ok(MapToDto(technician, CanViewPreciseLocation(technician)));
     }
 
     [AllowAnonymous]
@@ -34,7 +34,7 @@ public class TechnicianProfilesController : ControllerBase
     {
         var technician = await _service.GetByUserIdAsync(userId);
         if (technician == null) return NotFound();
-        return Ok(MapToDto(technician));
+        return Ok(MapToDto(technician, CanViewPreciseLocation(technician)));
     }
 
     [AllowAnonymous]
@@ -42,7 +42,7 @@ public class TechnicianProfilesController : ControllerBase
     public async Task<ActionResult<List<TechnicianProfileDto>>> GetActiveTechnicians()
     {
         var technicians = await _service.GetActiveTechniciansAsync();
-        return Ok(technicians.Select(MapToDto).ToList());
+        return Ok(technicians.Select(technician => MapToDto(technician, includePreciseLocation: false)).ToList());
     }
 
     [HttpPost]
@@ -82,7 +82,7 @@ public class TechnicianProfilesController : ControllerBase
 
         await _service.AddAsync(technician);
 
-        return CreatedAtAction(nameof(GetById), new { id = technician.Id }, MapToDto(technician));
+        return CreatedAtAction(nameof(GetById), new { id = technician.Id }, MapToDto(technician, includePreciseLocation: true));
     }
 
     [HttpPut("{id:int}")]
@@ -140,10 +140,18 @@ public class TechnicianProfilesController : ControllerBase
         }
 
         await _service.UpdateAsync(technician);
-        return Ok(MapToDto(technician));
+        return Ok(MapToDto(technician, includePreciseLocation: true));
     }
 
-    private static TechnicianProfileDto MapToDto(TechnicianProfile technician)
+    private bool CanViewPreciseLocation(TechnicianProfile technician)
+    {
+        if (User.IsInRole("Admin")) return true;
+        if (!User.IsInRole("Technician")) return false;
+        return int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+            && technician.UserId == userId;
+    }
+
+    private static TechnicianProfileDto MapToDto(TechnicianProfile technician, bool includePreciseLocation)
     {
         return new TechnicianProfileDto
         {
@@ -160,8 +168,8 @@ public class TechnicianProfilesController : ControllerBase
             AverageRating = technician.AverageRating,
             TotalJobs = technician.TotalJobs,
             CreatedAt = technician.CreatedAt,
-            CurrentLatitude = technician.CurrentLatitude,
-            CurrentLongitude = technician.CurrentLongitude,
+            CurrentLatitude = includePreciseLocation ? technician.CurrentLatitude : null,
+            CurrentLongitude = includePreciseLocation ? technician.CurrentLongitude : null,
             CurrentGovernorateId = technician.CurrentGovernorateId,
             CurrentCityId = technician.CurrentCityId
         };
