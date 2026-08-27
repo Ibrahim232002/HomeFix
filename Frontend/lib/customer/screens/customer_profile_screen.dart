@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/app_state_provider.dart';
-import '../../repositories/auth_repository.dart';
+
 import 'customer_addresses_screen.dart';
 import 'customer_support_screen.dart';
 import '../../common/screens/notifications_screen.dart';
@@ -10,8 +10,7 @@ import '../../common/screens/notifications_screen.dart';
 class CustomerProfileScreen extends StatelessWidget {
   const CustomerProfileScreen({Key? key}) : super(key: key);
 
-  Future<void> _logout(BuildContext context, AppStateProvider appState) async {
-    await AuthRepository().logout();
+  void _logout(BuildContext context, AppStateProvider appState) {
     appState.logout();
   }
 
