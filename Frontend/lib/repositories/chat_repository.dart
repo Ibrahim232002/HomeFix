@@ -185,16 +185,19 @@ class ChatRepository implements IChatRepository {
   }) async {
     final intCustomer = int.tryParse(customerId);
     final intTech = int.tryParse(technicianId);
-    final intRequest = requestId != null ? int.tryParse(requestId) : 0;
+    final intRequest = int.tryParse(requestId ?? '');
 
     if (intCustomer == null || intTech == null) {
       throw Exception('بيانات المحادثة غير مكتملة');
+    }
+    if (intRequest == null || intRequest <= 0) {
+      throw Exception('طلب خدمة صالح مطلوب لبدء المحادثة.');
     }
 
     final dto = await createApiConversation(CreateConversationRequest(
       customerId: intCustomer,
       technicianId: intTech,
-      serviceRequestId: intRequest ?? 0,
+      serviceRequestId: intRequest,
     ));
     return ConversationModel(
       id: dto.id.toString(),
