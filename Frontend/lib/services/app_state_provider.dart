@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/network/api_client.dart';
+import '../core/network/api_exception.dart';
 import '../core/constants/api_constants.dart';
 import '../models/user_model.dart';
 import '../models/category_model.dart';
@@ -358,7 +359,17 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   Future<List<CityDto>> loadCitiesForTechnician(int governorateId) async { final client = ApiClient(); final response = await client.get(ApiConstants.citiesByGovernorate(governorateId)); if (response is List) return response.map((e) => CityDto.fromJson(e as Map<String, dynamic>)).toList(); return []; }
-  Future<String> getCityName(int cityId) async { final client = ApiClient(); try { final response = await client.get(ApiConstants.cityById(cityId)); return CityDto.fromJson(response as Map<String, dynamic>).name ?? 'مدينة $cityId'; } catch (_) { return 'مدينة $cityId'; } }
+  Future<String?> getCityName(int cityId) async {
+    final client = ApiClient();
+    try {
+      final response = await client.get(ApiConstants.cityById(cityId));
+      final name = CityDto.fromJson(response as Map<String, dynamic>).name;
+      return name?.trim().isEmpty == true ? null : name;
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) return null;
+      rethrow;
+    }
+  }
   Future<void> selectCategory(String categoryId) async { _selectedCategoryId = categoryId; _categoryError = null; _isLoadingCategoryServices = true; notifyListeners(); try { if (categoryId == 'all') _services = await _serviceRepo.getServices(); else { final categoryName = _categories.firstWhere((c) => c.id == categoryId, orElse: () => _categories.first).nameAr; _services = await _serviceRepo.getServicesByCategory(categoryId, categoryNameAr: categoryName); } } catch (e) { _services = []; _categoryError = e.toString(); } finally { _isLoadingCategoryServices = false; notifyListeners(); } }
   void setSearchQuery(String query) async { _searchQuery = query; _apiError = null; try { _services = await _serviceRepo.searchServices(query); } catch (e) { _apiError = e.toString(); } finally { notifyListeners(); } }
   Future<void> applyPromoCode(String code) async { try { final dto = await _promoRepo.getPromoCodeByCode(code); if (dto != null && dto.isActive) _appliedPromo = PromoCodeModel(code: dto.code ?? code, title: dto.code ?? 'كود خصم', discount: '${dto.discountValue.toStringAsFixed(0)}%', maxDiscount: 'خصم ${dto.discountValue}', description: 'كود ترويجي', expiry: dto.endDate, discountPercentage: dto.discountValue, maxDiscountAmount: dto.discountValue); else _appliedPromo = null; } catch (_) { _appliedPromo = null; } notifyListeners(); }
@@ -431,7 +442,7 @@ class AppStateProvider extends ChangeNotifier {
   Future<List<PaymentModel>> loadPaymentsForRequest(String requestId) async { final reqId = int.tryParse(requestId) ?? 0; if (reqId == 0) return []; try { final dtoList = await _paymentRepo.getPaymentsByRequestId(reqId); final mapped = dtoList.map((d) => PaymentModel.fromDto(d)).toList(); _payments = mapped; notifyListeners(); return mapped; } catch (_) { return []; } }
   Future<InitiatePaymentResponse> initiatePayment({required String serviceRequestId, required PaymentMethodType method, String? walletPhoneNumber, String paymentType = 'FullService'}) async { final reqId = int.tryParse(serviceRequestId) ?? 0; if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح'); _isLoading = true; _errorMessage = null; notifyListeners(); try { final response = await _paymentRepo.initiatePayment(InitiatePaymentRequest(serviceRequestId: reqId, paymentMethod: method.nameStr, walletPhoneNumber: walletPhoneNumber, paymentType: paymentType)); _activePayment = PaymentModel.fromInitiateResponse(response, serviceRequestId, response.amount); _isLoading = false; notifyListeners(); return response; } catch (e) { _isLoading = false; _errorMessage = e.toString(); notifyListeners(); rethrow; } }
   Future<VerifyPaymentResponse> verifyPayment(int paymentId) async { _isLoading = true; notifyListeners(); try { final verifyResp = await _paymentRepo.verifyPayment(paymentId); if (_activePayment != null && _activePayment!.id == paymentId.toString()) _activePayment = _activePayment!.copyWith(status: PaymentStatusTypeExtension.fromString(verifyResp.status), transactionReference: verifyResp.transactionReference, paidAt: verifyResp.paidAt); if (verifyResp.isSuccess && _currentUser != null) _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); _isLoading = false; notifyListeners(); return verifyResp; } catch (e) { _isLoading = false; notifyListeners(); rethrow; } }
-  Future<PaymentDto> selectCashOnDelivery(String serviceRequestId) async { final reqId = int.tryParse(serviceRequestId) ?? 0; if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح'); _isLoading = true; notifyListeners(); try { final dto = await _paymentRepo.setCashPayment(reqId); _activePayment = PaymentModel.fromDto(dto); if (_currentUser != null) _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); _isLoading = false; notifyListeners(); return dto; } catch (e) { _isLoading = false; _errorMessage = e.toString(); notifyListeners(); rethrow; } }
+  Future<PaymentDto> selectCashOnDelivery(String serviceRequestId) async { final reqId = int.tryParse(serviceRequestId) ?? 0; if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح'); _isLoading = true; _errorMessage = null; notifyListeners(); try { final dto = await _paymentRepo.setCashPayment(reqId); _activePayment = PaymentModel.fromDto(dto); if (_currentUser != null) _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); _isLoading = false; notifyListeners(); return dto; } catch (e) { _isLoading = false; _errorMessage = e.toString(); notifyListeners(); rethrow; } }
 
   void _upsertInspection(InspectionModel inspection) {
     final target = isTechnician ? _technicianInspections : _customerInspections;
