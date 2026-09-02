@@ -69,14 +69,13 @@ public class PayoutsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<PayoutDto>> Update(int id, UpdatePayoutRequest request)
     {
-        var payout = await _service.GetByIdAsync(id);
-        if (payout is null) return NotFound();
+        var payout = await _service.UpdateAsync(
+            id,
+            request.Status,
+            request.TransactionReference,
+            request.CompletedAt);
 
-        payout.Status = request.Status;
-        payout.TransactionReference = request.TransactionReference;
-        payout.CompletedAt = request.CompletedAt;
-        await _service.UpdateAsync(payout);
-        return Ok(MapToDto(payout));
+        return payout is null ? NotFound() : Ok(MapToDto(payout));
     }
 
     private static PayoutDto MapToDto(Payout payout) => new()
