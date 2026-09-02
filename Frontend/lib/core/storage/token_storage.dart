@@ -51,14 +51,16 @@ class TokenStorage {
     String? userFullName,
   }) async {
     _accessToken = accessToken;
-    if (refreshToken != null) _refreshToken = refreshToken;
+    _refreshToken = refreshToken;
     if (userId != null) _userId = userId;
     if (userRole != null) _userRole = userRole;
     if (userEmail != null) _userEmail = userEmail;
     if (userFullName != null) _userFullName = userFullName;
 
     await _secureStorage.write(key: _accessTokenKey, value: _accessToken);
-    if (_refreshToken != null) {
+    if (_refreshToken == null) {
+      await _secureStorage.delete(key: _refreshTokenKey);
+    } else {
       await _secureStorage.write(key: _refreshTokenKey, value: _refreshToken);
     }
     if (_userId != null) {
@@ -97,6 +99,14 @@ class TokenStorage {
     _userRole = null;
     _userEmail = null;
     _userFullName = null;
-    await _secureStorage.deleteAll();
+
+    await Future.wait([
+      _secureStorage.delete(key: _accessTokenKey),
+      _secureStorage.delete(key: _refreshTokenKey),
+      _secureStorage.delete(key: _userIdKey),
+      _secureStorage.delete(key: _userRoleKey),
+      _secureStorage.delete(key: _userEmailKey),
+      _secureStorage.delete(key: _userFullNameKey),
+    ]);
   }
 }
