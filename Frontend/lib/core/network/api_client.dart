@@ -153,7 +153,7 @@ class ApiClient {
           final accessToken = data['accessToken'] ?? data['token'];
           final newRefreshToken = data['refreshToken'];
           if (accessToken != null && newRefreshToken != null) {
-            _tokenStorage.updateTokens(
+            await _tokenStorage.updateTokens(
               accessToken: accessToken.toString(),
               refreshToken: newRefreshToken.toString(),
             );
@@ -186,7 +186,6 @@ class ApiClient {
       return decodedData;
     }
 
-    // Extract error message if present in response
     String errorMessage = 'حدث خطأ في الخادم';
     Map<String, dynamic>? validationErrors;
 
