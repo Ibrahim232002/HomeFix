@@ -44,6 +44,14 @@ class HomeFixApp extends StatelessWidget {
   }
 
   Widget _getHomeScreen(AppStateProvider appState) {
+    if (appState.isRestoringSession) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     if (!appState.isAuthenticated) {
       return const AuthScreen();
     }
