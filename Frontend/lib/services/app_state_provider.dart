@@ -57,6 +57,7 @@ class AppStateProvider extends ChangeNotifier {
 
   UserModel? _currentUser;
   bool _isLoading = false;
+  bool _isRestoringSession = true;
   bool _isLoadingPublic = false;
   bool _isLoadingCategoryServices = false;
   bool _publicDataLoadSucceeded = false;
@@ -97,6 +98,7 @@ class AppStateProvider extends ChangeNotifier {
 
   UserModel? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
+  bool get isRestoringSession => _isRestoringSession;
   UserRole get currentRole => _currentUser?.role ?? UserRole.customer;
   bool get isCustomer => currentRole == UserRole.customer;
   bool get isTechnician => currentRole == UserRole.technician;
@@ -133,7 +135,30 @@ class AppStateProvider extends ChangeNotifier {
   List<TechnicianServiceAreaModel> get serviceAreas => _serviceAreas;
   int get unreadNotificationsCount => _notifications.where((n) => !n.isRead).length;
 
-  AppStateProvider() { _publicDataFuture = _loadPublicData(); }
+  AppStateProvider() {
+    _publicDataFuture = _loadPublicData();
+    unawaited(_restoreSession());
+  }
+
+  Future<void> _restoreSession() async {
+    try {
+      final user = await _authRepo.restoreSession();
+      if (user != null) {
+        _currentUser = user;
+        if (user.role == UserRole.technician) {
+          _technicianNavIndex = 0;
+        } else {
+          _customerNavIndex = 0;
+        }
+        await _loadInitialData();
+      }
+    } catch (_) {
+      _currentUser = null;
+    } finally {
+      _isRestoringSession = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> _loadPublicData() async {
     _isLoadingPublic = true; _categoryError = null; _apiError = null; _publicDataLoadSucceeded = false; notifyListeners();
@@ -197,141 +222,54 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   Future<void> _initializeCustomerState(List<String> errors) async {
-    try {
-      _savedAddresses = await _userRepo.getUserAddresses(_currentUser!.id);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
-
-    try {
-      final requests = await _requestRepo.getRequestsByCustomer(_currentUser!.id);
-      _customerRequests = _enrichRequests(requests, addresses: _savedAddresses);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
-
-    try {
-      _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
+    try { _savedAddresses = await _userRepo.getUserAddresses(_currentUser!.id); } catch (e) { _appendInitializationError(errors, e); }
+    try { final requests = await _requestRepo.getRequestsByCustomer(_currentUser!.id); _customerRequests = _enrichRequests(requests, addresses: _savedAddresses); } catch (e) { _appendInitializationError(errors, e); }
+    try { _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id); } catch (e) { _appendInitializationError(errors, e); }
   }
 
   Future<void> _initializeTechnicianState(List<String> errors) async {
-    try {
-      await _refreshAvailableTechnicianRequests(notify: false);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
-
-    try {
-      _technicianOffers = await _offerRepo.getMyOffers();
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
+    try { await _refreshAvailableTechnicianRequests(notify: false); } catch (e) { _appendInitializationError(errors, e); }
+    try { _technicianOffers = await _offerRepo.getMyOffers(); } catch (e) { _appendInitializationError(errors, e); }
 
     TechnicianProfileModel? profile;
     try {
       final userId = _currentUser!.id;
       profile = await _techRepo.getTechnicianByUserId(userId);
-      if (profile == null || profile.id.isEmpty) {
-        throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
-      }
+      if (profile == null || profile.id.isEmpty) throw Exception('تعذر العثور على ملف الفني المرتبط بالحساب.');
       debugPrint('[TECH_PROFILE_RESOLUTION]');
       debugPrint('userId: $userId');
       debugPrint('technicianProfileId: ${profile.id}');
       debugPrint('profile.userId: ${profile.userId}');
-      if (profile.userId != userId) {
-        throw Exception('عدم تطابق هوية ملف الفني مع حساب المستخدم.');
-      }
+      if (profile.userId != userId) throw Exception('عدم تطابق هوية ملف الفني مع حساب المستخدم.');
       final technicianProfileId = int.tryParse(profile.id);
-      if (technicianProfileId == null || technicianProfileId <= 0) {
-        throw Exception('معرف ملف الفني غير صالح.');
-      }
+      if (technicianProfileId == null || technicianProfileId <= 0) throw Exception('معرف ملف الفني غير صالح.');
       _currentTechProfile = profile;
-    } catch (e) {
-      _appendInitializationError(errors, e);
-      return;
-    }
+    } catch (e) { _appendInitializationError(errors, e); return; }
 
     final technicianProfileId = int.parse(profile.id);
-
-    try {
-      _bookings = await _bookingRepo.getBookingsByTechnician(profile.id);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
-
-    try {
-      _wallet = await _walletRepo.getWalletByTechnician(profile.id);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
-
-    try {
-      _serviceAreas = await _techRepo.getServiceAreas(technicianProfileId);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
+    try { _bookings = await _bookingRepo.getBookingsByTechnician(profile.id); } catch (e) { _appendInitializationError(errors, e); }
+    try { _wallet = await _walletRepo.getWalletByTechnician(profile.id); } catch (e) { _appendInitializationError(errors, e); }
+    try { _serviceAreas = await _techRepo.getServiceAreas(technicianProfileId); } catch (e) { _appendInitializationError(errors, e); }
   }
 
   Future<void> _initializeSharedUserState(List<String> errors) async {
-    try {
-      _conversations = await _chatRepo.getConversations(_currentUser!.id);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
-
-    try {
-      _notifications = await _userRepo.getUserNotifications(_currentUser!.id);
-    } catch (e) {
-      _appendInitializationError(errors, e);
-    }
+    try { _conversations = await _chatRepo.getConversations(_currentUser!.id); } catch (e) { _appendInitializationError(errors, e); }
+    try { _notifications = await _userRepo.getUserNotifications(_currentUser!.id); } catch (e) { _appendInitializationError(errors, e); }
   }
 
   Future<void> _loadInitialData() async {
     final initializationErrors = <String>[];
-
     try {
       final publicDataFuture = _publicDataFuture;
-      if (publicDataFuture != null) {
-        try {
-          await publicDataFuture;
-        } catch (e) {
-          _appendInitializationError(initializationErrors, e);
-        }
-      }
-
-      if (!_publicDataLoadSucceeded) {
-        try {
-          _publicDataFuture = _loadPublicData();
-          await _publicDataFuture!;
-        } catch (e) {
-          _appendInitializationError(initializationErrors, e);
-        }
-      }
-
-      if (_apiError != null && _apiError!.trim().isNotEmpty && !_publicDataLoadSucceeded) {
-        _appendInitializationError(initializationErrors, _apiError!);
-      }
-
+      if (publicDataFuture != null) { try { await publicDataFuture; } catch (e) { _appendInitializationError(initializationErrors, e); } }
+      if (!_publicDataLoadSucceeded) { try { _publicDataFuture = _loadPublicData(); await _publicDataFuture!; } catch (e) { _appendInitializationError(initializationErrors, e); } }
+      if (_apiError != null && _apiError!.trim().isNotEmpty && !_publicDataLoadSucceeded) _appendInitializationError(initializationErrors, _apiError!);
       if (_currentUser != null) {
-        if (isCustomer) {
-          await _initializeCustomerState(initializationErrors);
-        } else if (isTechnician) {
-          await _initializeTechnicianState(initializationErrors);
-        }
-
+        if (isCustomer) await _initializeCustomerState(initializationErrors); else if (isTechnician) await _initializeTechnicianState(initializationErrors);
         await _initializeSharedUserState(initializationErrors);
       }
-    } catch (e) {
-      _appendInitializationError(initializationErrors, e);
-    }
-
-    if (initializationErrors.isNotEmpty) {
-      _apiError = initializationErrors.join('\n');
-    }
-
+    } catch (e) { _appendInitializationError(initializationErrors, e); }
+    if (initializationErrors.isNotEmpty) _apiError = initializationErrors.join('\n');
     notifyListeners();
   }
 
@@ -341,35 +279,13 @@ class AppStateProvider extends ChangeNotifier {
     if (inFlight != null) return inFlight;
     final future = _fetchGovernoratesForTechnician();
     _governoratesFuture = future;
-    try {
-      final result = await future;
-      _governorates = result;
-      _governoratesLoaded = true;
-      return result;
-    } finally {
-      if (identical(_governoratesFuture, future)) _governoratesFuture = null;
-    }
+    try { final result = await future; _governorates = result; _governoratesLoaded = true; return result; }
+    finally { if (identical(_governoratesFuture, future)) _governoratesFuture = null; }
   }
 
-  Future<List<GovernorateDto>> _fetchGovernoratesForTechnician() async {
-    final client = ApiClient();
-    final response = await client.get(ApiConstants.governorates);
-    if (response is List) return response.map((e) => GovernorateDto.fromJson(e as Map<String, dynamic>)).toList();
-    return [];
-  }
-
+  Future<List<GovernorateDto>> _fetchGovernoratesForTechnician() async { final client = ApiClient(); final response = await client.get(ApiConstants.governorates); if (response is List) return response.map((e) => GovernorateDto.fromJson(e as Map<String, dynamic>)).toList(); return []; }
   Future<List<CityDto>> loadCitiesForTechnician(int governorateId) async { final client = ApiClient(); final response = await client.get(ApiConstants.citiesByGovernorate(governorateId)); if (response is List) return response.map((e) => CityDto.fromJson(e as Map<String, dynamic>)).toList(); return []; }
-  Future<String?> getCityName(int cityId) async {
-    final client = ApiClient();
-    try {
-      final response = await client.get(ApiConstants.cityById(cityId));
-      final name = CityDto.fromJson(response as Map<String, dynamic>).name;
-      return name?.trim().isEmpty == true ? null : name;
-    } on ApiException catch (error) {
-      if (error.statusCode == 404) return null;
-      rethrow;
-    }
-  }
+  Future<String?> getCityName(int cityId) async { final client = ApiClient(); try { final response = await client.get(ApiConstants.cityById(cityId)); final name = CityDto.fromJson(response as Map<String, dynamic>).name; return name?.trim().isEmpty == true ? null : name; } on ApiException catch (error) { if (error.statusCode == 404) return null; rethrow; } }
   Future<void> selectCategory(String categoryId) async { _selectedCategoryId = categoryId; _categoryError = null; _isLoadingCategoryServices = true; notifyListeners(); try { if (categoryId == 'all') _services = await _serviceRepo.getServices(); else { final categoryName = _categories.firstWhere((c) => c.id == categoryId, orElse: () => _categories.first).nameAr; _services = await _serviceRepo.getServicesByCategory(categoryId, categoryNameAr: categoryName); } } catch (e) { _services = []; _categoryError = e.toString(); } finally { _isLoadingCategoryServices = false; notifyListeners(); } }
   void setSearchQuery(String query) async { _searchQuery = query; _apiError = null; try { _services = await _serviceRepo.searchServices(query); } catch (e) { _apiError = e.toString(); } finally { notifyListeners(); } }
   Future<void> applyPromoCode(String code) async { try { final dto = await _promoRepo.getPromoCodeByCode(code); if (dto != null && dto.isActive) _appliedPromo = PromoCodeModel(code: dto.code ?? code, title: dto.code ?? 'كود خصم', discount: '${dto.discountValue.toStringAsFixed(0)}%', maxDiscount: 'خصم ${dto.discountValue}', description: 'كود ترويجي', expiry: dto.endDate, discountPercentage: dto.discountValue, maxDiscountAmount: dto.discountValue); else _appliedPromo = null; } catch (_) { _appliedPromo = null; } notifyListeners(); }
@@ -419,16 +335,7 @@ class AppStateProvider extends ChangeNotifier {
   Future<BookingVerificationIssueResult> requestJobStartCode(String bookingId) async => _bookingRepo.issueBookingVerificationCode(bookingId, 'JobStart');
   Future<BookingModel> verifyJobStart(String bookingId, String code) async { final verified = await _bookingRepo.verifyBookingCode(bookingId, 'JobStart', code); final refreshed = await _bookingRepo.getBookingById(bookingId) ?? verified; _upsertBooking(refreshed); notifyListeners(); return refreshed; }
   Future<BookingVerificationIssueResult> requestJobCompletionCode(String bookingId) async => _bookingRepo.issueBookingVerificationCode(bookingId, 'JobCompletion');
-  Future<BookingModel> verifyJobCompletion(String bookingId, String code) async {
-    final verified = await _bookingRepo.verifyBookingCode(bookingId, 'JobCompletion', code);
-    final refreshed = await _bookingRepo.getBookingById(bookingId) ?? verified;
-    _upsertBooking(refreshed);
-    if (_currentUser != null && isCustomer) {
-      _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses);
-    }
-    notifyListeners();
-    return refreshed;
-  }
+  Future<BookingModel> verifyJobCompletion(String bookingId, String code) async { final verified = await _bookingRepo.verifyBookingCode(bookingId, 'JobCompletion', code); final refreshed = await _bookingRepo.getBookingById(bookingId) ?? verified; _upsertBooking(refreshed); if (_currentUser != null && isCustomer) { _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); } notifyListeners(); return refreshed; }
   Future<void> updateBookingStatus(String bookingId, BookingStatus status) async { await _bookingRepo.updateBookingStatus(bookingId, status); if (_currentTechProfile != null) _bookings = await _bookingRepo.getBookingsByTechnician(_currentTechProfile!.id); notifyListeners(); }
   Future<void> toggleTechnicianAvailability() async { if (_currentTechProfile == null) return; final newStatus = !_currentTechProfile!.isAvailable; await _techRepo.updateAvailability(_currentTechProfile!.id, newStatus); _currentTechProfile = _currentTechProfile!.copyWith(isAvailable: newStatus); await _refreshAvailableTechnicianRequests(); notifyListeners(); }
   Future<MessageModel> sendMessage(String conversationId, String text, {String? attachmentUrl}) async { if (_currentUser == null) throw Exception('Not logged in'); final msg = await _chatRepo.sendMessage(conversationId: conversationId, sender: _currentUser!, text: text, attachmentUrl: attachmentUrl); _conversations = await _chatRepo.getConversations(_currentUser!.id); notifyListeners(); return msg; }
@@ -444,151 +351,22 @@ class AppStateProvider extends ChangeNotifier {
   Future<VerifyPaymentResponse> verifyPayment(int paymentId) async { _isLoading = true; notifyListeners(); try { final verifyResp = await _paymentRepo.verifyPayment(paymentId); if (_activePayment != null && _activePayment!.id == paymentId.toString()) _activePayment = _activePayment!.copyWith(status: PaymentStatusTypeExtension.fromString(verifyResp.status), transactionReference: verifyResp.transactionReference, paidAt: verifyResp.paidAt); if (verifyResp.isSuccess && _currentUser != null) _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); _isLoading = false; notifyListeners(); return verifyResp; } catch (e) { _isLoading = false; notifyListeners(); rethrow; } }
   Future<PaymentDto> selectCashOnDelivery(String serviceRequestId) async { final reqId = int.tryParse(serviceRequestId) ?? 0; if (reqId == 0) throw Exception('معرف طلب الخدمة غير صالح'); _isLoading = true; _errorMessage = null; notifyListeners(); try { final dto = await _paymentRepo.setCashPayment(reqId); _activePayment = PaymentModel.fromDto(dto); if (_currentUser != null) _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); _isLoading = false; notifyListeners(); return dto; } catch (e) { _isLoading = false; _errorMessage = e.toString(); notifyListeners(); rethrow; } }
 
-  void _upsertInspection(InspectionModel inspection) {
-    final target = isTechnician ? _technicianInspections : _customerInspections;
-    final index = target.indexWhere((item) => item.id == inspection.id);
-    if (index == -1) target.add(inspection); else target[index] = inspection;
-  }
+  void _upsertInspection(InspectionModel inspection) { final target = isTechnician ? _technicianInspections : _customerInspections; final index = target.indexWhere((item) => item.id == inspection.id); if (index == -1) target.add(inspection); else target[index] = inspection; }
+  void _upsertQuote(ServiceQuoteModel quote) { final index = _serviceQuotes.indexWhere((item) => item.id == quote.id); if (index == -1) _serviceQuotes.add(quote); else _serviceQuotes[index] = quote; }
 
-  void _upsertQuote(ServiceQuoteModel quote) {
-    final index = _serviceQuotes.indexWhere((item) => item.id == quote.id);
-    if (index == -1) _serviceQuotes.add(quote); else _serviceQuotes[index] = quote;
-  }
-
-  Future<void> loadTechnicianInspections() async {
-    if (!isTechnician) return;
-    _technicianInspections = await _inspectionRepo.getMyInspections();
-    notifyListeners();
-  }
-
-  Future<void> loadCustomerInspections(Iterable<String> requestIds) async {
-    if (!isCustomer) return;
-    final loaded = <InspectionModel>[];
-    for (final requestId in requestIds) {
-      final id = int.tryParse(requestId);
-      if (id == null || id <= 0) continue;
-      final inspection = await _inspectionRepo.getInspectionByRequest(id);
-      if (inspection != null) loaded.add(inspection);
-    }
-    _customerInspections = loaded;
-    notifyListeners();
-  }
-
-  Future<InspectionModel?> loadInspectionForRequest(String requestId) async {
-    final id = int.tryParse(requestId);
-    if (id == null || id <= 0) return null;
-    final inspection = await _inspectionRepo.getInspectionByRequest(id);
-    if (inspection != null) {
-      _upsertInspection(inspection);
-      notifyListeners();
-    }
-    return inspection;
-  }
-
-  Future<InspectionModel?> loadInspection(String inspectionId) async {
-    final id = int.tryParse(inspectionId);
-    if (id == null || id <= 0) return null;
-    final inspection = await _inspectionRepo.getInspection(id);
-    if (inspection != null) {
-      _upsertInspection(inspection);
-      notifyListeners();
-    }
-    return inspection;
-  }
-
-  Future<InspectionModel> createInspection({required int serviceRequestId, required DateTime scheduledAt}) async {
-    final inspection = await _inspectionRepo.createInspection(serviceRequestId: serviceRequestId, scheduledAt: scheduledAt);
-    _upsertInspection(inspection);
-    notifyListeners();
-    return inspection;
-  }
-
-  Future<InspectionModel> scheduleInspection(String inspectionId, DateTime scheduledAt) async {
-    final id = int.tryParse(inspectionId);
-    if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح');
-    final inspection = await _inspectionRepo.scheduleInspection(id, scheduledAt);
-    _upsertInspection(inspection);
-    notifyListeners();
-    return inspection;
-  }
-
-  Future<InspectionModel> startInspection(String inspectionId) async {
-    final id = int.tryParse(inspectionId);
-    if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح');
-    final inspection = await _inspectionRepo.startInspection(id);
-    _upsertInspection(inspection);
-    notifyListeners();
-    return inspection;
-  }
-
-  Future<InspectionModel> completeInspection(String inspectionId, String findings) async {
-    final id = int.tryParse(inspectionId);
-    if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح');
-    final inspection = await _inspectionRepo.completeInspection(id, findings);
-    _upsertInspection(inspection);
-    notifyListeners();
-    return inspection;
-  }
-
-  Future<InspectionModel> cancelInspection(String inspectionId) async {
-    final id = int.tryParse(inspectionId);
-    if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح');
-    final inspection = await _inspectionRepo.cancelInspection(id);
-    _upsertInspection(inspection);
-    notifyListeners();
-    return inspection;
-  }
-
-  Future<InspectionModel> noShowInspection(String inspectionId) async {
-    final id = int.tryParse(inspectionId);
-    if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح');
-    final inspection = await _inspectionRepo.noShowInspection(id);
-    _upsertInspection(inspection);
-    notifyListeners();
-    return inspection;
-  }
-
-  Future<List<ServiceQuoteModel>> loadServiceQuotes(int inspectionId) async {
-    _serviceQuotes = await _serviceQuoteRepo.getQuotesByInspection(inspectionId);
-    notifyListeners();
-    return _serviceQuotes;
-  }
-
-  Future<ServiceQuoteModel> createServiceQuote({required int inspectionId, required double amount, String? notes, DateTime? expiresAt}) async {
-    final quote = await _serviceQuoteRepo.createQuote(inspectionId: inspectionId, amount: amount, notes: notes, expiresAt: expiresAt);
-    _upsertQuote(quote);
-    notifyListeners();
-    return quote;
-  }
-
-  Future<ServiceQuoteModel> createQuoteRevision({required int quoteId, required double amount, String? notes, DateTime? expiresAt}) async {
-    final quote = await _serviceQuoteRepo.createRevision(quoteId: quoteId, amount: amount, notes: notes, expiresAt: expiresAt);
-    _upsertQuote(quote);
-    notifyListeners();
-    return quote;
-  }
-
-  Future<void> acceptServiceQuote(String quoteId, String inspectionId) async {
-    final id = int.tryParse(quoteId);
-    final inspectionValue = int.tryParse(inspectionId);
-    if (id == null || id <= 0) throw Exception('معرف عرض السعر غير صالح');
-    if (inspectionValue == null || inspectionValue <= 0) throw Exception('معرف المعاينة غير صالح');
-    await _serviceQuoteRepo.acceptQuote(id);
-    _serviceQuotes = await _serviceQuoteRepo.getQuotesByInspection(inspectionValue);
-    if (_currentUser != null && isCustomer) {
-      _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id);
-      _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses);
-    }
-    notifyListeners();
-  }
-
-  Future<void> rejectServiceQuote(String quoteId, String inspectionId) async {
-    final id = int.tryParse(quoteId);
-    final inspectionValue = int.tryParse(inspectionId);
-    if (id == null || id <= 0) throw Exception('معرف عرض السعر غير صالح');
-    if (inspectionValue == null || inspectionValue <= 0) throw Exception('معرف المعاينة غير صالح');
-    await _serviceQuoteRepo.rejectQuote(id);
-    _serviceQuotes = await _serviceQuoteRepo.getQuotesByInspection(inspectionValue);
-    notifyListeners();
-  }
+  Future<void> loadTechnicianInspections() async { if (!isTechnician) return; _technicianInspections = await _inspectionRepo.getMyInspections(); notifyListeners(); }
+  Future<void> loadCustomerInspections(Iterable<String> requestIds) async { if (!isCustomer) return; final loaded = <InspectionModel>[]; for (final requestId in requestIds) { final id = int.tryParse(requestId); if (id == null || id <= 0) continue; final inspection = await _inspectionRepo.getInspectionByRequest(id); if (inspection != null) loaded.add(inspection); } _customerInspections = loaded; notifyListeners(); }
+  Future<InspectionModel?> loadInspectionForRequest(String requestId) async { final id = int.tryParse(requestId); if (id == null || id <= 0) return null; final inspection = await _inspectionRepo.getInspectionByRequest(id); if (inspection != null) { _upsertInspection(inspection); notifyListeners(); } return inspection; }
+  Future<InspectionModel?> loadInspection(String inspectionId) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) return null; final inspection = await _inspectionRepo.getInspection(id); if (inspection != null) { _upsertInspection(inspection); notifyListeners(); } return inspection; }
+  Future<InspectionModel> createInspection({required int serviceRequestId, required DateTime scheduledAt}) async { final inspection = await _inspectionRepo.createInspection(serviceRequestId: serviceRequestId, scheduledAt: scheduledAt); _upsertInspection(inspection); notifyListeners(); return inspection; }
+  Future<InspectionModel> scheduleInspection(String inspectionId, DateTime scheduledAt) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح'); final inspection = await _inspectionRepo.scheduleInspection(id, scheduledAt); _upsertInspection(inspection); notifyListeners(); return inspection; }
+  Future<InspectionModel> startInspection(String inspectionId) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح'); final inspection = await _inspectionRepo.startInspection(id); _upsertInspection(inspection); notifyListeners(); return inspection; }
+  Future<InspectionModel> completeInspection(String inspectionId, String findings) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح'); final inspection = await _inspectionRepo.completeInspection(id, findings); _upsertInspection(inspection); notifyListeners(); return inspection; }
+  Future<InspectionModel> cancelInspection(String inspectionId) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح'); final inspection = await _inspectionRepo.cancelInspection(id); _upsertInspection(inspection); notifyListeners(); return inspection; }
+  Future<InspectionModel> noShowInspection(String inspectionId) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح'); final inspection = await _inspectionRepo.noShowInspection(id); _upsertInspection(inspection); notifyListeners(); return inspection; }
+  Future<List<ServiceQuoteModel>> loadServiceQuotes(int inspectionId) async { _serviceQuotes = await _serviceQuoteRepo.getQuotesByInspection(inspectionId); notifyListeners(); return _serviceQuotes; }
+  Future<ServiceQuoteModel> createServiceQuote({required int inspectionId, required double amount, String? notes, DateTime? expiresAt}) async { final quote = await _serviceQuoteRepo.createQuote(inspectionId: inspectionId, amount: amount, notes: notes, expiresAt: expiresAt); _upsertQuote(quote); notifyListeners(); return quote; }
+  Future<ServiceQuoteModel> createQuoteRevision({required int quoteId, required double amount, String? notes, DateTime? expiresAt}) async { final quote = await _serviceQuoteRepo.createRevision(quoteId: quoteId, amount: amount, notes: notes, expiresAt: expiresAt); _upsertQuote(quote); notifyListeners(); return quote; }
+  Future<void> acceptServiceQuote(String quoteId, String inspectionId) async { final id = int.tryParse(quoteId); final inspectionValue = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف عرض السعر غير صالح'); if (inspectionValue == null || inspectionValue <= 0) throw Exception('معرف المعاينة غير صالح'); await _serviceQuoteRepo.acceptQuote(id); _serviceQuotes = await _serviceQuoteRepo.getQuotesByInspection(inspectionValue); if (_currentUser != null && isCustomer) { _bookings = await _bookingRepo.getBookingsByCustomer(_currentUser!.id); _customerRequests = _enrichRequests(await _requestRepo.getRequestsByCustomer(_currentUser!.id), addresses: _savedAddresses); } notifyListeners(); }
+  Future<void> rejectServiceQuote(String quoteId, String inspectionId) async { final id = int.tryParse(quoteId); final inspectionValue = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف عرض السعر غير صالح'); if (inspectionValue == null || inspectionValue <= 0) throw Exception('معرف المعاينة غير صالح'); await _serviceQuoteRepo.rejectQuote(id); _serviceQuotes = await _serviceQuoteRepo.getQuotesByInspection(inspectionValue); notifyListeners(); }
 }
