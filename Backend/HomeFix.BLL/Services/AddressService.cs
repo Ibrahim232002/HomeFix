@@ -24,6 +24,9 @@ public class AddressService : IAddressService
     public Task<List<Address>> GetByCustomerIdAsync(int customerId)
         => _repository.GetByCustomerIdAsync(customerId);
 
+    public Task<bool> HasServiceRequestsAsync(int addressId)
+        => _repository.HasServiceRequestsAsync(addressId);
+
     public async Task AddAsync(Address address)
         {
         await _repository.AddAsync(address);
