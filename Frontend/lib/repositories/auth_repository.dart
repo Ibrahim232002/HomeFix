@@ -2,12 +2,14 @@ import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../core/storage/token_storage.dart';
 import '../models/api_dtos.dart';
+import '../models/user_model.dart';
 
 abstract class IAuthRepository {
   Future<dynamic> register(RegisterRequest request);
   Future<AuthResponseDto> login(LoginRequest request);
   Future<void> logout();
   Future<bool> refreshToken();
+  Future<UserModel?> restoreSession();
   Future<dynamic> getCurrentUser();
 }
 
@@ -35,7 +37,7 @@ class AuthRepository implements IAuthRepository {
 
     if (response is Map<String, dynamic>) {
       final authDto = AuthResponseDto.fromJson(response);
-      _tokenStorage.saveTokens(
+      await _tokenStorage.saveTokens(
         accessToken: authDto.accessToken,
         refreshToken: authDto.refreshToken,
         userId: authDto.userId,
@@ -58,10 +60,10 @@ class AuthRepository implements IAuthRepository {
           body: RefreshTokenRequest(refreshToken: refreshToken).toJson(),
         );
       } catch (_) {
-        // Silently clear local session on logout error
+        // Local session is cleared even if the server-side revoke fails.
       }
     }
-    _tokenStorage.clear();
+    await _tokenStorage.clear();
   }
 
   @override
@@ -80,7 +82,7 @@ class AuthRepository implements IAuthRepository {
         final accessToken = response['accessToken'] ?? response['token'];
         final newRefreshToken = response['refreshToken'];
         if (accessToken != null && newRefreshToken != null) {
-          _tokenStorage.updateTokens(
+          await _tokenStorage.updateTokens(
             accessToken: accessToken.toString(),
             refreshToken: newRefreshToken.toString(),
           );
@@ -94,8 +96,62 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
+  Future<UserModel?> restoreSession() async {
+    await _tokenStorage.restore();
+    if (!_tokenStorage.hasRefreshToken) {
+      await _tokenStorage.clear();
+      return null;
+    }
+
+    final refreshed = await refreshToken();
+    if (!refreshed) {
+      await _tokenStorage.clear();
+      return null;
+    }
+
+    try {
+      final response = await getCurrentUser();
+      if (response is! Map<String, dynamic>) {
+        await _tokenStorage.clear();
+        return null;
+      }
+
+      final userId = int.tryParse(response['userId']?.toString() ?? '');
+      final roleValue = response['role']?.toString();
+      if (userId == null || userId <= 0 || roleValue == null || roleValue.isEmpty) {
+        await _tokenStorage.clear();
+        return null;
+      }
+
+      final fullName = response['name']?.toString() ?? _tokenStorage.userFullName ?? 'المستخدم';
+      final email = response['email']?.toString() ?? _tokenStorage.userEmail ?? '';
+      final role = UserRole.fromString(roleValue);
+
+      await _tokenStorage.saveTokens(
+        accessToken: _tokenStorage.accessToken!,
+        refreshToken: _tokenStorage.refreshToken,
+        userId: userId,
+        userRole: role.nameStr,
+        userEmail: email,
+        userFullName: fullName,
+      );
+
+      return UserModel(
+        id: userId.toString(),
+        fullName: fullName,
+        email: email,
+        phoneNumber: '',
+        role: role,
+        createdAt: '',
+      );
+    } catch (_) {
+      await _tokenStorage.clear();
+      return null;
+    }
+  }
+
+  @override
   Future<dynamic> getCurrentUser() async {
-    final response = await _client.get(ApiConstants.me);
-    return response;
+    return _client.get(ApiConstants.me);
   }
 }
