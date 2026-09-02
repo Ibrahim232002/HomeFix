@@ -27,6 +27,13 @@ public class AddressRepository
             .ToListAsync();
     }
 
+    public Task<bool> HasServiceRequestsAsync(int addressId)
+    {
+        return _context.ServiceRequests
+            .AsNoTracking()
+            .AnyAsync(r => r.AddressId == addressId);
+    }
+
     public async Task AddAsync(Address address)
     {
         await _context.Addresses.AddAsync(address);
