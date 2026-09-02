@@ -72,6 +72,9 @@ public class PaymentsController : ControllerBase
         if (serviceRequest?.Booking is null)
             return BadRequest(new { message = "A confirmed booking is required before payment." });
 
+        if (!string.Equals(serviceRequest.Booking.Status, "Confirmed", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "A confirmed booking is required before payment." });
+
         var expectedAmount = serviceRequest.Booking.FinalPrice ?? serviceRequest.Booking.AgreedPrice;
         if (!expectedAmount.HasValue || expectedAmount.Value <= 0 || expectedAmount.Value != request.Amount)
             return BadRequest(new { message = "Payment amount must match the booking amount." });

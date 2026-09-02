@@ -43,6 +43,9 @@ public class PaymentService : IPaymentService
         if (request.Booking is null)
             return (false, "A confirmed booking is required before payment.", null);
 
+        if (!string.Equals(request.Booking.Status, "Confirmed", StringComparison.OrdinalIgnoreCase))
+            return (false, "A confirmed booking is required before payment.", null);
+
         var amount = request.Booking.FinalPrice ?? request.Booking.AgreedPrice;
         if (!amount.HasValue || amount.Value <= 0)
             return (false, "The booking does not have a valid agreed price.", null);
