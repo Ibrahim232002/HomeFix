@@ -97,19 +97,19 @@ class AuthRepository implements IAuthRepository {
 
   @override
   Future<UserModel?> restoreSession() async {
-    await _tokenStorage.restore();
-    if (!_tokenStorage.hasRefreshToken) {
-      await _tokenStorage.clear();
-      return null;
-    }
-
-    final refreshed = await refreshToken();
-    if (!refreshed) {
-      await _tokenStorage.clear();
-      return null;
-    }
-
     try {
+      await _tokenStorage.restore();
+      if (!_tokenStorage.hasRefreshToken) {
+        await _tokenStorage.clear();
+        return null;
+      }
+
+      final refreshed = await refreshToken();
+      if (!refreshed) {
+        await _tokenStorage.clear();
+        return null;
+      }
+
       final response = await getCurrentUser();
       if (response is! Map<String, dynamic>) {
         await _tokenStorage.clear();
@@ -145,7 +145,11 @@ class AuthRepository implements IAuthRepository {
         createdAt: '',
       );
     } catch (_) {
-      await _tokenStorage.clear();
+      try {
+        await _tokenStorage.clear();
+      } catch (_) {
+        // Best-effort cleanup if secure storage itself is unavailable.
+      }
       return null;
     }
   }
