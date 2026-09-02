@@ -107,9 +107,66 @@ public class PayoutService : IPayoutService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task UpdateAsync(Payout payout)
+    public async Task<Payout?> UpdateAsync(
+        int payoutId,
+        string status,
+        string? transactionReference,
+        DateTime? completedAt)
     {
-        await _repository.UpdateAsync(payout);
-        await _unitOfWork.SaveChangesAsync();
+        await using var dbTransaction = await _unitOfWork.BeginTransactionAsync(
+            IsolationLevel.Serializable);
+
+        try
+        {
+            var payout = await _repository.GetByIdAsync(payoutId);
+            if (payout is null)
+            {
+                await dbTransaction.RollbackAsync();
+                return null;
+            }
+
+            var previousStatus = payout.Status;
+            var normalizedStatus = status.Trim();
+            var shouldRefund = string.Equals(previousStatus, "Pending", StringComparison.OrdinalIgnoreCase)
+                && (string.Equals(normalizedStatus, "Failed", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(normalizedStatus, "Cancelled", StringComparison.OrdinalIgnoreCase));
+
+            if (shouldRefund)
+            {
+                var wallet = await _walletRepository.GetByTechnicianIdAsync(payout.TechnicianId);
+                if (wallet is null)
+                    throw new InvalidOperationException("Technician wallet not found.");
+
+                var before = wallet.Balance;
+                wallet.Balance += payout.Amount;
+                wallet.UpdatedAt = DateTime.UtcNow;
+
+                var refundTransaction = new WalletTransaction
+                {
+                    WalletId = wallet.Id,
+                    Amount = payout.Amount,
+                    BalanceBefore = before,
+                    BalanceAfter = wallet.Balance,
+                    TransactionType = "PayoutRefund",
+                    Description = $"Payout #{payout.Id} {normalizedStatus.ToLowerInvariant()}; funds refunded.",
+                    CreatedAt = wallet.UpdatedAt
+                };
+
+                await _transactionRepository.AddAsync(refundTransaction);
+            }
+
+            payout.Status = normalizedStatus;
+            payout.TransactionReference = transactionReference;
+            payout.CompletedAt = completedAt;
+
+            await _unitOfWork.SaveChangesAsync();
+            await dbTransaction.CommitAsync();
+            return payout;
+        }
+        catch
+        {
+            await dbTransaction.RollbackAsync();
+            throw;
+        }
     }
 }
