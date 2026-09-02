@@ -8,5 +8,5 @@ public interface IPayoutService
     Task<List<Payout>> GetByTechnicianIdAsync(int technicianId);
     Task<(bool Success, string? Error, Payout? Payout)> RequestAsync(int userId, decimal amount, string paymentMethod);
     Task AddAsync(Payout payout);
-    Task UpdateAsync(Payout payout);
+    Task<Payout?> UpdateAsync(int payoutId, string status, string? transactionReference, DateTime? completedAt);
 }
