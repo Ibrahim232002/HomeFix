@@ -104,6 +104,24 @@ public class AddressesController : ControllerBase
             });
         }
 
+        var locationChanged =
+            !string.Equals(address.FullAddress, request.FullAddress, StringComparison.Ordinal) ||
+            address.Latitude != request.Latitude ||
+            address.Longitude != request.Longitude ||
+            !string.Equals(address.BuildingNumber, request.BuildingNumber, StringComparison.Ordinal) ||
+            !string.Equals(address.FloorNumber, request.FloorNumber, StringComparison.Ordinal) ||
+            !string.Equals(address.ApartmentNumber, request.ApartmentNumber, StringComparison.Ordinal) ||
+            address.GovernorateId != request.GovernorateId ||
+            address.CityId != request.CityId;
+
+        if (locationChanged && await _addressService.HasServiceRequestsAsync(id))
+        {
+            return Conflict(new
+            {
+                message = "This address location is locked because it has been used by a service request."
+            });
+        }
+
         address.Label = request.Label;
         address.FullAddress = request.FullAddress;
         address.Latitude = request.Latitude;
