@@ -1,0 +1,123 @@
+name: Temporary EF Payment Migration
+
+on:
+  push:
+    branches:
+      - temp-payment-ef-generation
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: 8.0.x
+
+jobs:
+  generate:
+    if: github.event.head_commit.message == 'stage payment concurrency fix'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: |
+          dotnet restore Backend/HomeFix.API/HomeFix.API.csproj
+          dotnet restore Backend/HomeFix.Tests/HomeFix.Tests.csproj
+
+      - name: Build API
+        run: dotnet build Backend/HomeFix.API/HomeFix.API.csproj --configuration Release --no-restore
+
+      - name: Build tests
+        run: dotnet build Backend/HomeFix.Tests/HomeFix.Tests.csproj --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test Backend/HomeFix.Tests/HomeFix.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Inject active payment index into model
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('Backend/HomeFix.DAL/Data/HomeFixDbContext.cs')
+          text = path.read_text(encoding='utf-8-sig')
+          marker = '''            entity.Property(e => e.TransactionReference).HasMaxLength(200);\n\n            entity.HasOne(d => d.ServiceRequest).WithMany(p => p.Payments)'''
+          replacement = '''            entity.Property(e => e.TransactionReference).HasMaxLength(200);\n\n            entity.HasIndex(e => e.ServiceRequestId)\n                .HasDatabaseName("UX_Payments_Active_ServiceRequestId")\n                .IsUnique()\n                .HasFilter("[Status] IN ('Pending', 'Paid')");\n\n            entity.HasOne(d => d.ServiceRequest).WithMany(p => p.Payments)'''
+          if marker not in text:
+              raise SystemExit('Payment mapping insertion point not found')
+          path.write_text(text.replace(marker, replacement, 1), encoding='utf-8')
+          PY
+
+      - name: Seed temporary paid-only snapshot baseline
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('Backend/HomeFix.DAL/Data/HomeFixDbContext.cs')
+          text = path.read_text(encoding='utf-8-sig')
+          active = '''            entity.HasIndex(e => e.ServiceRequestId)\n                .HasDatabaseName("UX_Payments_Active_ServiceRequestId")\n                .IsUnique()\n                .HasFilter("[Status] IN ('Pending', 'Paid')");'''
+          old = '''            entity.HasIndex(e => e.ServiceRequestId)\n                .HasDatabaseName("UX_Payments_Paid_ServiceRequestId")\n                .IsUnique()\n                .HasFilter("[Status] = 'Paid'");'''
+          if active not in text:
+              raise SystemExit('Active payment index mapping not found')
+          path.write_text(text.replace(active, old, 1), encoding='utf-8')
+          PY
+          dotnet ef migrations add __PaymentIndexBaseline \
+            --project Backend/HomeFix.DAL/HomeFix.DAL.csproj \
+            --startup-project Backend/HomeFix.API/HomeFix.API.csproj
+
+      - name: Restore active payment model and generate final migration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('Backend/HomeFix.DAL/Data/HomeFixDbContext.cs')
+          text = path.read_text(encoding='utf-8-sig')
+          old = '''            entity.HasIndex(e => e.ServiceRequestId)\n                .HasDatabaseName("UX_Payments_Paid_ServiceRequestId")\n                .IsUnique()\n                .HasFilter("[Status] = 'Paid'");'''
+          active = '''            entity.HasIndex(e => e.ServiceRequestId)\n                .HasDatabaseName("UX_Payments_Active_ServiceRequestId")\n                .IsUnique()\n                .HasFilter("[Status] IN ('Pending', 'Paid')");'''
+          if old not in text:
+              raise SystemExit('Temporary paid-only mapping not found')
+          path.write_text(text.replace(old, active, 1), encoding='utf-8')
+          PY
+          dotnet ef migrations add PreventConcurrentActivePayments \
+            --project Backend/HomeFix.DAL/HomeFix.DAL.csproj \
+            --startup-project Backend/HomeFix.API/HomeFix.API.csproj
+
+      - name: Remove temporary baseline artifacts
+        shell: bash
+        run: |
+          rm -f Backend/HomeFix.DAL/Migrations/*__PaymentIndexBaseline.cs
+          rm -f Backend/HomeFix.DAL/Migrations/*__PaymentIndexBaseline.Designer.cs
+
+      - name: Verify generated migration
+        shell: bash
+        run: |
+          MIGRATION=$(find Backend/HomeFix.DAL/Migrations -maxdepth 1 -type f -name '*_PreventConcurrentActivePayments.cs' | head -n 1)
+          DESIGNER=$(find Backend/HomeFix.DAL/Migrations -maxdepth 1 -type f -name '*_PreventConcurrentActivePayments.Designer.cs' | head -n 1)
+          test -n "$MIGRATION"
+          test -n "$DESIGNER"
+          grep -q 'UX_Payments_Paid_ServiceRequestId' "$MIGRATION"
+          grep -q 'UX_Payments_Active_ServiceRequestId' "$MIGRATION"
+          grep -q 'Status.*Pending.*Paid' "$MIGRATION"
+          dotnet ef migrations has-pending-model-changes \
+            --project Backend/HomeFix.DAL/HomeFix.DAL.csproj \
+            --startup-project Backend/HomeFix.API/HomeFix.API.csproj
+          dotnet ef migrations list \
+            --project Backend/HomeFix.DAL/HomeFix.DAL.csproj \
+            --startup-project Backend/HomeFix.API/HomeFix.API.csproj
+
+      - name: Commit and push generated migration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Backend/HomeFix.DAL/Data/HomeFixDbContext.cs \
+                  Backend/HomeFix.API/Controllers/PaymentsController.cs \
+                  Backend/HomeFix.DAL/Migrations
+          git commit -m 'fix: prevent concurrent duplicate payments'
+          git push origin HEAD:temp-payment-ef-generation
