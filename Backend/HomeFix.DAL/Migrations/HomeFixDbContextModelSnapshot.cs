@@ -582,7 +582,10 @@ namespace HomeFix.DAL.Migrations
                     b.HasKey("Id")
                         .HasName("PK__Payments__3214EC07E975531E");
 
-                    b.HasIndex("ServiceRequestId");
+                    b.HasIndex("ServiceRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Payments_Active_ServiceRequestId")
+                        .HasFilter("[Status] IN ('Pending', 'Paid')");
 
                     b.ToTable("Payments");
                 });

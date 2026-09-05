@@ -5,6 +5,7 @@ using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 
 namespace HomeFix.API.Controllers;
 
@@ -98,7 +99,7 @@ public class PaymentsController : ControllerBase
         {
             await _service.AddAsync(payment);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsActivePaymentUniqueViolation(ex))
         {
             return Conflict(new { message = "An active payment already exists for this service request." });
         }
@@ -157,7 +158,7 @@ public class PaymentsController : ControllerBase
         {
             await _service.UpdateAsync(payment);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsActivePaymentUniqueViolation(ex))
         {
             return Conflict(new { message = "Another active payment already exists for this service request." });
         }
@@ -200,4 +201,21 @@ public class PaymentsController : ControllerBase
 
     private bool TryGetUserId(out int userId)
         => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
+
+    private static bool IsActivePaymentUniqueViolation(DbUpdateException exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SqlException sqlException &&
+                (sqlException.Number == 2601 || sqlException.Number == 2627) &&
+                sqlException.Message.Contains(
+                    "UX_Payments_Active_ServiceRequestId",
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

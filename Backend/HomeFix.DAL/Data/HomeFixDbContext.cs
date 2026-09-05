@@ -289,6 +289,10 @@ public partial class HomeFixDbContext : DbContext
                 .HasMaxLength(30)
                 .HasDefaultValue("Pending");
             entity.Property(e => e.TransactionReference).HasMaxLength(200);
+            entity.HasIndex(e => e.ServiceRequestId)
+                .HasDatabaseName("UX_Payments_Active_ServiceRequestId")
+                .IsUnique()
+                .HasFilter("[Status] IN ('Pending', 'Paid')");
 
             entity.HasOne(d => d.ServiceRequest).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.ServiceRequestId)
