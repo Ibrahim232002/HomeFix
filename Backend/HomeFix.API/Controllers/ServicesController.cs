@@ -29,7 +29,7 @@ public class ServicesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ServiceDto>> GetById(int id)
     {
-        var service = await _serviceService.GetServiceByIdAsync(id);
+        var service = await _serviceService.GetActiveServiceByIdAsync(id);
 
         if (service == null)
             return NotFound();
