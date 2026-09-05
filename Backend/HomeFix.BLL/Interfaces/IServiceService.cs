@@ -8,5 +8,7 @@ public interface IServiceService
 
     Task<Service?> GetServiceByIdAsync(int id);
 
+    Task<Service?> GetActiveServiceByIdAsync(int id);
+
     Task<List<Service>> GetActiveServicesByCategoryAsync(int categoryId);
 }
