@@ -49,6 +49,42 @@ public class ServiceCatalogTests
     }
 
     [Fact]
+    public async Task GetAll_ReturnsOnlyActiveServices()
+    {
+        await using var context = CreateContext();
+        context.Services.AddRange(
+            new Service { Id = 1, Name = "Active service", IsActive = true },
+            new Service { Id = 2, Name = "Inactive service", IsActive = false });
+        await context.SaveChangesAsync();
+
+        var repository = new ServiceRepository(context);
+
+        var result = await repository.GetAllAsync();
+
+        var service = Assert.Single(result);
+        Assert.Equal(1, service.Id);
+        Assert.True(service.IsActive);
+    }
+
+    [Fact]
+    public async Task GetActiveByCategory_ReturnsOnlyActiveServicesInCategory()
+    {
+        await using var context = CreateContext();
+        context.Services.AddRange(
+            new Service { Id = 1, Name = "Active service", IsActive = true },
+            new Service { Id = 2, Name = "Inactive service", IsActive = false });
+        await context.SaveChangesAsync();
+
+        var repository = new ServiceRepository(context);
+
+        var result = await repository.GetActiveByCategoryAsync(1);
+
+        var service = Assert.Single(result);
+        Assert.Equal(1, service.Id);
+        Assert.True(service.IsActive);
+    }
+
+    [Fact]
     public async Task PublicGetById_ReturnsOkForActiveService()
     {
         var service = new Service { Id = 1, Name = "Active service", IsActive = true };
