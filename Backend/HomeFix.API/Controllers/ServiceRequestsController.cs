@@ -119,18 +119,22 @@ public class ServiceRequestsController : ControllerBase
     [Authorize(Roles = "Customer")]
     public async Task<IActionResult> Cancel(int id)
     {
-        var serviceRequest = await _service.GetByIdAsync(id);
-        if (serviceRequest == null) return NotFound();
         if (!TryGetUserId(out var userId)) return Unauthorized();
         var profile = await _customerProfiles.GetByUserIdAsync(userId);
-        if (profile == null || serviceRequest.CustomerId != profile.Id) return Forbid();
-        if (serviceRequest.Status != "Open")
-            return BadRequest(new { message = "Only an open request can be cancelled." });
+        if (profile == null) return NotFound(new { message = "Customer profile not found." });
 
-        serviceRequest.Status = "Cancelled";
-        serviceRequest.UpdatedAt = DateTime.UtcNow;
-        await _service.UpdateAsync(serviceRequest);
-        return Ok(MapToDto(serviceRequest));
+        var result = await _service.CancelAsync(id, profile.Id);
+        if (!result.Success)
+        {
+            return result.Error switch
+            {
+                "Service request not found." => NotFound(),
+                "You are not allowed to cancel this request." => Forbid(),
+                _ => BadRequest(new { message = result.Error })
+            };
+        }
+
+        return Ok(MapToDto(result.Request!));
     }
 
     [HttpPut("{id:int}")]

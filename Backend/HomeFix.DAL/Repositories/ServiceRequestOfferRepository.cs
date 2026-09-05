@@ -12,6 +12,13 @@ public class ServiceRequestOfferRepository
     public Task<ServiceRequestOffer?> GetByIdAsync(int id) =>
         _context.ServiceRequestOffers.Include(x => x.ServiceRequest).ThenInclude(r => r.Customer).Include(x => x.ServiceRequest).ThenInclude(r => r.Service).Include(x => x.Technician).FirstOrDefaultAsync(x => x.Id == id);
 
+    public Task<int?> GetServiceRequestIdByOfferIdAsync(int offerId) =>
+        _context.ServiceRequestOffers
+            .AsNoTracking()
+            .Where(x => x.Id == offerId)
+            .Select(x => (int?)x.ServiceRequestId)
+            .FirstOrDefaultAsync();
+
     public Task<List<ServiceRequestOffer>> GetByRequestIdAsync(int requestId) =>
         _context.ServiceRequestOffers
             .Include(x => x.ServiceRequest)

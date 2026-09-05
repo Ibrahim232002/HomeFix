@@ -2,6 +2,8 @@ using HomeFix.DAL;
 using HomeFix.BLL.Interfaces;
 using HomeFix.DAL.Entities;
 using HomeFix.DAL.Repositories;
+using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace HomeFix.BLL.Services;
 
@@ -50,5 +52,47 @@ public class ServiceRequestService : IServiceRequestService
     {
         await _serviceRequestRepository.UpdateAsync(request);
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<(bool Success, string? Error, ServiceRequest? Request)> CancelAsync(int requestId, int customerProfileId)
+    {
+        await using var tx = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            var request = await _serviceRequestRepository.GetByIdAsync(requestId);
+            if (request == null)
+            {
+                await tx.RollbackAsync();
+                return (false, "Service request not found.", null);
+            }
+
+            if (request.CustomerId != customerProfileId)
+            {
+                await tx.RollbackAsync();
+                return (false, "You are not allowed to cancel this request.", null);
+            }
+
+            if (request.Status != "Open")
+            {
+                await tx.RollbackAsync();
+                return (false, "Only an open request can be cancelled.", null);
+            }
+
+            request.Status = "Cancelled";
+            request.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+            await tx.CommitAsync();
+            return (true, null, request);
+        }
+        catch (DbUpdateException)
+        {
+            await tx.RollbackAsync();
+            return (false, "The request could not be cancelled because it was updated concurrently. Please retry.", null);
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 }

@@ -14,4 +14,6 @@ public interface IServiceRequestService
     Task CreateAsync(ServiceRequest request);
 
     Task UpdateAsync(ServiceRequest request);
+
+    Task<(bool Success, string? Error, ServiceRequest? Request)> CancelAsync(int requestId, int customerProfileId);
 }

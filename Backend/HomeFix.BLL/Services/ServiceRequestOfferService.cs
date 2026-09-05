@@ -50,8 +50,6 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
                 return (false, "Technician is not eligible for this request.", null);
             }
 
-            // Re-check inside the serialized transaction so concurrent submissions
-            // cannot create duplicate pending offers for the same technician/request pair.
             if (await _offerRepository.ExistsForTechnicianAsync(requestId, technicianId))
             {
                 await tx.RollbackAsync();
@@ -90,18 +88,54 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
 
     public async Task<(bool Success, string? Error)> AcceptAsync(int offerId, int customerUserId)
     {
-        var offer = await _offerRepository.GetByIdAsync(offerId);
-        if (offer == null) return (false, "Offer not found.");
-        if (offer.ServiceRequest.Customer.UserId != customerUserId) return (false, "You are not allowed to accept this offer.");
-        if (offer.Status != "Pending") return (false, "Offer is no longer available.");
-        if (offer.ExpiresAt.HasValue && offer.ExpiresAt <= DateTime.UtcNow) return (false, "Offer has expired.");
+        var requestId = await _offerRepository.GetServiceRequestIdByOfferIdAsync(offerId);
+        if (!requestId.HasValue) return (false, "Offer not found.");
 
         await using var tx = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
         try
         {
-            var request = offer.ServiceRequest;
-            var pricingMode = request.Service.PricingMode;
+            // Lock and re-read the ServiceRequest first. Cancellation and offer operations
+            // all acquire this request lock before touching the offer/booking, so they serialize
+            // on the same business boundary and never create a booking from a cancelled request.
+            var request = await _requestRepository.GetByIdAsync(requestId.Value);
+            if (request == null)
+            {
+                await tx.RollbackAsync();
+                return (false, "Service request not found.");
+            }
 
+            if (request.Status is not ("Pending" or "Open" or "OfferPending"))
+            {
+                await tx.RollbackAsync();
+                return (false, "This request is no longer accepting offers.");
+            }
+
+            var currentOffer = await _offerRepository.GetByIdAsync(offerId);
+            if (currentOffer == null || currentOffer.ServiceRequestId != request.Id)
+            {
+                await tx.RollbackAsync();
+                return (false, "Offer not found.");
+            }
+
+            if (request.Customer.UserId != customerUserId)
+            {
+                await tx.RollbackAsync();
+                return (false, "You are not allowed to accept this offer.");
+            }
+
+            if (currentOffer.Status != "Pending")
+            {
+                await tx.RollbackAsync();
+                return (false, "Offer is no longer available.");
+            }
+
+            if (currentOffer.ExpiresAt.HasValue && currentOffer.ExpiresAt <= DateTime.UtcNow)
+            {
+                await tx.RollbackAsync();
+                return (false, "Offer has expired.");
+            }
+
+            var pricingMode = request.Service.PricingMode;
             var existingBooking = await _bookingRepository.GetByRequestIdAsync(request.Id);
             if (existingBooking != null)
             {
@@ -109,22 +143,6 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
                 return (false, "This request already has a booking.");
             }
 
-            // Re-read the offer inside the serialized transaction so concurrent acceptance
-            // cannot leave more than one accepted offer/booking for the same request.
-            var currentOffer = await _offerRepository.GetByIdAsync(offerId);
-            if (currentOffer == null || currentOffer.Status != "Pending")
-            {
-                await tx.RollbackAsync();
-                return (false, "Offer is no longer available.");
-            }
-            if (currentOffer.ExpiresAt.HasValue && currentOffer.ExpiresAt <= DateTime.UtcNow)
-            {
-                await tx.RollbackAsync();
-                return (false, "Offer has expired.");
-            }
-
-            // Inspection requests select a technician at offer acceptance time but do not
-            // create a Booking until the completed inspection quote is accepted.
             if (pricingMode == PricingMode.Inspection)
             {
                 var acceptedOffer = (await _offerRepository.GetByRequestIdAsync(currentOffer.ServiceRequestId))
@@ -145,8 +163,8 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
                 other.RespondedAt = DateTime.UtcNow;
             }
 
-            currentOffer.ServiceRequest.Status = "Accepted";
-            currentOffer.ServiceRequest.UpdatedAt = DateTime.UtcNow;
+            request.Status = "Accepted";
+            request.UpdatedAt = DateTime.UtcNow;
 
             if (pricingMode != PricingMode.Inspection)
             {
@@ -170,16 +188,62 @@ public class ServiceRequestOfferService : IServiceRequestOfferService
             await tx.RollbackAsync();
             return (false, "The offer could not be accepted because the request was updated concurrently. Please retry.");
         }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<(bool Success, string? Error)> RejectAsync(int offerId, int customerUserId)
     {
-        var offer = await _offerRepository.GetByIdAsync(offerId);
-        if (offer == null) return (false, "Offer not found.");
-        if (offer.ServiceRequest.Customer.UserId != customerUserId) return (false, "You are not allowed to reject this offer.");
-        if (offer.Status != "Pending") return (false, "Offer is no longer pending.");
-        offer.Status = "Rejected"; offer.RespondedAt = DateTime.UtcNow;
-        await _unitOfWork.SaveChangesAsync();
-        return (true, null);
+        var requestId = await _offerRepository.GetServiceRequestIdByOfferIdAsync(offerId);
+        if (!requestId.HasValue) return (false, "Offer not found.");
+
+        await using var tx = await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            var request = await _requestRepository.GetByIdAsync(requestId.Value);
+            if (request == null)
+            {
+                await tx.RollbackAsync();
+                return (false, "Service request not found.");
+            }
+
+            var offer = await _offerRepository.GetByIdAsync(offerId);
+            if (offer == null || offer.ServiceRequestId != request.Id)
+            {
+                await tx.RollbackAsync();
+                return (false, "Offer not found.");
+            }
+
+            if (request.Customer.UserId != customerUserId)
+            {
+                await tx.RollbackAsync();
+                return (false, "You are not allowed to reject this offer.");
+            }
+
+            if (offer.Status != "Pending")
+            {
+                await tx.RollbackAsync();
+                return (false, "Offer is no longer pending.");
+            }
+
+            offer.Status = "Rejected";
+            offer.RespondedAt = DateTime.UtcNow;
+            await _unitOfWork.SaveChangesAsync();
+            await tx.CommitAsync();
+            return (true, null);
+        }
+        catch (DbUpdateException)
+        {
+            await tx.RollbackAsync();
+            return (false, "The offer could not be rejected because the request was updated concurrently. Please retry.");
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 }
