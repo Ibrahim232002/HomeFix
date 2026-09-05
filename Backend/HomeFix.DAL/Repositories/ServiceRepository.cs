@@ -27,6 +27,12 @@ public class ServiceRepository
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
+    public async Task<Service?> GetActiveByIdAsync(int id)
+    {
+        return await _context.Services
+            .FirstOrDefaultAsync(s => s.Id == id && s.IsActive);
+    }
+
     public async Task<List<Service>> GetActiveByCategoryAsync(int categoryId)
     {
         return await _context.Services
