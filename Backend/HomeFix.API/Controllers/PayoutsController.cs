@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using HomeFix.API.DTOs.Payout;
 using HomeFix.BLL.Interfaces;
+using HomeFix.BLL.Services;
 using HomeFix.DAL.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -69,13 +70,20 @@ public class PayoutsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<PayoutDto>> Update(int id, UpdatePayoutRequest request)
     {
-        var payout = await _service.UpdateAsync(
-            id,
-            request.Status,
-            request.TransactionReference,
-            request.CompletedAt);
+        try
+        {
+            var payout = await _service.UpdateAsync(
+                id,
+                request.Status,
+                request.TransactionReference,
+                request.CompletedAt);
 
-        return payout is null ? NotFound() : Ok(MapToDto(payout));
+            return payout is null ? NotFound() : Ok(MapToDto(payout));
+        }
+        catch (PayoutStateTransitionException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     private static PayoutDto MapToDto(Payout payout) => new()
