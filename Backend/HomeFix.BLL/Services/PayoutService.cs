@@ -125,12 +125,13 @@ public class PayoutService : IPayoutService
                 return null;
             }
 
-            var previousStatus = payout.Status;
-            var normalizedStatus = status.Trim();
-            var shouldRefund = string.Equals(previousStatus, "Pending", StringComparison.OrdinalIgnoreCase)
-                && (string.Equals(normalizedStatus, "Failed", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(normalizedStatus, "Cancelled", StringComparison.OrdinalIgnoreCase));
+            var previousStatus = PayoutStatusRules.Normalize(payout.Status);
+            var normalizedStatus = PayoutStatusRules.Normalize(status);
 
+            if (!PayoutStatusRules.IsAllowedStatusTransition(previousStatus, normalizedStatus))
+                throw new PayoutStateTransitionException(previousStatus, normalizedStatus);
+
+            var shouldRefund = PayoutStatusRules.ShouldRefund(previousStatus, normalizedStatus);
             if (shouldRefund)
             {
                 var wallet = await _walletRepository.GetByTechnicianIdAsync(payout.TechnicianId);
@@ -169,4 +170,43 @@ public class PayoutService : IPayoutService
             throw;
         }
     }
+}
+
+public sealed class PayoutStateTransitionException : InvalidOperationException
+{
+    public PayoutStateTransitionException(string currentStatus, string requestedStatus)
+        : base($"Invalid payout status transition from {currentStatus} to {requestedStatus}.")
+    {
+    }
+}
+
+public static class PayoutStatusRules
+{
+    public static string Normalize(string status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return string.Empty;
+
+        return status.Trim() switch
+        {
+            "Pending" => "Pending",
+            "Completed" => "Completed",
+            "Failed" => "Failed",
+            "Cancelled" => "Cancelled",
+            var value => value
+        };
+    }
+
+    public static bool IsAllowedStatusTransition(string currentStatus, string nextStatus)
+        => currentStatus switch
+        {
+            "Pending" => nextStatus is "Pending" or "Completed" or "Failed" or "Cancelled",
+            "Completed" => nextStatus == "Completed",
+            "Failed" => nextStatus == "Failed",
+            "Cancelled" => nextStatus == "Cancelled",
+            _ => false
+        };
+
+    public static bool ShouldRefund(string currentStatus, string nextStatus)
+        => currentStatus == "Pending" && nextStatus is "Failed" or "Cancelled";
 }
