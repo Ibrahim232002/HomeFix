@@ -126,6 +126,7 @@ class _TechnicianSpecializationCardState extends State<TechnicianSpecializationC
       ),
     );
 
+    if (!mounted) return;
     if (selected == null) return;
     final newCategoryId = int.tryParse(selected.id);
     if (newCategoryId == null) return;
