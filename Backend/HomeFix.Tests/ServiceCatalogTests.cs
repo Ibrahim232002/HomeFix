@@ -70,9 +70,16 @@ public class ServiceCatalogTests
     public async Task GetActiveByCategory_ReturnsOnlyActiveServicesInCategory()
     {
         await using var context = CreateContext();
+        context.ServiceCategories.Add(new ServiceCategory
+        {
+            Id = 1,
+            Name = "Test category",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
         context.Services.AddRange(
-            new Service { Id = 1, Name = "Active service", IsActive = true },
-            new Service { Id = 2, Name = "Inactive service", IsActive = false });
+            new Service { Id = 1, Name = "Active service", CategoryId = 1, IsActive = true },
+            new Service { Id = 2, Name = "Inactive service", CategoryId = 1, IsActive = false });
         await context.SaveChangesAsync();
 
         var repository = new ServiceRepository(context);
