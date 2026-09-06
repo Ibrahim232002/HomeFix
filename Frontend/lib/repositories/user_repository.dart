@@ -47,17 +47,7 @@ class UserRepository implements IUserRepository {
 
   @override
   Future<UserModel> loginWithPhone(String phoneNumber, String otp, UserRole role) async {
-    final authResponse = await _authRepo.login(
-      LoginRequest(email: phoneNumber, password: 'password123'),
-    );
-    return UserModel(
-      id: (authResponse.userId ?? 1).toString(),
-      fullName: authResponse.fullName ?? 'المستخدم',
-      phoneNumber: phoneNumber,
-      email: authResponse.email ?? '',
-      role: authResponse.role == 'Technician' ? UserRole.technician : UserRole.customer,
-      createdAt: DateTime.now().toIso8601String(),
-    );
+    throw UnsupportedError('تسجيل الدخول برقم الهاتف ورمز OTP غير مدعوم حالياً. استخدم تسجيل الدخول بالبريد الإلكتروني وكلمة المرور.');
   }
 
   @override
