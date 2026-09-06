@@ -6,7 +6,6 @@ using HomeFix.DAL.Enums;
 using HomeFix.DAL.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
-using Xunit.Sdk;
 
 namespace HomeFix.Tests;
 
@@ -14,7 +13,7 @@ public class ServiceRequestOfferConcurrencyTests
 {
     private static string ConnectionString => Environment.GetEnvironmentVariable("HOMEFIX_TEST_CONNECTION_STRING") ?? string.Empty;
 
-    [Fact]
+    [SkippableFact]
     public async Task CancelAndCreateOfferRace_LeavesRequestAndOfferConsistent()
     {
         var ids = await CreateScenarioAsync();
@@ -32,9 +31,9 @@ public class ServiceRequestOfferConcurrencyTests
                 return await scope.Service.CancelAsync(ids.RequestId, ids.CustomerProfileId);
             });
 
-            var results = await Task.WhenAll(createTask, cancelTask);
-            var create = results[0];
-            var cancel = results[1];
+            await Task.WhenAll(createTask, cancelTask);
+            var create = await createTask;
+            var cancel = await cancelTask;
 
             await using var verify = await CreateContextAsync();
             var request = await verify.ServiceRequests.SingleAsync(x => x.Id == ids.RequestId);
@@ -66,7 +65,7 @@ public class ServiceRequestOfferConcurrencyTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task CancelAndAcceptOfferRace_LeavesRequestAndBookingConsistent()
     {
         var ids = await CreateScenarioAsync();
@@ -86,9 +85,9 @@ public class ServiceRequestOfferConcurrencyTests
                 return await scope.Service.CancelAsync(ids.RequestId, ids.CustomerProfileId);
             });
 
-            var results = await Task.WhenAll(acceptTask, cancelTask);
-            var accept = results[0];
-            var cancel = results[1];
+            await Task.WhenAll(acceptTask, cancelTask);
+            var accept = await acceptTask;
+            var cancel = await cancelTask;
 
             await using var verify = await CreateContextAsync();
             var request = await verify.ServiceRequests.SingleAsync(x => x.Id == ids.RequestId);
@@ -120,7 +119,7 @@ public class ServiceRequestOfferConcurrencyTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task AcceptAfterCancellation_IsRejectedAndCreatesNoBooking()
     {
         var ids = await CreateScenarioAsync();
@@ -151,7 +150,7 @@ public class ServiceRequestOfferConcurrencyTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task CancelAfterAcceptance_IsRejectedAndBookingRemainsConfirmed()
     {
         var ids = await CreateScenarioAsync();
@@ -182,7 +181,7 @@ public class ServiceRequestOfferConcurrencyTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task CancelledRequest_CannotProduceConfirmedBooking()
     {
         var ids = await CreateScenarioAsync();
@@ -211,7 +210,7 @@ public class ServiceRequestOfferConcurrencyTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RejectAndAcceptRace_LeavesOfferAndBookingConsistent()
     {
         var ids = await CreateScenarioAsync();
@@ -262,7 +261,7 @@ public class ServiceRequestOfferConcurrencyTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task NormalCancellation_StillWorks()
     {
         var ids = await CreateScenarioAsync();
@@ -279,7 +278,7 @@ public class ServiceRequestOfferConcurrencyTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task NormalOfferCreation_StillWorks()
     {
         var ids = await CreateScenarioAsync();
@@ -300,7 +299,7 @@ public class ServiceRequestOfferConcurrencyTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task NormalOfferAcceptance_StillCreatesConfirmedBooking()
     {
         var ids = await CreateScenarioAsync();
@@ -337,7 +336,12 @@ public class ServiceRequestOfferConcurrencyTests
                 x.Services.Any(s => s.IsActive && s.PricingMode != PricingMode.Inspection) &&
                 x.TechnicianServiceAreas.Any(a => db.Addresses.Any(ad => ad.CityId == a.CityId)));
 
-        if (technician == null) throw new SkipException("No verified/available technician with a matching test service area was found.");
+        if (technician == null)
+        {
+            Skip.If(true, "No verified/available technician with a matching test service area was found.");
+            throw new InvalidOperationException("No verified/available technician with a matching test service area was found.");
+        }
+
         var service = technician.Services.First(x => x.IsActive && x.PricingMode != PricingMode.Inspection);
         var cityId = technician.TechnicianServiceAreas.Select(x => x.CityId).First(x => db.Addresses.Any(a => a.CityId == x));
         var address = await db.Addresses.FirstAsync(x => x.CityId == cityId);
@@ -394,7 +398,10 @@ public class ServiceRequestOfferConcurrencyTests
     {
         if (string.IsNullOrWhiteSpace(ConnectionString))
         {
-            if (skipIfMissing) throw new SkipException("Set HOMEFIX_TEST_CONNECTION_STRING to run SQL Server concurrency tests.");
+            if (skipIfMissing)
+            {
+                Skip.If(true, "Set HOMEFIX_TEST_CONNECTION_STRING to run SQL Server concurrency tests.");
+            }
             throw new InvalidOperationException("Set HOMEFIX_TEST_CONNECTION_STRING to run SQL Server concurrency tests.");
         }
 
@@ -404,7 +411,10 @@ public class ServiceRequestOfferConcurrencyTests
         await using var db = new HomeFixDbContext(options);
         if (!await db.Database.CanConnectAsync())
         {
-            if (skipIfMissing) throw new SkipException("HOMEFIX_TEST_CONNECTION_STRING could not connect to SQL Server.");
+            if (skipIfMissing)
+            {
+                Skip.If(true, "HOMEFIX_TEST_CONNECTION_STRING could not connect to SQL Server.");
+            }
             throw new InvalidOperationException("HOMEFIX_TEST_CONNECTION_STRING could not connect to SQL Server.");
         }
     }
