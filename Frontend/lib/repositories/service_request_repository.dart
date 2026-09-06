@@ -121,12 +121,6 @@ class ServiceRequestRepository implements IServiceRequestRepository {
   Future<void> updateStatus(String requestId, ServiceRequestStatus newStatus, {String? notes, String? updatedBy}) async {
     final intId = int.tryParse(requestId);
     if (intId != null && intId > 0) {
-      await addStatusHistory(CreateServiceRequestStatusHistoryRequest(
-        serviceRequestId: intId,
-        oldStatus: 'Current',
-        newStatus: newStatus.nameStr,
-        changedByUserId: 1,
-      ));
       await updateApiServiceRequest(intId, {'status': newStatus.nameStr});
     }
   }
