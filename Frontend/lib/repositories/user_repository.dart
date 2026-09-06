@@ -28,12 +28,19 @@ class UserRepository implements IUserRepository {
     final authResponse = await _authRepo.login(
       LoginRequest(email: email, password: password),
     );
+    final userId = authResponse.userId;
+    if (userId == null || userId <= 0) {
+      throw Exception('استجابة تسجيل الدخول لا تحتوي على معرف مستخدم صالح.');
+    }
+
     return UserModel(
-      id: (authResponse.userId ?? 1).toString(),
+      id: userId.toString(),
       fullName: authResponse.fullName ?? 'المستخدم',
       phoneNumber: '',
       email: authResponse.email ?? email,
-      role: authResponse.role == 'Technician' ? UserRole.technician : (authResponse.role == 'Customer' ? UserRole.customer : role),
+      role: authResponse.role == 'Technician'
+          ? UserRole.technician
+          : (authResponse.role == 'Customer' ? UserRole.customer : role),
       createdAt: DateTime.now().toIso8601String(),
     );
   }
