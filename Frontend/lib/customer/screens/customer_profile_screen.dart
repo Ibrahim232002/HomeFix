@@ -10,8 +10,8 @@ import '../../common/screens/notifications_screen.dart';
 class CustomerProfileScreen extends StatelessWidget {
   const CustomerProfileScreen({Key? key}) : super(key: key);
 
-  void _logout(BuildContext context, AppStateProvider appState) {
-    appState.logout();
+  Future<void> _logout(BuildContext context, AppStateProvider appState) async {
+    await appState.logout();
   }
 
   @override
@@ -79,7 +79,7 @@ class CustomerProfileScreen extends StatelessWidget {
                 iconColor: AppColors.error,
                 title: 'تسجيل الخروج',
                 titleColor: AppColors.error,
-                onTap: () => _logout(context, appState),
+                onTap: () async => await _logout(context, appState),
               ),
             ),
             const SizedBox(height: 24),
