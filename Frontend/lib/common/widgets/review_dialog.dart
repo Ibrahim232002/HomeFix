@@ -23,12 +23,42 @@ class ReviewDialog extends StatefulWidget {
 
 class _ReviewDialogState extends State<ReviewDialog> {
   double _rating = 5.0;
+  bool _isSubmitting = false;
   final TextEditingController _commentController = TextEditingController();
 
   @override
   void dispose() {
     _commentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitReview() async {
+    if (_isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    try {
+      await Provider.of<AppStateProvider>(context, listen: false).submitReview(
+        requestId: widget.requestId,
+        technicianId: widget.technicianId,
+        rating: _rating,
+        comment: _commentController.text,
+        serviceNameAr: widget.serviceNameAr,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('شكراً لتقييمك! تم حفظ التقييم بنجاح.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   @override
@@ -50,7 +80,6 @@ class _ReviewDialogState extends State<ReviewDialog> {
                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Cairo'),
               ),
               const SizedBox(height: 16),
-              // Stars
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (index) {
@@ -61,15 +90,18 @@ class _ReviewDialogState extends State<ReviewDialog> {
                       color: const Color(0xFFF59E0B),
                       size: 32,
                     ),
-                    onPressed: () {
-                      setState(() => _rating = starIndex.toDouble());
-                    },
+                    onPressed: _isSubmitting
+                        ? null
+                        : () {
+                            setState(() => _rating = starIndex.toDouble());
+                          },
                   );
                 }),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _commentController,
+                enabled: !_isSubmitting,
                 maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'رأيك وملاحظاتك عن الفني',
@@ -81,7 +113,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _isSubmitting ? null : () => Navigator.pop(context),
             child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
           ),
           ElevatedButton(
@@ -89,20 +121,21 @@ class _ReviewDialogState extends State<ReviewDialog> {
               backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
-              Provider.of<AppStateProvider>(context, listen: false).submitReview(
-                requestId: widget.requestId,
-                technicianId: widget.technicianId,
-                rating: _rating,
-                comment: _commentController.text,
-                serviceNameAr: widget.serviceNameAr,
-              );
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('شكراً لتقييمك! تم حفظ التقييم بنجاح.')),
-              );
-            },
-            child: const Text('إرسال التقييم', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: Colors.white)),
+            onPressed: _isSubmitting ? null : _submitReview,
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text(
+                    'إرسال التقييم',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ],
       ),
