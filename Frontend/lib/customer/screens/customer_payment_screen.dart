@@ -91,7 +91,7 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
 
   bool get _hasConfirmedBookingForPayment {
     final booking = _booking;
-    if (booking == null || !booking.status.isActive) return false;
+    if (booking == null || booking.status != BookingStatus.upcoming) return false;
     final agreedOrFinal = booking.finalPrice ?? booking.agreedPrice;
     return agreedOrFinal != null && agreedOrFinal > 0;
   }
