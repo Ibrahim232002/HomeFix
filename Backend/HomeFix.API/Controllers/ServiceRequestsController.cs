@@ -146,7 +146,7 @@ public class ServiceRequestsController : ControllerBase
         if (!TryGetUserId(out var userId)) return Unauthorized();
         var profile = await _customerProfiles.GetByUserIdAsync(userId);
         if (profile == null || serviceRequest.CustomerId != profile.Id) return Forbid();
-        if (serviceRequest.Status is "Accepted" or "Completed" or "Cancelled") return BadRequest(new { message = "This request can no longer be edited." });
+        if (serviceRequest.Status != "Open") return BadRequest(new { message = "This request can only be edited while it is open." });
 
         if (request.Description != null) serviceRequest.Description = request.Description.Trim();
         if (request.PreferredDate.HasValue) serviceRequest.PreferredDate = request.PreferredDate;
@@ -185,8 +185,16 @@ public class ServiceRequestsController : ControllerBase
 
     private static ServiceRequestDto MapToDto(ServiceRequest request) => new()
     {
-        Id = request.Id, CustomerId = request.CustomerId, ServiceId = request.ServiceId, AddressId = request.AddressId,
-        Description = request.Description, PreferredDate = request.PreferredDate, PreferredTime = request.PreferredTime,
-        Status = request.Status, VisitFee = request.VisitFee, CreatedAt = request.CreatedAt, UpdatedAt = request.UpdatedAt
+        Id = request.Id,
+        CustomerId = request.CustomerId,
+        ServiceId = request.ServiceId,
+        AddressId = request.AddressId,
+        Description = request.Description,
+        PreferredDate = request.PreferredDate,
+        PreferredTime = request.PreferredTime,
+        Status = request.Status,
+        VisitFee = request.VisitFee,
+        CreatedAt = request.CreatedAt,
+        UpdatedAt = request.UpdatedAt
     };
 }
