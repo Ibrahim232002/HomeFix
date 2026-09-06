@@ -161,13 +161,54 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   Future<void> _loadPublicData() async {
-    _isLoadingPublic = true; _categoryError = null; _apiError = null; _publicDataLoadSucceeded = false; notifyListeners();
-    try { _categories = await _serviceCategoryRepo.getCategories(); _services = await _serviceRepo.getServices(includePricing: false); _technicians = await _techRepo.getTechnicians(); _publicDataLoadSucceeded = true; }
-    catch (e) { _apiError = e.toString(); }
-    finally { _isLoadingPublic = false; notifyListeners(); }
+    _isLoadingPublic = true;
+    _categoryError = null;
+    _apiError = null;
+    _publicDataLoadSucceeded = false;
+    notifyListeners();
+
+    var categoriesLoaded = false;
+    var servicesLoaded = false;
+    var techniciansLoaded = false;
+    final errors = <String>[];
+
+    try {
+      _categories = await _serviceCategoryRepo.getCategories();
+      categoriesLoaded = true;
+    } catch (e) {
+      _categoryError = e.toString();
+      errors.add(e.toString());
+    }
+
+    try {
+      _services = await _serviceRepo.getServices(includePricing: false);
+      servicesLoaded = true;
+    } catch (e) {
+      errors.add(e.toString());
+    }
+
+    try {
+      _technicians = await _techRepo.getTechnicians();
+      techniciansLoaded = true;
+    } catch (e) {
+      errors.add(e.toString());
+    }
+
+    if (errors.isNotEmpty) {
+      _apiError = errors.join('\n');
+    }
+
+    _publicDataLoadSucceeded =
+        categoriesLoaded && servicesLoaded && techniciansLoaded;
+
+    _isLoadingPublic = false;
+    notifyListeners();
   }
 
-  Future<void> refreshPublicData() { _publicDataFuture = _loadPublicData(); return _publicDataFuture!; }
+  Future<void> refreshPublicData() {
+    _publicDataFuture = _loadPublicData();
+    return _publicDataFuture!;
+  }
 
   Future<void> login(String email, String password, UserRole role) async { _isLoading = true; _errorMessage = null; notifyListeners(); try { _currentUser = await _userRepo.login(email, password, role); if (_currentUser?.role == UserRole.technician) _technicianNavIndex = 0; else _customerNavIndex = 0; await _loadInitialData(); } catch (e) { _errorMessage = e.toString().replaceAll('Exception: ', ''); } finally { _isLoading = false; notifyListeners(); } }
   Future<void> register({required String fullName, required String email, required String phoneNumber, required String password, required UserRole role}) async { _isLoading = true; _errorMessage = null; notifyListeners(); try { _currentUser = await _userRepo.register(RegisterRequest(fullName: fullName, email: email, phoneNumber: phoneNumber, password: password, role: role == UserRole.technician ? 'Technician' : 'Customer')); if (_currentUser?.role == UserRole.technician) _technicianNavIndex = 0; else _customerNavIndex = 0; await _loadInitialData(); } catch (e) { _errorMessage = e.toString().replaceAll('Exception: ', ''); } finally { _isLoading = false; notifyListeners(); } }
@@ -357,7 +398,7 @@ class AppStateProvider extends ChangeNotifier {
   Future<void> loadTechnicianInspections() async { if (!isTechnician) return; _technicianInspections = await _inspectionRepo.getMyInspections(); notifyListeners(); }
   Future<void> loadCustomerInspections(Iterable<String> requestIds) async { if (!isCustomer) return; final loaded = <InspectionModel>[]; for (final requestId in requestIds) { final id = int.tryParse(requestId); if (id == null || id <= 0) continue; final inspection = await _inspectionRepo.getInspectionByRequest(id); if (inspection != null) loaded.add(inspection); } _customerInspections = loaded; notifyListeners(); }
   Future<InspectionModel?> loadInspectionForRequest(String requestId) async { final id = int.tryParse(requestId); if (id == null || id <= 0) return null; final inspection = await _inspectionRepo.getInspectionByRequest(id); if (inspection != null) { _upsertInspection(inspection); notifyListeners(); } return inspection; }
-  Future<InspectionModel?> loadInspection(String inspectionId) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) return null; final inspection = await _inspectionRepo.getInspection(id); if (inspection != null) { _upsertInspection(inspection); notifyListeners(); } return inspection; }
+  Future<InspectionModel?> loadInspection(String inspectionId) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) return null; final inspection = await _inspectionRepo.getInspection(int.tryParse(inspectionId) ?? 0); if (inspection != null) { _upsertInspection(inspection); notifyListeners(); } return inspection; }
   Future<InspectionModel> createInspection({required int serviceRequestId, required DateTime scheduledAt}) async { final inspection = await _inspectionRepo.createInspection(serviceRequestId: serviceRequestId, scheduledAt: scheduledAt); _upsertInspection(inspection); notifyListeners(); return inspection; }
   Future<InspectionModel> scheduleInspection(String inspectionId, DateTime scheduledAt) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح'); final inspection = await _inspectionRepo.scheduleInspection(id, scheduledAt); _upsertInspection(inspection); notifyListeners(); return inspection; }
   Future<InspectionModel> startInspection(String inspectionId) async { final id = int.tryParse(inspectionId); if (id == null || id <= 0) throw Exception('معرف المعاينة غير صالح'); final inspection = await _inspectionRepo.startInspection(id); _upsertInspection(inspection); notifyListeners(); return inspection; }
