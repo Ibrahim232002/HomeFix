@@ -137,7 +137,9 @@ class TechnicianProfileScreen extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
               child: ListTile(
-                onTap: () => appState.logout(),
+                onTap: () async {
+                  await appState.logout();
+                },
                 leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.errorLight, borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.logout_rounded, color: AppColors.error, size: 20)),
                 title: const Text('تسجيل الخروج', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.error, fontFamily: 'Cairo')),
                 trailing: const Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
