@@ -161,11 +161,25 @@ class _CustomerRequestDetailScreenState extends State<CustomerRequestDetailScree
   }
 
   Future<void> _acceptOffer(String offerId) async {
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
+    final isInspection = _request != null && provider.services.any(
+      (service) => service.id == _request!.serviceId && service.pricingMode == 2,
+    );
     setState(() => _actingOffers.add(offerId));
     try {
-      await Provider.of<AppStateProvider>(context, listen: false).acceptCustomerOffer(offerId, widget.requestId);
+      await provider.acceptCustomerOffer(offerId, widget.requestId);
       await _loadBooking();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم قبول العرض وتأكيد الحجز بنجاح.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isInspection
+                  ? 'تم قبول العرض بنجاح. يمكنك الآن متابعة المعاينة والتسعير.'
+                  : 'تم قبول العرض وتأكيد الحجز بنجاح.',
+            ),
+          ),
+        );
+      }
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
     } finally {
