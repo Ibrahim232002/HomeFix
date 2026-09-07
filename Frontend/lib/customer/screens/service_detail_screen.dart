@@ -21,6 +21,12 @@ class ServiceDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pricing = service.pricing;
+    final imageUrl = service.image.trim();
+    final imageUri = Uri.tryParse(imageUrl);
+    final hasValidImage = imageUri != null &&
+        (imageUri.scheme == 'http' || imageUri.scheme == 'https') &&
+        imageUri.host.isNotEmpty;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
@@ -32,7 +38,27 @@ class ServiceDetailScreen extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(service.image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.primaryLight, child: const Icon(Icons.build, size: 64, color: AppColors.primary))),
+                  hasValidImage
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: AppColors.primaryLight,
+                            child: const Icon(
+                              Icons.build,
+                              size: 64,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: AppColors.primaryLight,
+                          child: const Icon(
+                            Icons.build,
+                            size: 64,
+                            color: AppColors.primary,
+                          ),
+                        ),
                   Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.3), Colors.transparent, Colors.black.withOpacity(0.6)]))),
                 ],
               ),

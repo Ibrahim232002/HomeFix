@@ -166,6 +166,12 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             .clamp(0, appState.appliedPromo!.maxDiscountAmount)
         : 0.0;
 
+    final imageUrl = _selectedService.image.trim();
+    final imageUri = Uri.tryParse(imageUrl);
+    final hasValidServiceImage = imageUri != null &&
+        (imageUri.scheme == 'http' || imageUri.scheme == 'https') &&
+        imageUri.host.isNotEmpty;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -187,18 +193,25 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      _selectedService.image,
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 60,
-                        height: 60,
-                        color: AppColors.primaryLight,
-                        child: const Icon(Icons.build, color: AppColors.primary),
-                      ),
-                    ),
+                    child: hasValidServiceImage
+                        ? Image.network(
+                            imageUrl,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 60,
+                              height: 60,
+                              color: AppColors.primaryLight,
+                              child: const Icon(Icons.build, color: AppColors.primary),
+                            ),
+                          )
+                        : Container(
+                            width: 60,
+                            height: 60,
+                            color: AppColors.primaryLight,
+                            child: const Icon(Icons.build, color: AppColors.primary),
+                          ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

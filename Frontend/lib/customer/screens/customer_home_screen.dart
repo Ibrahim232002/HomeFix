@@ -645,6 +645,11 @@ class CustomerHomeScreen extends StatelessWidget {
                     (context, index) {
                       final service = appState.services[index];
                       final minimumPrice = service.pricing.minPrice;
+                      final imageUrl = service.image.trim();
+                      final imageUri = Uri.tryParse(imageUrl);
+                      final hasValidImage = imageUri != null &&
+                          (imageUri.scheme == 'http' || imageUri.scheme == 'https') &&
+                          imageUri.host.isNotEmpty;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 14),
@@ -675,18 +680,25 @@ class CustomerHomeScreen extends StatelessWidget {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    service.image,
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      width: 80,
-                                      height: 80,
-                                      color: AppColors.primaryLight,
-                                      child: const Icon(Icons.build, color: AppColors.primary),
-                                    ),
-                                  ),
+                                  child: hasValidImage
+                                      ? Image.network(
+                                          imageUrl,
+                                          width: 80,
+                                          height: 80,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            width: 80,
+                                            height: 80,
+                                            color: AppColors.primaryLight,
+                                            child: const Icon(Icons.build, color: AppColors.primary),
+                                          ),
+                                        )
+                                      : Container(
+                                          width: 80,
+                                          height: 80,
+                                          color: AppColors.primaryLight,
+                                          child: const Icon(Icons.build, color: AppColors.primary),
+                                        ),
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
