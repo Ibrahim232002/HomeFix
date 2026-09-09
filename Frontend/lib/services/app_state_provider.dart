@@ -272,9 +272,6 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   Future<void> _initializeTechnicianState(List<String> errors) async {
-    try { await _refreshAvailableTechnicianRequests(notify: false); } catch (e) { _appendInitializationError(errors, e); }
-    try { _technicianOffers = await _offerRepo.getMyOffers(); } catch (e) { _appendInitializationError(errors, e); }
-
     TechnicianProfileModel? profile;
     try {
       final userId = _currentUser!.id;
@@ -291,6 +288,8 @@ class AppStateProvider extends ChangeNotifier {
     } catch (e) { _appendInitializationError(errors, e); return; }
 
     final technicianProfileId = int.parse(profile.id);
+    try { await _refreshAvailableTechnicianRequests(notify: false); } catch (e) { _appendInitializationError(errors, e); }
+    try { _technicianOffers = await _offerRepo.getMyOffers(); } catch (e) { _appendInitializationError(errors, e); }
     try { _bookings = await _bookingRepo.getBookingsByTechnician(profile.id); } catch (e) { _appendInitializationError(errors, e); }
     try { _wallet = await _walletRepo.getWalletByTechnician(profile.id); } catch (e) { _appendInitializationError(errors, e); }
     try { _serviceAreas = await _techRepo.getServiceAreas(technicianProfileId); } catch (e) { _appendInitializationError(errors, e); }
