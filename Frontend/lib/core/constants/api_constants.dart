@@ -1,6 +1,37 @@
+import 'package:flutter/foundation.dart';
+
 class ApiConstants {
+  // Development-only fallback for local/physical-device testing.
   static const String defaultBaseUrl = 'http://192.168.1.4:5045';
-  static String baseUrl = defaultBaseUrl;
+
+  // Runtime/compile-time override. Release builds must supply an HTTPS URL.
+  static const String _configuredBaseUrl = String.fromEnvironment(
+    'HOMEFIX_API_URL',
+    defaultValue: '',
+  );
+
+  static String _resolveBaseUrl() {
+    final configured = _configuredBaseUrl.trim();
+
+    if (kReleaseMode) {
+      if (configured.isEmpty) {
+        throw StateError(
+          'HOMEFIX_API_URL must be set to an HTTPS URL for release builds.',
+        );
+      }
+
+      final uri = Uri.tryParse(configured);
+      if (uri == null || uri.scheme.toLowerCase() != 'https' || uri.host.isEmpty) {
+        throw StateError(
+          'HOMEFIX_API_URL must be a valid HTTPS URL for release builds.',
+        );
+      }
+    }
+
+    return configured.isNotEmpty ? configured : defaultBaseUrl;
+  }
+
+  static String baseUrl = _resolveBaseUrl();
   static const Duration timeoutDuration = Duration(seconds: 30);
 
   static const String register = '/api/Auth/register';
